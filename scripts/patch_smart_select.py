@@ -71,4 +71,403 @@ block = block.replace('key = Some(top)', 'key = Some(target)')
 select = select[:start] + block + select[end:]
 select_path.write_text(select, encoding="utf-8", newline="\n")
 
-print("SUCCESS: Ctrl-click selects a child; the black arrow can then move that child without Ctrl.")
+# --- Leo Design Smart Guides multi-colour preferences ---
+# The upstream Preferences dialog already renders and saves every PREF_SPECS colour field.
+def replace_once(path, old, new, label):
+    content = path.read_text(encoding="utf-8")
+    count = content.count(old)
+    if count != 1:
+        raise SystemExit(f"Expected exactly one {label} anchor in {path}, found {count}; refusing to patch.")
+    path.write_text(content.replace(old, new, 1), encoding="utf-8", newline="\n")
+
+engine_lib = root / "crates/engine/src/lib.rs"
+replace_once(
+    engine_lib,
+    '    pub smart_guide_color: String,\n    pub alignment_guides: bool,',
+    '''    pub smart_guide_color: String,
+    pub smart_guide_horizontal_color: String,
+    pub smart_guide_vertical_color: String,
+    pub smart_guide_spacing_color: String,
+    pub smart_guide_construction_color: String,
+    pub smart_guide_distance_color: String,
+    pub smart_guide_distance_label_color: String,
+    pub smart_guide_label_color: String,
+    pub smart_guide_anchor_color: String,
+    pub smart_guide_center_color: String,
+    pub smart_guide_path_color: String,
+    pub alignment_guides: bool,''',
+    "Prefs Smart Guides colour fields",
+)
+replace_once(
+    engine_lib,
+    '            smart_guide_color: s("#ff3dfc"),\n            alignment_guides: true,',
+    '''            smart_guide_color: s("#ff3dfc"),
+            smart_guide_horizontal_color: s("#ff3dfc"),
+            smart_guide_vertical_color: s("#ff3dfc"),
+            smart_guide_spacing_color: s("#ff3dfc"),
+            smart_guide_construction_color: s("#ff3dfc"),
+            smart_guide_distance_color: s("#ff3dfc"),
+            smart_guide_distance_label_color: s("#ff3dfc"),
+            smart_guide_label_color: s("#ff3dfc"),
+            smart_guide_anchor_color: s("#ff3dfc"),
+            smart_guide_center_color: s("#ff3dfc"),
+            smart_guide_path_color: s("#ff3dfc"),
+            alignment_guides: true,''',
+    "Prefs Smart Guides default colours",
+)
+
+prefs_cmds = root / "crates/engine/src/cmd/prefscmds.rs"
+replace_once(
+    prefs_cmds,
+    '    p!("smartGuideColor", "Smart Guides", "Display Options", "Color", color),',
+    '''    p!("smartGuideColor", "Smart Guides", "Display Options", "Default / Other Guides Color", color),
+    p!("smartGuideHorizontalColor", "Smart Guides", "Display Options", "Horizontal Alignment Line", color),
+    p!("smartGuideVerticalColor", "Smart Guides", "Display Options", "Vertical Alignment Line", color),
+    p!("smartGuideSpacingColor", "Smart Guides", "Display Options", "Spacing Guide Lines", color),
+    p!("smartGuideConstructionColor", "Smart Guides", "Display Options", "Construction / Angle Guides", color),
+    p!("smartGuideDistanceColor", "Smart Guides", "Display Options", "Distance Measurement Line", color),
+    p!("smartGuideDistanceLabelColor", "Smart Guides", "Display Options", "Distance Measurement Label", color),
+    p!("smartGuideLabelColor", "Smart Guides", "Display Options", "General Hint Labels", color),
+    p!("smartGuideAnchorColor", "Smart Guides", "Display Options", "Anchor Hint", color),
+    p!("smartGuideCenterColor", "Smart Guides", "Display Options", "Center Hint", color),
+    p!("smartGuidePathColor", "Smart Guides", "Display Options", "Path Hint", color),''',
+    "PREF_SPECS Smart Guides colour controls",
+)
+
+tools_lib = root / "crates/tools/src/lib.rs"
+replace_once(
+    tools_lib,
+    '    pub smart_guide_color: [u8; 3],\n    /// Smart Guides → Alignment Guides:',
+    '''    pub smart_guide_color: [u8; 3],
+    pub smart_guide_horizontal_color: [u8; 3],
+    pub smart_guide_vertical_color: [u8; 3],
+    pub smart_guide_spacing_color: [u8; 3],
+    pub smart_guide_construction_color: [u8; 3],
+    pub smart_guide_distance_color: [u8; 3],
+    pub smart_guide_distance_label_color: [u8; 3],
+    pub smart_guide_label_color: [u8; 3],
+    pub smart_guide_anchor_color: [u8; 3],
+    pub smart_guide_center_color: [u8; 3],
+    pub smart_guide_path_color: [u8; 3],
+    /// Smart Guides → Alignment Guides:''',
+    "ToolContext Smart Guides colour fields",
+)
+replace_once(
+    tools_lib,
+    '            smart_guide_color: guides::MAGENTA,\n            alignment_guides: true,',
+    '''            smart_guide_color: guides::MAGENTA,
+            smart_guide_horizontal_color: guides::MAGENTA,
+            smart_guide_vertical_color: guides::MAGENTA,
+            smart_guide_spacing_color: guides::MAGENTA,
+            smart_guide_construction_color: guides::MAGENTA,
+            smart_guide_distance_color: guides::MAGENTA,
+            smart_guide_distance_label_color: guides::MAGENTA,
+            smart_guide_label_color: guides::MAGENTA,
+            smart_guide_anchor_color: guides::MAGENTA,
+            smart_guide_center_color: guides::MAGENTA,
+            smart_guide_path_color: guides::MAGENTA,
+            alignment_guides: true,''',
+    "ToolContext test-context default colours",
+)
+
+replace_once(
+    tooling_path,
+    '            smart_guide_color: rgb(&self.prefs.smart_guide_color, vectorcraft_tools::guides::MAGENTA),\n            alignment_guides: self.prefs.alignment_guides,',
+    '''            smart_guide_color: rgb(&self.prefs.smart_guide_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_horizontal_color: rgb(&self.prefs.smart_guide_horizontal_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_vertical_color: rgb(&self.prefs.smart_guide_vertical_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_spacing_color: rgb(&self.prefs.smart_guide_spacing_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_construction_color: rgb(&self.prefs.smart_guide_construction_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_distance_color: rgb(&self.prefs.smart_guide_distance_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_distance_label_color: rgb(&self.prefs.smart_guide_distance_label_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_label_color: rgb(&self.prefs.smart_guide_label_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_anchor_color: rgb(&self.prefs.smart_guide_anchor_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_center_color: rgb(&self.prefs.smart_guide_center_color, vectorcraft_tools::guides::MAGENTA),
+            smart_guide_path_color: rgb(&self.prefs.smart_guide_path_color, vectorcraft_tools::guides::MAGENTA),
+            alignment_guides: self.prefs.alignment_guides,''',
+    "engine ToolContext Smart Guides colour wiring",
+)
+
+guides = root / "crates/tools/src/guides.rs"
+replace_once(
+    guides,
+    '    pub color: [u8; 3],\n    /// Alignment Guides:',
+    '''    pub color: [u8; 3],
+    pub horizontal_color: [u8; 3],
+    pub vertical_color: [u8; 3],
+    pub spacing_color: [u8; 3],
+    pub construction_color: [u8; 3],
+    pub label_color: [u8; 3],
+    pub anchor_color: [u8; 3],
+    pub center_color: [u8; 3],
+    pub path_color: [u8; 3],
+    /// Alignment Guides:''',
+    "GuideStyle colour fields",
+)
+replace_once(
+    guides,
+    '        Self { color: MAGENTA, lines: true, labels: true }',
+    '''        Self {
+            color: MAGENTA,
+            horizontal_color: MAGENTA,
+            vertical_color: MAGENTA,
+            spacing_color: MAGENTA,
+            construction_color: MAGENTA,
+            label_color: MAGENTA,
+            anchor_color: MAGENTA,
+            center_color: MAGENTA,
+            path_color: MAGENTA,
+            lines: true,
+            labels: true,
+        }''',
+    "GuideStyle default colours",
+)
+replace_once(
+    guides,
+    '        Self { color: cx.smart_guide_color, lines: cx.alignment_guides, labels: cx.anchor_path_labels }',
+    '''        Self {
+            color: cx.smart_guide_color,
+            horizontal_color: cx.smart_guide_horizontal_color,
+            vertical_color: cx.smart_guide_vertical_color,
+            spacing_color: cx.smart_guide_spacing_color,
+            construction_color: cx.smart_guide_construction_color,
+            label_color: cx.smart_guide_label_color,
+            anchor_color: cx.smart_guide_anchor_color,
+            center_color: cx.smart_guide_center_color,
+            path_color: cx.smart_guide_path_color,
+            lines: cx.alignment_guides,
+            labels: cx.anchor_path_labels,
+        }''',
+    "GuideStyle preference wiring",
+)
+replace_once(
+    guides,
+    '''    fn line(&self, a: Point, b: Point) -> Option<Overlay> {
+        self.style.lines.then_some(Overlay::Line { a, b, color: self.style.color, dashed: false })
+    }''',
+    '''    fn line(&self, a: Point, b: Point) -> Option<Overlay> {
+        let color = if (a.y - b.y).abs() <= 1e-6 {
+            self.style.horizontal_color
+        } else if (a.x - b.x).abs() <= 1e-6 {
+            self.style.vertical_color
+        } else {
+            self.style.color
+        };
+        self.style.lines.then_some(Overlay::Line { a, b, color, dashed: false })
+    }''',
+    "axis-specific alignment line colour",
+)
+replace_once(
+    guides,
+    '''    fn label(&self, p: Point, text: &str) -> Option<Overlay> {
+        self.style.labels.then(|| Overlay::Label { p, text: text.into(), color: self.style.color })
+    }''',
+    '''    fn label(&self, p: Point, text: &str) -> Option<Overlay> {
+        self.style.labels.then(|| Overlay::Label { p, text: text.into(), color: self.style.color_for_label(text) })
+    }''',
+    "Smart Guides label colour selection",
+)
+replace_once(
+    guides,
+    '''impl GuideStyle {
+    /// The style the preferences in cx ask for.
+    pub fn of(cx: &ToolContext) -> Self {''',
+    '''impl GuideStyle {
+    /// Colour for the point/path label shown by a Smart Guide.
+    pub fn color_for_label(&self, text: &str) -> [u8; 3] {
+        match text {
+            "anchor" => self.anchor_color,
+            "center" => self.center_color,
+            "path" => self.path_color,
+            _ => self.label_color,
+        }
+    }
+
+    /// The style the preferences in cx ask for.
+    pub fn of(cx: &ToolContext) -> Self {''',
+    "GuideStyle label colour helper",
+)
+replace_once(
+    guides,
+    'let construction = |q: Point| Overlay::Line { a: at, b: q, color: self.style.color, dashed: false };',
+    'let construction = |q: Point| Overlay::Line { a: at, b: q, color: self.style.construction_color, dashed: false };',
+    "construction guide colour",
+)
+replace_once(
+    guides,
+    'out.push(Overlay::Path { path: mark, color: self.style.color, width: 1.0, dashed: false });',
+    'out.push(Overlay::Path { path: mark, color: self.style.construction_color, width: 1.0, dashed: false });',
+    "perpendicular construction mark colour",
+)
+replace_once(
+    guides,
+    'let line = |a: Point, b: Point| Overlay::Line { a, b, color: self.style.color, dashed: false };',
+    'let line = |a: Point, b: Point| Overlay::Line { a, b, color: self.style.spacing_color, dashed: false };',
+    "spacing guide colour",
+)
+replace_once(
+    guides,
+    '    let color = cx.smart_guide_color;\n    let mut out = Vec::new();',
+    '    let color = cx.smart_guide_distance_color;\n    let label_color = cx.smart_guide_distance_label_color;\n    let mut out = Vec::new();',
+    "distance guide line and label colours",
+)
+replace_once(
+    guides,
+    'out.push(Overlay::Distance { a: pt(fu, across), b: pt(tu, across), text: cx.len(length), color });',
+    'out.push(Overlay::Distance { a: pt(fu, across), b: pt(tu, across), text: cx.len(length), color, label_color });',
+    "distance overlay label colour",
+)
+replace_once(
+    guides,
+    'let c = ToolContext { smart_guide_color: green, ..cx(&d, &s, &p) };',
+    '''let c = ToolContext {
+            smart_guide_color: green,
+            smart_guide_horizontal_color: green,
+            smart_guide_vertical_color: green,
+            smart_guide_spacing_color: green,
+            smart_guide_construction_color: green,
+            smart_guide_distance_color: green,
+            smart_guide_distance_label_color: green,
+            smart_guide_label_color: green,
+            smart_guide_anchor_color: green,
+            smart_guide_center_color: green,
+            smart_guide_path_color: green,
+            ..cx(&d, &s, &p)
+        };''',
+    "Smart Guides colour unit test setup",
+)
+
+tools_lib = root / "crates/tools/src/lib.rs"
+replace_once(
+    tools_lib,
+    '    Distance { a: Point, b: Point, text: String, color: [u8; 3] },',
+    '    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },',
+    "Distance overlay separate label colour",
+)
+replace_once(
+    tools_lib,
+    '    /// text (its length) in a pill of color on its middle.\n    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },',
+    '    /// text (its length) in a pill of label_color on its middle.\n    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },',
+    "Distance overlay documentation",
+)
+
+canvas = root / "crates/ui-egui/src/canvas.rs"
+replace_once(
+    canvas,
+    '            Overlay::Distance { a, b, text, color } => distance_guide(p, xf.to_screen(*a), xf.to_screen(*b), text, c32(*color)),',
+    '            Overlay::Distance { a, b, text, color, label_color } => distance_guide(p, xf.to_screen(*a), xf.to_screen(*b), text, c32(*color), c32(*label_color)),',
+    "Distance overlay rendering wiring",
+)
+replace_once(
+    canvas,
+    '''/// A Distance Guides measurement on screen: the line from a to b in the
+/// smart guide colour color with a 4 px tick across each end, and text in a pill of that colour
+/// on its middle, in white or black, whichever reads on it.
+fn distance_guide(p: &egui::Painter, a: Pos2, b: Pos2, text: &str, color: Color32) {
+    let s = Stroke::new(1.0, color);''',
+    '''/// A Distance Guides measurement on screen: line and label pill can use independent colours.
+fn distance_guide(p: &egui::Painter, a: Pos2, b: Pos2, text: &str, color: Color32, label_color: Color32) {
+    let s = Stroke::new(1.0, color);''',
+    "Distance guide renderer signature",
+)
+replace_once(
+    canvas,
+    '''    let luma = 0.299 * f32::from(color.r()) + 0.587 * f32::from(color.g()) + 0.114 * f32::from(color.b());
+    let ink = if luma > 150.0 { Color32::BLACK } else { Color32::WHITE };
+    let galley = p.layout_no_wrap(text.to_owned(), egui::FontId::proportional(11.0), ink);
+    let r = egui::Rect::from_center_size(a + along / 2.0, galley.size() + vec2(8.0, 4.0));
+    p.rect_filled(r, CornerRadius::same(3), color);''',
+    '''    let luma = 0.299 * f32::from(label_color.r()) + 0.587 * f32::from(label_color.g()) + 0.114 * f32::from(label_color.b());
+    let ink = if luma > 150.0 { Color32::BLACK } else { Color32::WHITE };
+    let galley = p.layout_no_wrap(text.to_owned(), egui::FontId::proportional(11.0), ink);
+    let r = egui::Rect::from_center_size(a + along / 2.0, galley.size() + vec2(8.0, 4.0));
+    p.rect_filled(r, CornerRadius::same(3), label_color);''',
+    "Distance guide label pill colour",
+)
+
+select_path = root / "crates/tools/src/select.rs"
+replace_once(
+    select_path,
+    'o.push(Overlay::Label { p: q, text: label.into(), color: style.color });',
+    'o.push(Overlay::Label { p: q, text: label.into(), color: style.color_for_label(label) });',
+    "selection hover label colour",
+)
+
+prefs_dialog = root / "crates/ui-egui/src/prefs_dialog.rs"
+replace_once(
+    prefs_dialog,
+    'fn category_fields(ui: &mut egui::Ui, d: &mut Dialog, cat: &str) {',
+    '''fn apply_smart_guide_palette(d: &mut Dialog, colors: &[(&str, &str)]) {
+    for (key, value) in colors {
+        d.fields.insert((*key).into(), json!(*value));
+    }
+}
+
+fn category_fields(ui: &mut egui::Ui, d: &mut Dialog, cat: &str) {''',
+    "Smart Guides palette helper",
+)
+replace_once(
+    prefs_dialog,
+    '''    if cat == "Smart Guides" {
+        bool_row(ui, d, "__smartGuides", UI_FIELDS[0].2);
+        ui.add_space(4.0);
+    }''',
+    '''    if cat == "Smart Guides" {
+        bool_row(ui, d, "__smartGuides", UI_FIELDS[0].2);
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new("Colour Presets").color(t.text_strong).size(11.5));
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("Classic Magenta").clicked() {
+                apply_smart_guide_palette(d, &[
+                    ("smartGuideColor", "#ff3dfc"),
+                    ("smartGuideHorizontalColor", "#ff3dfc"),
+                    ("smartGuideVerticalColor", "#ff3dfc"),
+                    ("smartGuideSpacingColor", "#ff3dfc"),
+                    ("smartGuideConstructionColor", "#ff3dfc"),
+                    ("smartGuideDistanceColor", "#ff3dfc"),
+                    ("smartGuideDistanceLabelColor", "#ff3dfc"),
+                    ("smartGuideLabelColor", "#ff3dfc"),
+                    ("smartGuideAnchorColor", "#ff3dfc"),
+                    ("smartGuideCenterColor", "#ff3dfc"),
+                    ("smartGuidePathColor", "#ff3dfc"),
+                ]);
+            }
+            if ui.button("High Contrast").clicked() {
+                apply_smart_guide_palette(d, &[
+                    ("smartGuideColor", "#ff3dfc"),
+                    ("smartGuideHorizontalColor", "#ff4d4f"),
+                    ("smartGuideVerticalColor", "#00d4ff"),
+                    ("smartGuideSpacingColor", "#ffd166"),
+                    ("smartGuideConstructionColor", "#49e59a"),
+                    ("smartGuideDistanceColor", "#a78bfa"),
+                    ("smartGuideDistanceLabelColor", "#ffffff"),
+                    ("smartGuideLabelColor", "#ffffff"),
+                    ("smartGuideAnchorColor", "#ff4d4f"),
+                    ("smartGuideCenterColor", "#00d4ff"),
+                    ("smartGuidePathColor", "#49e59a"),
+                ]);
+            }
+            if ui.button("Cool Studio").clicked() {
+                apply_smart_guide_palette(d, &[
+                    ("smartGuideColor", "#ff3dfc"),
+                    ("smartGuideHorizontalColor", "#ff5bd6"),
+                    ("smartGuideVerticalColor", "#38d9ff"),
+                    ("smartGuideSpacingColor", "#ffd166"),
+                    ("smartGuideConstructionColor", "#7ae582"),
+                    ("smartGuideDistanceColor", "#b197fc"),
+                    ("smartGuideDistanceLabelColor", "#38d9ff"),
+                    ("smartGuideLabelColor", "#38d9ff"),
+                    ("smartGuideAnchorColor", "#ff5bd6"),
+                    ("smartGuideCenterColor", "#38d9ff"),
+                    ("smartGuidePathColor", "#7ae582"),
+                ]);
+            }
+        });
+        ui.label(egui::RichText::new("Choose a preset, then fine-tune each colour below. Confirm with OK to save.").color(t.text_dim).size(11.0));
+        ui.add_space(4.0);
+    }''',
+    "Smart Guides preset controls",
+)
+
+print("SUCCESS: Smart Select patch and customizable Smart Guides colour system applied.")
+
