@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Apply Leo Design Smart Select and Smart Guides changes
+      - name: Apply Leo Design Smart Select, Smart Guides, and Group Anchor Move changes
         shell: pwsh
         run: |
           python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
@@ -68,18 +68,19 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.2.0 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.3.0 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
           3. Press V (Selection / black arrow).
           4. Ctrl + left-click a child inside a group to select it without ungrouping.
           5. Ctrl + left-drag a child to move it.
-          6. Plain left-click still selects the whole group.
-          7. Ctrl + Alt + left-click retains the original Select Behind behaviour.
-          8. Open Edit > Preferences > Smart Guides to customize each guide colour.
-          9. Choose Classic Magenta, High Contrast or Cool Studio, then fine-tune individual colours.
-          10. Click OK to save; settings persist for this portable build.
+          6. To move a whole group by a child anchor without reshaping: select the group with V, press A, then Ctrl+Shift+left-drag a visible anchor inside the group. The dragged anchor snaps to other path anchors/endpoints; the whole selected group translates rigidly. Shift here activates this gesture and does not constrain the move to 45 degrees.
+          7. Plain left-click still selects the whole group.
+          8. Ctrl + Alt + left-click retains the original Select Behind behaviour.
+          9. Open Edit > Preferences > Smart Guides to customize each guide colour.
+          10. Choose Classic Magenta, High Contrast or Cool Studio, then fine-tune individual colours.
+          11. Click OK to save; settings persist for this portable build.
           
           portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
@@ -92,7 +93,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.2.0_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.3.0_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the Leo Design Smart Select patch to VectorCraft v0.17.0.
+"""Apply Leo Design Smart Select, Smart Guides and Group Anchor Move patches to VectorCraft v0.17.0.
 
 Usage: python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
 The script fails closed if upstream source no longer matches the expected anchors.
@@ -466,5 +466,105 @@ replace_once(
     "Smart Guides preset controls",
 )
 
-print("SUCCESS: Smart Select patch and customizable Smart Guides colour system applied.")
+# --- Leo Design Group Anchor Move: rigidly translate a selected group by a child anchor ---
+direct_path = root / "crates/tools/src/direct.rs"
+replace_once(
+    direct_path,
+    '    /// Dragging a curved segment: it follows the pointer',
+    '''    /// Ctrl+Shift-dragging a descendant anchor moves its selected group as a rigid whole.
+    MoveGroupAnchor {
+        start: Point,
+        grab: Point,
+        began: bool,
+    },
+    /// Dragging a curved segment: it follows the pointer''',
+    "Group Anchor Move state",
+)
+
+replace_once(
+    direct_path,
+    '''                if let Some((id, si, ai, grab)) = hit_anchor(cx, p, point) {
+                    if cx.doc.node(id).is_some_and(is_area_type) {''',
+    '''                if let Some((id, si, ai, grab)) = hit_anchor(cx, p, point) {
+                    // Leo Design: Ctrl+Shift-drag a child anchor to move the selected group rigidly.
+                    // The grabbed child anchor is the snap reference; only the selected parent group
+                    // is transformed, so no path or internal spacing is reshaped.
+                    if ev.mods.cmd
+                        && ev.mods.shift
+                        && !ev.mods.alt
+                        && cx.selection.objects.len() == 1
+                        && let Some(selected) = cx.selection.objects.first().copied()
+                        && selected != id
+                        && cx.doc.node(selected).is_some_and(|n| n.children().is_some())
+                        && cx.doc.ancestry(id).is_some_and(|anc| anc.contains(&selected))
+                    {
+                        self.state = State::MoveGroupAnchor { start: p, grab, began: false };
+                        return vec![];
+                    }
+                    if cx.doc.node(id).is_some_and(is_area_type) {''',
+    "Group Anchor Move gesture",
+)
+
+replace_once(
+    direct_path,
+    '''            (PointerKind::Drag, State::MoveObject { start, grab, hold, began, .. }) => {
+                let mut out = vec![];''',
+    '''            (PointerKind::Drag, State::MoveGroupAnchor { start, grab, began }) => {
+                let mut out = vec![];
+                if !began {
+                    if p.distance(start) < cx.tol(3.0) {
+                        return out;
+                    }
+                    out.push(Action::Begin("Move Group by Anchor".into()));
+                    self.state = State::MoveGroupAnchor { start, grab, began: true };
+                    self.anchor_snap = Some(PointSnap::new(cx, || Targets::for_anchor_drag(cx.doc, cx.selection)));
+                }
+                // Shift activates this gesture but must not impose the normal 45-degree constraint.
+                let mut d = move_delta(start, p, false, cx.constrain_angle);
+                let unsnapped = d;
+                self.guides.clear();
+                if let Some(snap) = &self.anchor_snap {
+                    let (q, guides) = snap.snap_from(cx, grab + (p - start), None);
+                    (d, self.guides) = (q - grab, guides);
+                }
+                self.snapped = snapped(d, unsnapped, false, &self.guides);
+                out.push(Action::Preview(
+                    "object.transform".into(),
+                    json!({"matrix": matrix_json(vectorcraft_geom::Affine::translate(d)), "copy": false}),
+                ));
+                out
+            }
+            (PointerKind::Drag, State::MoveObject { start, grab, hold, began, .. }) => {
+                let mut out = vec![];''',
+    "Group Anchor Move drag",
+)
+
+replace_once(
+    direct_path,
+    '''                | State::MoveObject { began, .. }
+                | State::Segment { began, .. }''',
+    '''                | State::MoveObject { began, .. }
+                | State::MoveGroupAnchor { began, .. }
+                | State::Segment { began, .. }''',
+    "Group Anchor Move release",
+)
+
+replace_once(
+    direct_path,
+    '''                if matches!(self.state, State::Handle { .. } | State::MoveAnchors { .. } | State::MoveObject { .. }) {''',
+    '''                if matches!(self.state, State::Handle { .. } | State::MoveAnchors { .. } | State::MoveObject { .. } | State::MoveGroupAnchor { .. }) {''',
+    "Group Anchor Move smart guides",
+)
+
+replace_once(
+    direct_path,
+    '''                | State::MoveAnchors { began: true, .. }
+                | State::MoveObject { began: true, .. } => {''',
+    '''                | State::MoveAnchors { began: true, .. }
+                | State::MoveObject { began: true, .. }
+                | State::MoveGroupAnchor { began: true, .. } => {''',
+    "Group Anchor Move cursor",
+)
+
+print("SUCCESS: Smart Select, customizable Smart Guides, and rigid Group Anchor Move patches applied.")
 
