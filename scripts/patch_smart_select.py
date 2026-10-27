@@ -269,11 +269,8 @@ replace_once(
 )
 replace_once(
     guides,
-    '''impl GuideStyle {
-    /// The style the preferences in cx ask for.
-    pub fn of(cx: &ToolContext) -> Self {''',
-    '''impl GuideStyle {
-    /// Colour for the point/path label shown by a Smart Guide.
+    '    pub fn of(cx: &ToolContext) -> Self {',
+    '''    /// Colour for the point/path label shown by a Smart Guide.
     pub fn color_for_label(&self, text: &str) -> [u8; 3] {
         match text {
             "anchor" => self.anchor_color,
@@ -283,7 +280,6 @@ replace_once(
         }
     }
 
-    /// The style the preferences in cx ask for.
     pub fn of(cx: &ToolContext) -> Self {''',
     "GuideStyle label colour helper",
 )
@@ -344,12 +340,12 @@ replace_once(
     '    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },',
     "Distance overlay separate label colour",
 )
-replace_once(
-    tools_lib,
-    '    /// text (its length) in a pill of color on its middle.\n    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },',
-    '    /// text (its length) in a pill of label_color on its middle.\n    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },',
-    "Distance overlay documentation",
-)
+
+
+# Update the distance overlay comment without relying on literal backticks in this patch script.
+distance_doc = '    /// ' + chr(96) + 'text' + chr(96) + ' (its length) in a pill of ' + chr(96) + 'color' + chr(96) + ' on its middle.\n    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },'
+distance_doc_new = '    /// ' + chr(96) + 'text' + chr(96) + ' (its length) in a pill of ' + chr(96) + 'label_color' + chr(96) + ' on its middle.\n    Distance { a: Point, b: Point, text: String, color: [u8; 3], label_color: [u8; 3] },'
+replace_once(tools_lib, distance_doc, distance_doc_new, "Distance overlay documentation")
 
 canvas = root / "crates/ui-egui/src/canvas.rs"
 replace_once(
@@ -360,14 +356,14 @@ replace_once(
 )
 replace_once(
     canvas,
-    '''/// A Distance Guides measurement on screen: the line from a to b in the
-/// smart guide colour color with a 4 px tick across each end, and text in a pill of that colour
-/// on its middle, in white or black, whichever reads on it.
-fn distance_guide(p: &egui::Painter, a: Pos2, b: Pos2, text: &str, color: Color32) {
-    let s = Stroke::new(1.0, color);''',
-    '''/// A Distance Guides measurement on screen: line and label pill can use independent colours.
-fn distance_guide(p: &egui::Painter, a: Pos2, b: Pos2, text: &str, color: Color32, label_color: Color32) {
-    let s = Stroke::new(1.0, color);''',
+    '/// on its middle, in white or black, whichever reads on it.',
+    '/// on its middle. The label pill uses its own colour and contrast-aware text.',
+    "Distance guide documentation",
+)
+replace_once(
+    canvas,
+    'fn distance_guide(p: &egui::Painter, a: Pos2, b: Pos2, text: &str, color: Color32) {',
+    'fn distance_guide(p: &egui::Painter, a: Pos2, b: Pos2, text: &str, color: Color32, label_color: Color32) {',
     "Distance guide renderer signature",
 )
 replace_once(
