@@ -70,4 +70,5 @@ block = block.replace('"ids": [top.0]', '"ids": [target.0]')
 block = block.replace('key = Some(top)', 'key = Some(target)')
 select = select[:start] + block + select[end:]
 select_path.write_text(select, encoding="utf-8", newline="\n")
-print("SUCCESS: Ctrl-click uses Group Selection, and the selected child remains movable with the black arrow.")
+
+print("SUCCESS: Ctrl-click selects a child; the black arrow can then move that child without Ctrl.")
