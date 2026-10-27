@@ -1,0 +1,92 @@
+name: Leo Design VectorCraft Enhanced - Windows x64
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build independent Windows portable EXE
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout Leo Design build recipe
+        uses: actions/checkout@v4
+
+      - name: Checkout official VectorCraft v0.17.0
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: v0.17.0
+          path: vectorcraft
+          persist-credentials: false
+
+      - name: Prepare Python for patching (cloud only)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply Leo Design Smart Select change
+        shell: pwsh
+        run: |
+          python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
+          if ($LASTEXITCODE -ne 0) { throw "Source patch failed" }
+          git -C vectorcraft diff --check
+          if ($LASTEXITCODE -ne 0) { throw "Patch whitespace check failed" }
+          git -C vectorcraft diff -- crates/engine/src/tooling.rs
+
+      - name: Install stable Rust on GitHub Windows runner
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          if ($LASTEXITCODE -ne 0) { throw "Rust install failed" }
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Compile native VectorCraft Windows executable
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+          CARGO_TERM_COLOR: always
+        run: |
+          cargo build --release --locked -p vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Windows compilation failed; inspect build logs" }
+
+      - name: Package isolated portable version
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          $source = "vectorcraft/target/release/vectorcraft.exe"
+          if (-not (Test-Path $source)) { throw "Missing compiled VectorCraft.exe" }
+          Copy-Item $source "dist/vectorcraft.exe"
+          New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
+          @'
+          Leo Design VectorCraft Enhanced v0.1.0 (Windows x64)
+          
+          1. Extract all files into a NEW folder.
+          2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
+          3. Press V (Selection / black arrow).
+          4. Ctrl + left-click a child inside a group to select it without ungrouping.
+          5. Ctrl + left-drag a child to move it.
+          6. Plain left-click still selects the whole group.
+          7. Ctrl + Alt + left-click retains the original Select Behind behaviour.
+          
+          portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
+          This is an unsigned experimental build: test on copies of design files.
+          Built automatically from upstream VectorCraft v0.17.0 plus a one-function patch.
+          '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
+          git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
+          & "dist/vectorcraft.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "Compiled executable smoke-test failed" }
+
+      - name: Upload ready-to-unzip Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_Enhanced_v0.1.0_Windows_x64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
