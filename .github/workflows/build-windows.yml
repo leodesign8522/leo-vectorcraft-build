@@ -2,6 +2,9 @@ name: Leo Design VectorCraft Enhanced - Windows x64
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -65,7 +68,7 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.1.0 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.1.1 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
@@ -86,7 +89,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.1.0_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.1.1_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
