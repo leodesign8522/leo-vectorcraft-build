@@ -269,8 +269,9 @@ replace_once(
 )
 replace_once(
     guides,
-    '    pub fn of(cx: &ToolContext) -> Self {',
-    '''    /// Colour for the point/path label shown by a Smart Guide.
+    'impl GuideStyle {\n',
+    '''impl GuideStyle {
+    /// Colour for the point/path label shown by a Smart Guide.
     pub fn color_for_label(&self, text: &str) -> [u8; 3] {
         match text {
             "anchor" => self.anchor_color,
@@ -280,7 +281,7 @@ replace_once(
         }
     }
 
-    pub fn of(cx: &ToolContext) -> Self {''',
+''',
     "GuideStyle label colour helper",
 )
 replace_once(
