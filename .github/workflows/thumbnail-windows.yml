@@ -27,7 +27,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
           if (!(Test-Path $csc)) { throw "Windows .NET Framework C# compiler not found." }
-          & $csc /nologo /target:library /optimize+ /platform:x64 /out:dist/LeoDesign.ThumbnailPreview.dll /reference:System.dll /reference:System.Drawing.dll thumbnail/src/VectorCraftThumbnailProvider.cs
+          $src = (Resolve-Path 'thumbnail/src/VectorCraftThumbnailProvider.cs').Path
+          $dll = Join-Path (Resolve-Path 'dist').Path 'LeoDesign.ThumbnailPreview.dll'
+          & $csc /nologo /target:library /optimize+ /platform:x64 ("/out:" + $dll) /reference:System.dll /reference:System.Drawing.dll $src
           if ($LASTEXITCODE -ne 0) { throw "C# thumbnail handler compilation failed." }
 
       - name: Build test documents with preview and compressed preview
@@ -40,7 +42,10 @@ jobs:
         shell: pwsh
         run: |
           $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-          & $csc /nologo /platform:x64 /out:dist/PreviewSmokeTest.exe /reference:dist/LeoDesign.ThumbnailPreview.dll /reference:System.Drawing.dll thumbnail/tests/PreviewSmokeTest.cs
+          $test = (Resolve-Path 'thumbnail/tests/PreviewSmokeTest.cs').Path
+          $dll = (Resolve-Path 'dist/LeoDesign.ThumbnailPreview.dll').Path
+          $exe = Join-Path (Resolve-Path 'dist').Path 'PreviewSmokeTest.exe'
+          & $csc /nologo /platform:x64 ("/out:" + $exe) ("/reference:" + $dll) /reference:System.Drawing.dll $test
           if ($LASTEXITCODE -ne 0) { throw "Thumbnail extraction test compilation failed." }
           & "dist/PreviewSmokeTest.exe" "dist/tests"
           if ($LASTEXITCODE -ne 0) { throw "Thumbnail extraction tests failed." }
