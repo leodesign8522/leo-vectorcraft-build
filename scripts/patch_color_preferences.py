@@ -22,13 +22,23 @@ def replace_once(path, original, replacement, label):
     path.write_text(source.replace(original, replacement, 1), encoding="utf-8", newline="\n")
 
 
-cargo = root / "apps/vectorcraft/Cargo.toml"
+ui_prefs = root / "crates/ui-egui/src/prefs_dialog.rs"
 replace_once(
-    cargo,
-    "vectorcraft-engine = { workspace = true, features = [\"bundled-fonts\"] }\n",
-    "vectorcraft-engine = { workspace = true, features = [\"bundled-fonts\"] }\n"
-    "vectorcraft-color = { workspace = true }\n",
-    "Add native app colour CMS dependency",
+    ui_prefs,
+    "/// UI-only fields shown in the dialog (backed by `UiState`, not engine prefs).",
+    '''/// Leo Design: persist working ICC settings via the UI crate's existing CMS dependency.
+pub fn leo_color_settings_bytes() -> serde_json::Result<Vec<u8>> {
+    serde_json::to_vec_pretty(&vectorcraft_color::cms::active_settings())
+}
+
+pub fn leo_restore_color_settings(bytes: &[u8]) -> Result<(), String> {
+    let st = serde_json::from_slice::<vectorcraft_color::cms::ColorSettings>(bytes)
+        .map_err(|e| e.to_string())?;
+    vectorcraft_color::cms::set_active(&st).map_err(|e| e.to_string())
+}
+
+/// UI-only fields shown in the dialog (backed by `UiState`, not engine prefs).''',
+    "Colour settings persistence helpers in existing UI CMS dependency",
 )
 
 main = root / "apps/vectorcraft/src/main.rs"
@@ -45,13 +55,9 @@ fn leo_color_settings_path() -> Option<std::path::PathBuf> {
 fn leo_restore_color_settings() {
     let Some(path) = leo_color_settings_path() else { return };
     let Ok(bytes) = std::fs::read(&path) else { return };
-    let Ok(settings) = serde_json::from_slice::<vectorcraft_color::cms::ColorSettings>(&bytes) else {
-        log::warn!("Leo Design: ignored invalid saved colour settings at {}", path.display());
-        return;
-    };
-    if let Err(e) = vectorcraft_color::cms::set_active(&settings) {
-        // A missing ICC file must never prevent the editor from starting.
-        log::warn!("Leo Design: saved colour settings could not be restored: {e}");
+    if let Err(e) = vectorcraft_ui_egui::prefs_dialog::leo_restore_color_settings(&bytes) {
+        // A missing or invalid ICC must never prevent the editor from starting.
+        log::warn!("Leo Design: saved colour settings at {} were not restored: {e}", path.display());
     }
 }
 
@@ -83,7 +89,7 @@ replace_once(
         }
         // Persist RGB/CMYK working space, rendering intent and BPC together.
         // Use the same atomic writing used for UI prefs (and never modify the artwork).
-        if let Ok(bytes) = serde_json::to_vec_pretty(&vectorcraft_color::cms::active_settings()) {
+        if let Ok(bytes) = vectorcraft_ui_egui::prefs_dialog::leo_color_settings_bytes() {
             if let Some(color_path) = leo_color_settings_path() {
                 let _ = fileio::write_atomic(&color_path, &bytes);
             }
