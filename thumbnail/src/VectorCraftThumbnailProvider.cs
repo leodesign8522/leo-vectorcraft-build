@@ -93,17 +93,13 @@ namespace LeoDesign.ThumbnailPreview
         public override int Read(byte[] b, int offset, int count)
         {
             if (count == 0) return 0;
-            IntPtr temp = Marshal.AllocHGlobal(count);
-            try
-            {
-                Marshal.WriteInt32(readCount, 0);
-                source.Read(temp, count, readCount);
-                int len = Marshal.ReadInt32(readCount);
-                if (len < 0 || len > count) throw new IOException("Invalid IStream read.");
-                if (len > 0) Marshal.Copy(temp, b, offset, len);
-                return len;
-            }
-            finally { Marshal.FreeHGlobal(temp); }
+            byte[] temp = new byte[count];
+            Marshal.WriteInt32(readCount, 0);
+            source.Read(temp, count, readCount);
+            int len = Marshal.ReadInt32(readCount);
+            if (len < 0 || len > count) throw new IOException("Invalid IStream read.");
+            if (len > 0) Buffer.BlockCopy(temp, 0, b, offset, len);
+            return len;
         }
         public override bool CanRead { get { return true; } }
         public override bool CanSeek { get { return true; } }
