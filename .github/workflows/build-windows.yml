@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Apply Leo Design Smart Select, Smart Guides, Colour Settings and Image Pro Export
+      - name: Apply Leo Design Smart Select, Smart Guides, Colour Settings and Dockable Image Pro Export
         shell: pwsh
         run: |
           python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
@@ -45,6 +45,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Colour Settings persistence patch failed" }
           python scripts/patch_image_pro_export.py vectorcraft scripts/leo_image_export.rs
           if ($LASTEXITCODE -ne 0) { throw "Image Pro Export native module patch failed" }
+          python scripts/patch_image_export_sidebar.py vectorcraft scripts/leo_image_sidebar.rs
+          if ($LASTEXITCODE -ne 0) { throw "Image Pro Export sidebar patch failed" }
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patch whitespace check failed" }
           git -C vectorcraft diff --stat
@@ -88,7 +90,7 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.4.0 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.4.1 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
@@ -107,15 +109,17 @@ jobs:
           13. Installed ICC files stay in VectorCraftData/Color Profiles. When upgrading,
               keep/copy the OLD VectorCraftData directory next to the NEW EXE so profiles
               and preferences survive; do not delete that directory.
-          14. File > Export > Leo Design Image Pro Export opens a new Chinese native
-              JPEG / transparent PNG dialog. Configure resolution, ICC, quality,
+          14. File > Export > Leo Design Image Pro Export opens a dockable Chinese right-sidebar
+              panel (not a blocking popup). You can also open it from Window >
+              Leo Design Image Pro Export or the right-side picture icon.
+              Configure JPEG / transparent PNG, DPI, ICC, quality,
               compression, anti-aliasing, artboards, naming and output folder.
               Supports current / all / range of artboards, including precise DPI.
               v1.0 preview: ICO and separate live image preview are not yet included.
           
           portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
-          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings and native Image Pro Export.
+          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings and native dockable Image Pro Export.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           & "dist/vectorcraft.exe" --version
@@ -124,7 +128,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.4.0_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.4.1_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
