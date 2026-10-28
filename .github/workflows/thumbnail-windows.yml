@@ -1,0 +1,67 @@
+name: Leo Design Thumbnail Preview - Windows x64
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "thumbnail/**"
+      - ".github/workflows/thumbnail-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows Explorer thumbnail extension and run smoke tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Compile x64 Windows COM thumbnail provider
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (!(Test-Path $csc)) { throw "Windows .NET Framework C# compiler not found." }
+          & $csc /nologo /target:library /optimize+ /platform:x64 /out:dist/LeoDesign.ThumbnailPreview.dll /reference:System.dll /reference:System.Drawing.dll thumbnail/src/VectorCraftThumbnailProvider.cs
+          if ($LASTEXITCODE -ne 0) { throw "C# thumbnail handler compilation failed." }
+
+      - name: Build test documents with preview and compressed preview
+        shell: pwsh
+        run: |
+          python thumbnail/tests/make_samples.py dist/tests
+          if ($LASTEXITCODE -ne 0) { throw "Test fixture generation failed." }
+
+      - name: Compile and run native preview extraction tests
+        shell: pwsh
+        run: |
+          $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $csc /nologo /platform:x64 /out:dist/PreviewSmokeTest.exe /reference:dist/LeoDesign.ThumbnailPreview.dll /reference:System.Drawing.dll thumbnail/tests/PreviewSmokeTest.cs
+          if ($LASTEXITCODE -ne 0) { throw "Thumbnail extraction test compilation failed." }
+          & "dist/PreviewSmokeTest.exe" "dist/tests"
+          if ($LASTEXITCODE -ne 0) { throw "Thumbnail extraction tests failed." }
+
+      - name: Package install/uninstall helpers
+        shell: pwsh
+        run: |
+          Copy-Item thumbnail/Install.cmd dist/Install.cmd
+          Copy-Item thumbnail/Uninstall.cmd dist/Uninstall.cmd
+          Copy-Item thumbnail/Install.ps1 dist/Install.ps1
+          Copy-Item thumbnail/Uninstall.ps1 dist/Uninstall.ps1
+          Copy-Item thumbnail/README.md dist/README_FIRST.md
+          Remove-Item -Recurse -Force dist/tests
+          Remove-Item -Force dist/PreviewSmokeTest.exe
+          if (!(Test-Path dist/LeoDesign.ThumbnailPreview.dll)) { throw "Missing thumbnail DLL." }
+          Get-ChildItem dist | Select-Object Name, Length
+
+      - name: Upload independent Windows thumbnail installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_Thumbnail_Preview_v0.1.0_Windows_x64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
