@@ -53,10 +53,10 @@ replace_once(menus,
              "        | \"file.exportForScreens\"\n        | \"file.leoImageProExport\"\n        | \"file.documentSetup\"\n",
              "Enable command only with active document")
 replace_once(menus,
-             "                         c(\"Export for Screens…\", \"file.exportForScreens\"),\n",
-             "                         c(\"Leo Design · 图像专业导出…\", \"file.leoImageProExport\"),\n"
-             "                         Sep,\n"
-             "                         c(\"Export for Screens…\", \"file.exportForScreens\"),\n",
+             'c("Export for Screens…", "file.exportForScreens"),',
+             'c("Leo Design · 图像专业导出…", "file.leoImageProExport"),\n'
+             '                        Sep,\n'
+             '                        c("Export for Screens…", "file.exportForScreens"),',
              "Add native export menu entry")
 
 target = root / "crates/ui-egui/src/dialogs/leo_image_export.rs"
