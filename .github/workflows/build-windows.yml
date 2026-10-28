@@ -31,11 +31,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Apply Leo Design Smart Select, Smart Guides, and Group Anchor Move changes
+      - name: Apply Leo Design Smart Select, Smart Guides, Group Anchor Move and Colour Settings changes
         shell: pwsh
         run: |
           python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
-          if ($LASTEXITCODE -ne 0) { throw "Source patch failed" }
+          if ($LASTEXITCODE -ne 0) { throw "Smart Select patch failed" }
+          python scripts/patch_color_preferences.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Colour Settings persistence patch failed" }
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patch whitespace check failed" }
           git -C vectorcraft diff --stat
@@ -68,7 +70,7 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.3.1 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.3.2 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
@@ -81,10 +83,16 @@ jobs:
           9. Open Edit > Preferences > Smart Guides to customize each guide colour.
           10. Choose Classic Magenta, High Contrast or Cool Studio, then fine-tune individual colours.
           11. Click OK to save; settings persist for this portable build.
+          12. Edit > Color Settings > CMYK: choose your ICC profile once, e.g. Japan Color 2001 Coated.
+              The chosen working RGB/CMYK profiles, intent and BPC save immediately to
+              VectorCraftData/Leo Color Settings.json, and restore automatically on next launch.
+          13. Installed ICC files stay in VectorCraftData/Color Profiles. When upgrading,
+              keep/copy the OLD VectorCraftData directory next to the NEW EXE so profiles
+              and preferences survive; do not delete that directory.
           
           portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
-          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, and Group Anchor Move patches.
+          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move and persisted color settings patches.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           & "dist/vectorcraft.exe" --version
@@ -93,7 +101,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.3.1_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.3.2_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
