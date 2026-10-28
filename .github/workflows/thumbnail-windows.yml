@@ -50,6 +50,26 @@ jobs:
           & "dist/PreviewSmokeTest.exe" "dist/tests"
           if ($LASTEXITCODE -ne 0) { throw "Thumbnail extraction tests failed." }
 
+      - name: Verify Windows COM registration and GetThumbnail
+        shell: pwsh
+        run: |
+          $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          $regasm = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe"
+          $test = (Resolve-Path 'thumbnail/tests/ComSmokeTest.cs').Path
+          $dll = (Resolve-Path 'dist/LeoDesign.ThumbnailPreview.dll').Path
+          $exe = Join-Path (Resolve-Path 'dist').Path 'ComSmokeTest.exe'
+          & $csc /nologo /platform:x64 ("/out:" + $exe) ("/reference:" + $dll) $test
+          if ($LASTEXITCODE -ne 0) { throw "COM test compilation failed." }
+          & $regasm $dll /codebase /nologo
+          if ($LASTEXITCODE -ne 0) { throw "COM registration failed." }
+          try {
+            & $exe "dist/tests"
+            if ($LASTEXITCODE -ne 0) { throw "COM thumbnail provider test failed." }
+          }
+          finally {
+            & $regasm $dll /unregister /nologo
+          }
+
       - name: Package install/uninstall helpers
         shell: pwsh
         run: |
@@ -59,7 +79,7 @@ jobs:
           Copy-Item thumbnail/Uninstall.ps1 dist/Uninstall.ps1
           Copy-Item thumbnail/README.md dist/README_FIRST.md
           Remove-Item -Recurse -Force dist/tests
-          Remove-Item -Force dist/PreviewSmokeTest.exe
+          Remove-Item -Force dist/PreviewSmokeTest.exe, dist/ComSmokeTest.exe
           if (!(Test-Path dist/LeoDesign.ThumbnailPreview.dll)) { throw "Missing thumbnail DLL." }
           Get-ChildItem dist | Select-Object Name, Length
 
