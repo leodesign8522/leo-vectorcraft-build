@@ -48,7 +48,7 @@ class ComSmokeTest
             finally
             {
                 if (stream != null) Marshal.ReleaseComObject(stream);
-                if (com != null) Marshal.ReleaseComObject(com);
+                if (com != null && Marshal.IsComObject(com)) Marshal.ReleaseComObject(com);
             }
         }
         return 0;
