@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Apply Leo Design Smart Select, Smart Guides, Colour, Image Pro Export and Workspace Pro
+      - name: Apply Leo Design Smart Select, Smart Guides, Colour, Export, Workspace, and Text Exit
         shell: pwsh
         run: |
           python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
@@ -49,6 +49,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Image Pro Export sidebar patch failed" }
           python scripts/patch_workspace_pro.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Workspace Pro docking patch failed" }
+          python scripts/patch_text_finish.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Ctrl+Enter Text Finish patch failed" }
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patch whitespace check failed" }
           git -C vectorcraft diff --stat
@@ -92,7 +94,7 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.5.0 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.5.1 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
@@ -125,10 +127,14 @@ jobs:
               The right shared dock can grow to 1200 UI points with smaller pane
               minimums, suitable for multiple columns on large monitors.
               Window > Workspace > New Workspace saves the custom layout.
+          16. While editing text inside a text frame, Ctrl+Enter (Windows)
+              finishes text editing, preserving the text and selecting its object.
+              Plain Enter still inserts a line break. IME composition, dialogs
+              and user-defined Ctrl+Enter command bindings are not overridden.
           
           portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
-          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings, dockable Image Pro Export and Workspace Pro.
+          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings, dockable Image Pro Export, Workspace Pro and Ctrl+Enter text finish.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           & "dist/vectorcraft.exe" --version
@@ -137,7 +143,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.5.0_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.5.1_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
