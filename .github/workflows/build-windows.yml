@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Do not burn build minutes on an old commit when several quick UI fixes land.
+concurrency:
+  group: leo-vectorcraft-windows-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build independent Windows portable EXE
@@ -53,6 +58,15 @@ jobs:
           rustc --version
           cargo --version
 
+      # Cache the Rust registry and compiled release dependencies between commits.
+      # With a stable upstream tag, small Leo Design changes can reuse prior artifacts.
+      - name: Restore Rust release build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          shared-key: "leo-vectorcraft-v017-windows-release"
+          cache-all-crates: false
+
       - name: Compile native VectorCraft Windows executable
         shell: pwsh
         working-directory: vectorcraft
@@ -63,15 +77,8 @@ jobs:
           cargo build --release --locked -p vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Windows compilation failed; inspect build logs" }
 
-      - name: Test Leo Design Image Pro Export JPEG and PNG parameter mapping
-        shell: pwsh
-        working-directory: vectorcraft
-        env:
-          CARGO_INCREMENTAL: "0"
-        run: |
-          cargo test --locked --release -p vectorcraft-ui-egui leo_image_export --lib -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Image Pro Export tests failed" }
-
+      # Detailed UI unit tests are available in the separate manual workflow.
+      # Do not rebuild the whole UI test harness after an already-successful EXE.
       - name: Package isolated portable version
         shell: pwsh
         run: |

@@ -1,0 +1,43 @@
+name: Leo Design Image Pro Export - Manual Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui-tests:
+    name: Run image export unit tests on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: v0.17.0
+          path: vectorcraft
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply the same patches as the release
+        shell: pwsh
+        run: |
+          python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
+          if ($LASTEXITCODE -ne 0) { throw "Smart Select patch failed" }
+          python scripts/patch_color_preferences.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Color patch failed" }
+          python scripts/patch_image_pro_export.py vectorcraft scripts/leo_image_export.rs
+          if ($LASTEXITCODE -ne 0) { throw "Export UI patch failed" }
+      - name: Restore Rust test cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          shared-key: "leo-vectorcraft-v017-windows-ui-tests"
+      - name: Run JPEG and PNG export option tests
+        working-directory: vectorcraft
+        shell: pwsh
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_image_export --lib -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Image Pro Export tests failed" }
