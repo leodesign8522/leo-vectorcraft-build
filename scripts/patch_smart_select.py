@@ -471,7 +471,7 @@ direct_path = root / "crates/tools/src/direct.rs"
 replace_once(
     direct_path,
     '    /// Dragging a curved segment: it follows the pointer',
-    '''    /// Ctrl+Shift-dragging a descendant anchor moves its selected group as a rigid whole.
+    '''    /// Ctrl-dragging a descendant anchor moves its selected group as a rigid whole.
     MoveGroupAnchor {
         start: Point,
         grab: Point,
@@ -486,11 +486,11 @@ replace_once(
     '''                if let Some((id, si, ai, grab)) = hit_anchor(cx, p, point) {
                     if cx.doc.node(id).is_some_and(is_area_type) {''',
     '''                if let Some((id, si, ai, grab)) = hit_anchor(cx, p, point) {
-                    // Leo Design: Ctrl+Shift-drag a child anchor to move the selected group rigidly.
+                    // Leo Design: Ctrl-drag a child anchor to move the selected group rigidly.
                     // The grabbed child anchor is the snap reference; only the selected parent group
                     // is transformed, so no path or internal spacing is reshaped.
                     if ev.mods.cmd
-                        && ev.mods.shift
+                        && !ev.mods.shift
                         && !ev.mods.alt
                         && cx.selection.objects.len() == 1
                         && let Some(selected) = cx.selection.objects.first().copied()
@@ -519,7 +519,7 @@ replace_once(
                     self.state = State::MoveGroupAnchor { start, grab, began: true };
                     self.anchor_snap = Some(PointSnap::new(cx, || Targets::for_anchor_drag(cx.doc, cx.selection)));
                 }
-                // Shift activates this gesture but must not impose the normal 45-degree constraint.
+                // Ctrl activates this gesture. Normal Shift-constrained editing remains unchanged.
                 let mut d = move_delta(start, p, false, cx.constrain_angle);
                 let unsnapped = d;
                 self.guides.clear();

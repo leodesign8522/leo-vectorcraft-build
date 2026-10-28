@@ -68,14 +68,14 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.3.0 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.3.1 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
           3. Press V (Selection / black arrow).
           4. Ctrl + left-click a child inside a group to select it without ungrouping.
           5. Ctrl + left-drag a child to move it.
-          6. To move a whole group by a child anchor without reshaping: select the group with V, press A, then Ctrl+Shift+left-drag a visible anchor inside the group. The dragged anchor snaps to other path anchors/endpoints; the whole selected group translates rigidly. Shift here activates this gesture and does not constrain the move to 45 degrees.
+          6. To move a whole group by a child anchor without reshaping: select the group with V, press A, then Ctrl+left-drag a visible anchor inside the group. The dragged anchor snaps to other path anchors/endpoints; the whole selected group translates rigidly. Plain dragging still edits anchors; Ctrl+Alt keeps its original behavior.
           7. Plain left-click still selects the whole group.
           8. Ctrl + Alt + left-click retains the original Select Behind behaviour.
           9. Open Edit > Preferences > Smart Guides to customize each guide colour.
@@ -84,7 +84,7 @@ jobs:
           
           portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
-          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection and Smart Guides patches.
+          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, and Group Anchor Move patches.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           & "dist/vectorcraft.exe" --version
@@ -93,7 +93,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.3.0_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.3.1_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
