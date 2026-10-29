@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Apply Leo Design Smart Select, Smart Guides, Colour, Export, Workspace, and Text Exit
+      - name: Apply Leo Design Smart Select, Smart Guides, Colour, Export, Workspace and Chinese Type
         shell: pwsh
         run: |
           python scripts/patch_smart_select.py vectorcraft/crates/engine/src/tooling.rs
@@ -51,6 +51,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Workspace Pro docking patch failed" }
           python scripts/patch_text_finish.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Ctrl+Enter Text Finish patch failed" }
+          python scripts/patch_chinese_paragraph.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Chinese Paragraph / Auto Size patch failed" }
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patch whitespace check failed" }
           git -C vectorcraft diff --stat
@@ -94,7 +96,7 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.5.1 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.5.2 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
@@ -132,9 +134,16 @@ jobs:
               Plain Enter still inserts a line break. IME composition, dialogs
               and user-defined Ctrl+Enter command bindings are not overridden.
           
+          17. Leo Design Chinese Type: select an area text box, open Window > Type >
+              Paragraph, click "文字框贴合内容高度" to fit the height to its actual
+              text (maintains width). Use "固定框高" to return to a fixed-height box.
+              Paragraph now always shows Chinese-labelled Kinsoku (Strict / Loose /
+              None) and the two available Mojikumi options (None / line-end half width).
+              These use upstream real text layout and persist with the document.
+          
           portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
-          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings, dockable Image Pro Export, Workspace Pro and Ctrl+Enter text finish.
+          Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings, dockable Image Pro Export, Workspace Pro and Ctrl+Enter text finish and Chinese Paragraph Auto Size.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           & "dist/vectorcraft.exe" --version
@@ -143,7 +152,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.5.1_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.5.2_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
