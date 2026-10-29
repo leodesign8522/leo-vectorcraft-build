@@ -56,6 +56,12 @@ rep(panels,
         });
         if change {
             app.ui.leo_panel_sizes.insert(panel.to_string(), [width, height]);
+            if let Some(layout) = app.ui.docking.as_mut() {
+                if let Some(group) = layout.floating.iter_mut().find(|g| g.panels.iter().any(|id| id == panel)) {
+                    group.rect[2] = width;
+                    group.rect[3] = height;
+                }
+            }
             app.prefs_changed = true;
         }
         ui.horizontal(|ui| {
@@ -66,6 +72,12 @@ rep(panels,
             ] {
                 if ui.button(label).clicked() {
                     app.ui.leo_panel_sizes.insert(panel.to_string(), [w, h]);
+                    if let Some(layout) = app.ui.docking.as_mut() {
+                        if let Some(group) = layout.floating.iter_mut().find(|g| g.panels.iter().any(|id| id == panel)) {
+                            group.rect[2] = w;
+                            group.rect[3] = h;
+                        }
+                    }
                     app.prefs_changed = true;
                 }
             }
