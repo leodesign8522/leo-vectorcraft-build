@@ -61,6 +61,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "CMYK color panel lock patch failed" }
           python scripts/patch_quick_settings.py vectorcraft scripts/leo_quick_settings.rs
           if ($LASTEXITCODE -ne 0) { throw "Quick Settings sidebar patch failed" }
+          python scripts/patch_panel_resizing.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Universal panel sizing patch failed" }
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patch whitespace check failed" }
           git -C vectorcraft diff --stat
@@ -104,7 +106,7 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.5.5 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.5.6 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
@@ -154,7 +156,14 @@ jobs:
               resolution. Mixed-language live text remains editable when the source
               format contains text. This is NOT yet full Illustrator paragraph parity.
 
-          19. Leo Design: Color panel menu now offers 固定显示 CMYK（不转换原色）.\n              The slider display stays CMYK while inspecting RGB/CMYK objects;\n              selecting a native mode exits the lock. Stored source colors are not\n              converted merely by enabling the display lock.\n          20. Illustrator PDF clipboard: strip recognized CJK PDF encoding suffixes\n              like -GBpc-EUC-H from font names, preserving live-text styling.\n\n          21. Right icon rail: Leo Design Units (general/stroke/type/East Asian)\n              and Document Color Mode (RGB/CMYK), separate dockable settings panels.\n\n          portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
+          19. Leo Design: Color panel menu now offers 固定显示 CMYK（不转换原色）.\n              The slider display stays CMYK while inspecting RGB/CMYK objects;\n              selecting a native mode exits the lock. Stored source colors are not\n              converted merely by enabling the display lock.\n          20. Illustrator PDF clipboard: strip recognized CJK PDF encoding suffixes\n              like -GBpc-EUC-H from font names, preserving live-text styling.\n\n          21. Right icon rail: Leo Design Units (general/stroke/type/East Asian)\n              and Document Color Mode (RGB/CMYK), separate dockable settings panels.\n\n          22. Leo Design Workspace Pro v0.5.6: per-panel Width / Height controls
+              under each panel menu. Icon popouts resize from the lower-left corner
+              (attached to the right rail), and free-floating legacy panels resize
+              from the lower-right corner. Saved sizes restore on next launch.
+              Docked panels still occupy their split region: drag splitters or
+              float them for an independently sized window.
+
+          portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
           Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings, dockable Image Pro Export, Workspace Pro and Ctrl+Enter text finish and Chinese Paragraph Auto Size.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
@@ -165,7 +174,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.5.5_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.5.6_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
