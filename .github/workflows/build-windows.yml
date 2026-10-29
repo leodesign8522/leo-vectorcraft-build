@@ -53,6 +53,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Ctrl+Enter Text Finish patch failed" }
           python scripts/patch_chinese_paragraph.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Chinese Paragraph / Auto Size patch failed" }
+          python scripts/patch_illustrator_text_bridge.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Illustrator text bridge patch failed" }
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patch whitespace check failed" }
           git -C vectorcraft diff --stat
@@ -96,7 +98,7 @@ jobs:
           Copy-Item $source "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.5.2 (Windows x64)
+          Leo Design VectorCraft Enhanced v0.5.3 (Windows x64)
           
           1. Extract all files into a NEW folder.
           2. Double-click vectorcraft.exe. Your official VectorCraft is not replaced.
@@ -141,6 +143,11 @@ jobs:
               None) and the two available Mojikumi options (None / line-end half width).
               These use upstream real text layout and persist with the document.
           
+          18. Leo Design Illustrator Text Bridge v1.0 preview: improved CJK font-family
+              matching for Illustrator PDF clipboard text, plus SVG PostScript font/style
+              resolution. Mixed-language live text remains editable when the source
+              format contains text. This is NOT yet full Illustrator paragraph parity.
+
           portable.txt keeps this build's preferences beside this EXE in VectorCraftData.
           This is an unsigned experimental build: test on copies of design files.
           Built automatically from upstream VectorCraft v0.17.0 plus Leo Design selection, Smart Guides, Group Anchor Move, persistent colour settings, dockable Image Pro Export, Workspace Pro and Ctrl+Enter text finish and Chinese Paragraph Auto Size.
@@ -152,7 +159,7 @@ jobs:
       - name: Upload ready-to-unzip Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_Enhanced_v0.5.2_Windows_x64
+          name: Leo_Design_VectorCraft_Enhanced_v0.5.3_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
