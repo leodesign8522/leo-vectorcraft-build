@@ -146,4 +146,83 @@ rep("crates/engine/src/cmd/path.rs",
         Ok(())
     })?;''',
     "keep live corner on explicit path.moveAnchor endpoint")
+
+# A real open 3-point path: the middle corner is rounded, the other endpoint
+# moves as the user drags with A. We expect the same radius and regenerated
+# tangencies after each preview, with one undo restoring the original.
+test_file=root/"crates/engine/src/tests/livecorners.rs"
+test_code=r'''
+/// Leo Design: moving another point on an open path must recompute, not
+/// destructively freeze, its previously rounded middle corner.
+#[test]
+fn leo_open_path_corner_stays_live_after_endpoint_move_and_undo() {
+    use vectorcraft_geom::{PathData, Point, SubPath};
+    let (mut s, id) = session();
+    let base = PathData::single(SubPath::polyline(
+        &[Point::new(50.0, 75.0), Point::new(260.0, 160.0), Point::new(50.0, 160.0)],
+        false,
+    ));
+    let live = LiveShape::Path {
+        base: base.clone(),
+        radii: vec![0.0, 18.0, 0.0],
+        kinds: vec![],
+        radii_relative: false,
+    };
+    {
+        let d = std::sync::Arc::make_mut(&mut s.doc_mut().unwrap().doc);
+        let NodeKind::Path { path, live: slot, .. } = &mut d.node_mut(id).unwrap().kind else { panic!("expected path") };
+        *path = live.to_path();
+        *slot = Some(Box::new(live));
+    }
+    let before = node_path(&s, id);
+    assert_eq!(before.0.subpaths[0].anchors.len(), 4, "the middle corner splits into two arc endpoints");
+    s.execute("select.anchors", &json!({"id":id.0,"anchors":[[0,0]],"mode":"set"})).unwrap();
+    let orig = s.doc().unwrap().history.undo.len();
+    s.begin_interaction("Move").unwrap();
+    for (dx, dy) in [(20.0, 5.0), (50.0, -20.0), (85.0, -45.0)] {
+        s.preview("path.moveAnchors", &json!({"dx":dx,"dy":dy})).unwrap();
+        let (drawn, linked) = node_path(&s, id);
+        let Some(LiveShape::Path { base, radii, .. }) = linked else {
+            panic!("moving an unrounded endpoint destroyed Live Corners");
+        };
+        assert_eq!(radii[1],18.0,"radius is retained for the middle sharp corner");
+        assert_eq!(base.subpaths[0].anchors[0].p, Point::new(50.0+dx,75.0+dy));
+        assert_eq!(drawn, LiveShape::Path {
+            base, radii, kinds: vec![], radii_relative: false
+        }.to_path(), "tangent arc must be regenerated from moved base path");
+    }
+    s.commit_interaction().unwrap();
+    assert_eq!(s.doc().unwrap().history.undo.len(),orig+1,"one undo step for a drag");
+    s.execute("edit.undo",&json!({})).unwrap();
+    assert_eq!(node_path(&s,id),before,"undo restores original round geometry");
+}
+
+/// Explicit movement commands also maintain the live corner relationship.
+#[test]
+fn leo_move_anchor_endpoint_keeps_live_corner() {
+    use vectorcraft_geom::{PathData, Point, SubPath};
+    let (mut s,id)=session();
+    let original = PathData::single(SubPath::polyline(
+        &[Point::new(50.0,50.0),Point::new(250.0,150.0),Point::new(50.0,150.0)],false
+    ));
+    let l = LiveShape::Path { base: original, radii: vec![0.0,15.0,0.0], kinds:vec![], radii_relative:false };
+    {
+        let d=std::sync::Arc::make_mut(&mut s.doc_mut().unwrap().doc);
+        let NodeKind::Path { path, live, .. }=&mut d.node_mut(id).unwrap().kind else {panic!("path")};
+        *path=l.to_path();
+        *live=Some(Box::new(l));
+    }
+    s.execute("path.moveAnchor",&json!({"id":id.0,"subpath":0,"anchor":0,"x":80,"y":40})).unwrap();
+    let (path,live)=node_path(&s,id);
+    let Some(LiveShape::Path { base, radii, .. })=live else {panic!("lost live corners")};
+    assert_eq!(base.subpaths[0].anchors[0].p,Point::new(80.0,40.0));
+    assert_eq!(radii[1],15.0);
+    assert_eq!(path.anchor_count(),4);
+}
+'''
+t=test_file.read_text(encoding="utf-8")
+if "fn leo_open_path_corner_stays_live_after_endpoint_move_and_undo()" in t:
+    raise SystemExit("FAIL duplicate Live Corner Geometry Link tests")
+test_file.write_text(t+"\n"+test_code,encoding="utf-8",newline="\n")
+print("OK two live path move/regenerate/undo tests")
 print("SUCCESS Leo Design Live Corner Geometry Link port (non-destructive endpoint movement)")
