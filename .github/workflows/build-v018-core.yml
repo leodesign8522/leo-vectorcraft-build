@@ -54,6 +54,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Leo per-workspace flyout size save/restore failed" }
           python v018/patch_smart_interactions.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo Smart Select and Group Anchor Move patch failed" }
+          python v018/patch_direct_marquee_edges.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Direct Selection marquee edge patch failed" }
           python v018/patch_smart_guide_colors.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo multi-colour Smart Guides patch failed" }
           python v018/patch_quick_settings.py vectorcraft
@@ -85,7 +87,7 @@ jobs:
           python ../v018/patch_craft_ui_flyout.py
           if ($LASTEXITCODE -ne 0) { throw "craft-ui in-place flyout resize patch failed" }
           # The Rust cache includes a precompiled craft-ui. Cargo did not
-          # recompile it after editing the pinned git checkout in v0.6.7.
+          # recompile it after editing the pinned git checkout in v0.6.8.
           # Force invalidation so the patched flyout renderer is in the EXE.
           cargo clean --release -p craft-ui
           if ($LASTEXITCODE -ne 0) { throw "Unable to invalidate cached craft-ui" }
@@ -105,7 +107,7 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.6.7 — v0.18.0 Core Bridge preview
+          Leo Design VectorCraft Enhanced v0.6.8 — v0.18.0 Core Bridge preview
           This is a separate portable build from the official v0.18.0 source.
           DO NOT overwrite existing v0.5.7 or its VectorCraftData folder.
           Extract into an EMPTY directory; this portable EXE is a preview build.
@@ -115,7 +117,7 @@ jobs:
           Includes Workspace/Shortcut JSON, Ctrl+Enter text finish, CJK paragraph
           Auto-height and Illustrator PDF/SVG font name compatibility.
           Includes Image Pro Export sidebar with corrected scrolling and universal\n          floating panel size presets (320x420 / 430x690 / 600x850).
-          Restores Smart Select Ctrl child picking, Group Anchor Move, Smart Guides\n          all 10 color channels and 3 presets, Units/Document Color side panels\n          and CMYK display lock. Direct resizing on the right-hand iconic panel\n          now has 16pt visible resize grips and numeric width/height presets\n          without floating, per workspace. The workflow forces fresh craft-ui\n          compilation instead of reusing stale cached docking binaries.\n          Adds Leo Design Screenshot Paste v1.0: Ctrl+V for Windows screenshots,\n          CF_BITMAP-only image fallback, and duplicate-paste guards.\n          Additional historical features remain pending.
+          Restores Smart Select Ctrl child picking, Group Anchor Move, Smart Guides\n          all 10 color channels and 3 presets, Units/Document Color side panels\n          and CMYK display lock. Direct resizing on the right-hand iconic panel\n          now has 16pt visible resize grips and numeric width/height presets\n          without floating, per workspace. The workflow forces fresh craft-ui\n          compilation instead of reusing stale cached docking binaries.\n          Adds Leo Design Screenshot Paste v1.0: Ctrl+V for Windows screenshots,\n          CF_BITMAP-only image fallback, and duplicate-paste guards.\n          A-tool rectangle marquee can select path segments even when both\n          endpoints are outside the selection, including Bezier curves.\n          Additional historical features remain pending.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           & "dist/vectorcraft.exe" --version
@@ -123,7 +125,7 @@ jobs:
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.7_Windows_x64
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.8_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
@@ -139,7 +141,7 @@ jobs:
       - name: Fetch enhanced VectorCraft v0.18 EXE
         uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.7_Windows_x64
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.8_Windows_x64
           path: overlay-source
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -164,7 +166,7 @@ jobs:
       - name: Upload one-click overlay installer
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Core_Bridge_v0.6.7_Overlay_Installer_for_VectorCraft_v0.18
+          name: Leo_Design_Core_Bridge_v0.6.8_Overlay_Installer_for_VectorCraft_v0.18
           path: overlay-output/*.exe
           if-no-files-found: error
           retention-days: 30
