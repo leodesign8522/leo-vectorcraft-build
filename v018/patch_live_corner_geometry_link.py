@@ -79,9 +79,14 @@ fn transform_live_corner_source(
     }
     *path = live.to_path(); // updates tangencies on every drag preview
     let source_map = LiveCorners::of(node)?;
-    let next = source_map.sources().iter().enumerate().flat_map(|(si, sources)| {
-        sources.iter().enumerate().filter_map(|(ai, src)| original.contains(src).then_some((si, ai)))
-    }).collect();
+    let mut next = BTreeSet::new();
+    for (si, sources) in source_map.sources().iter().enumerate() {
+        for (ai, src) in sources.iter().enumerate() {
+            if original.contains(src) {
+                next.insert((si, ai));
+            }
+        }
+    }
     Some(next)
 }
 
