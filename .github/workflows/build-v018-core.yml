@@ -48,6 +48,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Leo panel size and scrolling patch failed" }
           python v018/patch_docked_panel_sizes.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo docked panel size state patch failed" }
+          python v018/patch_workspace_flyout_sizes.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo per-workspace flyout size save/restore failed" }
           python v018/patch_smart_interactions.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo Smart Select and Group Anchor Move patch failed" }
           python v018/patch_smart_guide_colors.py vectorcraft
