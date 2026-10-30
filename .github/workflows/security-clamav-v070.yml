@@ -1,0 +1,63 @@
+name: Leo Design v0.7.0 - Independent AV scan
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v018-migration
+    paths:
+      - ".github/workflows/security-clamav-v070.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  scan:
+    name: ClamAV scan downloaded v0.7.0 artifact binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Download both v0.7.0 builds from original successful run
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41031544358
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: Leo_Design_*v0.7.0*
+          path: builds
+          merge-multiple: false
+
+      - name: Check both binaries and write SHA-256 hashes
+        run: |
+          set -euo pipefail
+          mkdir -p report
+          test "$(find builds -name '*.exe' | wc -l)" -ge 2
+          find builds -name '*.exe' -type f -exec sha256sum {} \; | sort | tee report/SHA256.txt
+          printf '%s\n' 'Build: https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41031544358' > report/BUILD_SOURCE.txt
+          printf '%s\n' 'A clean AV scan cannot prove safety; unsigned executables can still be blocked by Chrome.' >> report/BUILD_SOURCE.txt
+
+      - name: Install ClamAV and fresh signature database
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam --stdout | tee report/FRESHCLAM_UPDATE.txt
+          clamscan --version | tee report/CLAMAV_VERSION.txt
+
+      - name: Scan both EXE files with ClamAV
+        run: |
+          set -euo pipefail
+          clamscan -r -i --infected --log=report/SCAN_RESULT.txt builds
+          cat report/SCAN_RESULT.txt
+          grep -Eq '^Infected files: 0$' report/SCAN_RESULT.txt
+
+      - name: Publish security transparency report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_v0.7.0_ClamAV_Scan_Report
+          path: report/
+          if-no-files-found: warn
+          retention-days: 30
