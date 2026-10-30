@@ -82,20 +82,50 @@ replace(
             // floating window. Shared docking stores its width and height in
             // the workspace, not in the document.
             ui.menu_button("Leo Design · 面板尺寸", |ui| {
+                // Leo Design: pinned iconic flyouts now have independent
+                // dimensions. Never float them merely to change their size.
+                let iconic = app.ui.open_panel.as_deref() == Some(id);
+                if iconic {
+                    ui.label("停靠面板尺寸（不浮动）");
+                    let mut size = app.ui.leo_icon_flyout_sizes.get(id).copied()
+                        .unwrap_or([320.0, 560.0]);
+                    let mut changed = false;
+                    ui.horizontal(|ui| {
+                        ui.label("宽");
+                        changed |= ui.add(egui::DragValue::new(&mut size[0]).speed(1.0)
+                            .range(220.0..=900.0).suffix(" pt")).changed();
+                        ui.label("高");
+                        changed |= ui.add(egui::DragValue::new(&mut size[1]).speed(1.0)
+                            .range(160.0..=1200.0).suffix(" pt")).changed();
+                    });
+                    if changed {
+                        app.ui.leo_icon_flyout_sizes.insert(id.to_owned(), size);
+                        app.prefs_changed = true;
+                    }
+                    ui.label(egui::RichText::new("拖动面板左侧中部调整宽度；拖动底边中部调整高度。").small().weak());
+                    ui.separator();
+                }
                 for (name, w, h) in [
                     ("紧凑 320 × 420", 320.0, 420.0),
                     ("标准 430 × 690", 430.0, 690.0),
                     ("宽大 600 × 850", 600.0, 850.0),
                 ] {
                     if ui.button(name).clicked() {
-                        if let Err(e) = crate::panel_docking::leo_float_panel_sized(app, id, w, h) {
+                        if iconic {
+                            app.ui.leo_icon_flyout_sizes.insert(id.to_owned(), [w, h]);
+                            app.prefs_changed = true;
+                        } else if let Err(e) = crate::panel_docking::leo_float_panel_sized(app, id, w, h) {
                             app.ui.status = e;
                         }
                         ui.close();
                     }
                 }
                 ui.separator();
-                ui.label(egui::RichText::new("转成浮动面板后，可直接拖动窗口边缘").small().weak());
+                ui.label(egui::RichText::new(if iconic {
+                    "当前保持右侧停靠状态。"
+                } else {
+                    "非图标停靠面板：可浮动后调整尺寸。"
+                }).small().weak());
             });
             ui.separator();
             // The panel floats out of the dock or goes back in, as dragging its tab does.
@@ -115,12 +145,15 @@ replace(
     ui.vertical(|ui| {
         ui.set_min_width(190.0);
         ui.horizontal(|ui| {
-            if ui.small_button("⛶ 展开并调整大小").clicked() {
-                if let Err(e) = crate::panel_docking::leo_float_panel_sized(app, "leoImageExport", 430.0, 690.0) {
+            if ui.small_button("⛶ 展开面板").clicked() {
+                if app.ui.open_panel.as_deref() == Some("leoImageExport") {
+                    app.ui.leo_icon_flyout_sizes.insert("leoImageExport".to_owned(), [430.0, 690.0]);
+                    app.prefs_changed = true;
+                } else if let Err(e) = crate::panel_docking::leo_float_panel_sized(app, "leoImageExport", 430.0, 690.0) {
                     app.ui.status = e;
                 }
             }
-            ui.label(egui::RichText::new("展开后可拖动窗口边缘").small().weak());
+            ui.label(egui::RichText::new("停靠时也可以直接拖动左边框和下边框").small().weak());
         });
         ui.add_space(4.0);''',
     "remove double scrolling and provide one-click large export panel"
