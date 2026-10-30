@@ -89,3 +89,44 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
+
+  overlay-installer:
+    name: Build Leo Design overlay installer
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Leo Design installer recipe
+        uses: actions/checkout@v4
+      - name: Fetch enhanced VectorCraft v0.18 EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.0_Windows_x64
+          path: overlay-source
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          $compiler = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          if (-not (Test-Path $compiler)) { throw "ISCC.exe was not found" }
+      - name: Compile version-checked overlay installer
+        shell: pwsh
+        run: |
+          $compiler = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+          $source = (Resolve-Path "overlay-source/vectorcraft.exe").Path
+          $outDir = (New-Item -ItemType Directory -Force -Path "overlay-output").FullName
+          & $compiler "/DSourceExe=$source" "/O$outDir" "v018/overlay/Leo_Design_Core_Bridge.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Overlay installer compilation failed" }
+          $installer = Get-ChildItem -Path $outDir -Filter "Leo_Design_Core_Bridge*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "Overlay installer executable not created" }
+          Write-Host "Ready: $($installer.FullName) / $($installer.Length) bytes"
+      - name: Upload one-click overlay installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_Core_Bridge_v0.6.0_Overlay_Installer_for_VectorCraft_v0.18
+          path: overlay-output/*.exe
+          if-no-files-found: error
+          retention-days: 30
