@@ -110,7 +110,7 @@ jobs:
         env:
           CARGO_INCREMENTAL: "0"
         run: |
-          cargo test --release --locked -p vectorcraft-engine leo_open_path_corner_stays_live_after_endpoint_move_and_undo -- --exact --nocapture
+          cargo test --release --locked -p vectorcraft-engine leo_open_path_corner_stays_live_after_endpoint_move_and_undo -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Live corner drag regression failed" }
           cargo test --release --locked -p vectorcraft-engine leo_move_anchor_endpoint_keeps_live_corner -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Live corner explicit move regression failed" }
