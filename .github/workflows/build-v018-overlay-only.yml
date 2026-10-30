@@ -1,0 +1,57 @@
+name: Leo Design v0.18 - Fast Overlay Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v018-migration
+    paths:
+      - ".github/workflows/build-v018-overlay-only.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  installer:
+    name: Package previously compiled v0.6 Core Bridge as a Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout installer source
+        uses: actions/checkout@v4
+      - name: Reuse verified v0.6.0 Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.0_Windows_x64
+          run-id: 40992057405
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: overlay-source
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $compiler = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed" }
+          }
+          if (-not (Test-Path $compiler)) { throw "ISCC.exe not found" }
+      - name: Compile one-click guarded overlay
+        shell: pwsh
+        run: |
+          $compiler = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+          $source = (Resolve-Path "overlay-source/vectorcraft.exe").Path
+          $outDir = (New-Item -ItemType Directory -Path overlay-output -Force).FullName
+          & $compiler "/DSourceExe=$source" "/O$outDir" "v018/overlay/Leo_Design_Core_Bridge.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Overlay compiler failed" }
+          $exe = Get-ChildItem overlay-output -Filter "Leo_Design_Core_Bridge*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No overlay installer executable found" }
+          Write-Host "Installer created: $($exe.FullName)"
+      - name: Upload installer EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_Core_Bridge_v0.6.0_Overlay_Installer_for_VectorCraft_v0.18
+          path: overlay-output/*.exe
+          retention-days: 30
+          if-no-files-found: error
