@@ -79,7 +79,7 @@ edit(
                 let c = if resize_width.hovered() || resize_width.dragged() {
                     style.accent
                 } else {
-                    style.inactive_text.gamma_multiply(0.65)
+                    style.weak_text.gamma_multiply(0.65)
                 };
                 let mid = left_grip.center();
                 for offset in [-5.0, 0.0, 5.0] {
@@ -99,7 +99,7 @@ edit(
                 let c = if resize_height.hovered() || resize_height.dragged() {
                     style.accent
                 } else {
-                    style.inactive_text.gamma_multiply(0.65)
+                    style.weak_text.gamma_multiply(0.65)
                 };
                 let mid = bottom_grip.center();
                 for offset in [-5.0, 0.0, 5.0] {
