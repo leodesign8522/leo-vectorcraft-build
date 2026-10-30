@@ -44,6 +44,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Leo Design essential v0.18 patches failed" }
           python v018/patch_image_export.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo Image Pro Export v0.18 integration failed" }
+          python v018/patch_panel_usability.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo panel size and scrolling patch failed" }
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Source whitespace validation failed" }
           git -C vectorcraft diff --stat
@@ -76,7 +78,7 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.6.2 — v0.18.0 Core Bridge preview
+          Leo Design VectorCraft Enhanced v0.6.3 — v0.18.0 Core Bridge preview
           This is a separate portable build from the official v0.18.0 source.
           DO NOT overwrite existing v0.5.7 or its VectorCraftData folder.
           Extract into an EMPTY directory; this portable EXE is a preview build.
@@ -85,7 +87,7 @@ jobs:
           are stored separately and not included in those JSON files.
           Includes Workspace/Shortcut JSON, Ctrl+Enter text finish, CJK paragraph
           Auto-height and Illustrator PDF/SVG font name compatibility.
-          Includes the first v0.18 port of the native Image Pro Export sidebar.
+          Includes Image Pro Export sidebar with corrected scrolling and universal\n          floating panel size presets (320x420 / 430x690 / 600x850).
           Other historical functions remain in the migration roadmap.
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
@@ -94,7 +96,7 @@ jobs:
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.2_Windows_x64
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.3_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
@@ -110,7 +112,7 @@ jobs:
       - name: Fetch enhanced VectorCraft v0.18 EXE
         uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.2_Windows_x64
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.3_Windows_x64
           path: overlay-source
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -135,7 +137,7 @@ jobs:
       - name: Upload one-click overlay installer
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Core_Bridge_v0.6.2_Overlay_Installer_for_VectorCraft_v0.18
+          name: Leo_Design_Core_Bridge_v0.6.3_Overlay_Installer_for_VectorCraft_v0.18
           path: overlay-output/*.exe
           if-no-files-found: error
           retention-days: 30
