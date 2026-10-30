@@ -40,4 +40,22 @@ edit(
     ui.status_bar = w.status_bar;''',
  "restore flyout sizes when switching workspaces")
 p.write_text(s,encoding="utf-8",newline="\n")
+# On workspace switch, craft-ui must not reuse another workspace's
+# temporary egui sizes. Reload the new workspace's saved dimensions instead.
+d = Path(sys.argv[1])/"crates/ui-egui/src/panel_docking.rs"
+dsrc=d.read_text(encoding="utf-8")
+anchor='''    if changed_workspace {
+        craft_ui::docking::cancel_drag::<String>(&ctx, area);
+    }'''
+replacement='''    if changed_workspace {
+        craft_ui::docking::cancel_drag::<String>(&ctx, area);
+        // Leo Design: each named workspace has its own per-panel sizes.
+        ctx.data_mut(|data| {
+            for (id, _) in crate::state::all_panels() {
+                data.remove::<egui::Vec2>(area.with(("leo-icon-size", id.to_owned())));
+            }
+        });
+    }'''
+if dsrc.count(anchor)!=1:raise SystemExit(f"FAIL workspace switch hook: {dsrc.count(anchor)}")
+d.write_text(dsrc.replace(anchor,replacement,1),encoding="utf-8",newline="\n")
 print("SUCCESS named workspaces include Leo Design docked icon flyout geometry")
