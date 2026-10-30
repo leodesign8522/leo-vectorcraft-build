@@ -28,7 +28,6 @@ RestartApplications=no
 Uninstallable=no
 CreateUninstallRegKey=no
 SetupLogging=yes
-SetupIconFile=
 ; This is a safe overlay installer, NOT a separately loadable VectorCraft plugin.
 ; It must be rebuilt against each supported upstream release.
 
