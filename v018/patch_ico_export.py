@@ -62,24 +62,18 @@ rep("crates/engine/src/cmd/fileio/encode.rs",
 
 panel="crates/ui-egui/src/dialogs/leo_image_export.rs"
 # The native sidebar/dialog have independent UI bodies but share params().
-rep(panel,
- '''"format": "jpg",
-        "colorModel":''',
- '''"format": "jpg",
-        "icoSizes": [16,24,32,48,64,128,256],
-        "colorModel":''',
- "add default ICO layers to export dialog")
-rep(panel,
- '''"format": "jpg",
-        "colorModel":''',
- '''"format": "jpg",
-        "icoSizes": [16,24,32,48,64,128,256],
-        "colorModel":''',
- "add default ICO layers to nonmodal export sidebar")
+# Both dialog and sidebar defaults share the same JSON.
+p = root / panel
+raw = p.read_text(encoding="utf-8")
+old = '"format": "jpg",\n        "colorModel":'
+new = '"format": "jpg",\n        "icoSizes": [16,24,32,48,64,128,256],\n        "colorModel":'
+if raw.count(old) != 2: raise SystemExit(f"FAIL ICO defaults: expected two, got {raw.count(old)}")
+p.write_text(raw.replace(old, new), encoding="utf-8", newline="\n")
+print("OK dialog and sidebar default icon sizes")
 
 rep(panel,
- '''"JPEG / 透明 PNG · ICC 色彩管理"''',
- '''"JPEG / 透明 PNG / 多尺寸 ICO · ICC 色彩管理"''',
+ '''"精确画板裁切 · JPEG / 透明 PNG · ICC 色彩管理"''',
+ '''"精确画板裁切 · JPEG / 透明 PNG / 多尺寸 ICO · ICC 色彩管理"''',
  "export dialog header")
 rep(panel,
  '''select(ui, d, "format", &["jpg", "png"], &["JPEG (.jpg)", "PNG 透明图 (.png)"], 244.0);''',
@@ -97,6 +91,7 @@ rep(panel,
             ui.horizontal(|ui| {''',
  '''            if d.str("format") == "ico" {
                 ico_size_picker(ui, d);
+                ui.end_row();
             } else {
             ui.label("分辨率（DPI）");
             ui.horizontal(|ui| {''',
