@@ -4,7 +4,7 @@
 This patches the exact craft-libs git checkout pinned by official VectorCraft
 v0.18.0. No upstream source is rewritten in the VectorCraft repository.
 An iconic flyout stays docked, visually anchored to the icon strip, but gets
-left/right/bottom resize handles like a floating frame. Each panel size is
+invisible left and bottom resize hotzones without floating. Each panel size is
 kept under a deterministic egui context id. The host captures its changes.
 """
 from pathlib import Path
@@ -60,14 +60,14 @@ edit(
     '''        // Leo Design: an iconic flyout is anchored to its icon rail. The
         // standard FloatingFrame edge handles are only 4 screen points wide
         // and very hard to hit; instead give the LEFT and BOTTOM edges large,
-        // visible, accessible drag targets entirely inside the flyout.
+        // accessible, invisible drag targets entirely inside the flyout.
         // No float conversion or new OS window is required.
         let response = FloatingFrame::new(id, rect).bounds(bounds)
             .resizable(false).show(ctx, &style, |ui, panel_rect| {
                 self.group(ui, &group.panels, group.active, false, panel_rect, GroupKind::Dock);
                 let min_width = (self.style.min_pane + 40.0).max(220.0);
-                // 16 pt wide inner strip, with a center grip painted when
-                // hovered; the flyout is attached to the icons on its right.
+                // Invisible 16 pt inner strip; the flyout stays attached
+                // to the icon rail on the right.
                 let left_grip = Rect::from_min_max(
                     pos2(panel_rect.left(), panel_rect.top() + 20.0),
                     pos2((panel_rect.left() + 16.0).min(panel_rect.right()), panel_rect.bottom() - 20.0));
@@ -76,16 +76,8 @@ edit(
                     .on_hover_text("Leo Design：拖动左边缘调整面板宽度");
                 resize_width.widget_info(|| egui::WidgetInfo::labeled(
                     egui::Role::Button, ui.is_enabled(), "调整停靠面板宽度"));
-                let c = if resize_width.hovered() || resize_width.dragged() {
-                    style.accent
-                } else {
-                    style.weak_text.gamma_multiply(0.65)
-                };
-                let mid = left_grip.center();
-                for offset in [-5.0, 0.0, 5.0] {
-                    ui.painter().vline(mid.x + offset, (mid.y - 13.0)..=(mid.y + 13.0),
-                        Stroke::new(1.0, c));
-                }
+                // Intentionally invisible: the 16 pt hit area and resize cursor
+                // remain active, but no decorative grip lines are painted.
                 // The bottom grip occupies 16 pt INSIDE the panel. Leave
                 // corners to the horizontal grip and avoid the scrollbar.
                 let bottom_grip = Rect::from_min_max(
@@ -96,16 +88,7 @@ edit(
                     .on_hover_text("Leo Design：拖动下边缘调整面板高度");
                 resize_height.widget_info(|| egui::WidgetInfo::labeled(
                     egui::Role::Button, ui.is_enabled(), "调整停靠面板高度"));
-                let c = if resize_height.hovered() || resize_height.dragged() {
-                    style.accent
-                } else {
-                    style.weak_text.gamma_multiply(0.65)
-                };
-                let mid = bottom_grip.center();
-                for offset in [-5.0, 0.0, 5.0] {
-                    ui.painter().hline((mid.x - 13.0)..=(mid.x + 13.0), mid.y + offset,
-                        Stroke::new(1.0, c));
-                }
+                // Keep the bottom 16 pt drag target fully transparent as well.
                 let delta = ui.input(|i| i.pointer.delta());
                 if (resize_width.dragged() && delta.x != 0.0)
                     || (resize_height.dragged() && delta.y != 0.0)
@@ -124,7 +107,7 @@ edit(
                 }
             });
         self.iconic.rect = Some(response.rect);''',
-    "give iconic flyouts accessible 16pt inside-edge resize grips"
+    "give iconic flyouts invisible 16pt inside-edge resize hotzones"
 )
 file.write_text(text,encoding="utf-8",newline="\n")
 print("SUCCESS: Leo Design resizable pinned craft-ui icon flyouts",file)
