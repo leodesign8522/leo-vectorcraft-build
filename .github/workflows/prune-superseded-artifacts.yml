@@ -1,0 +1,71 @@
+name: Leo Design - Prune superseded v0.18 build artifacts
+
+on:
+  push:
+    branches:
+      - leo-v018-migration
+    paths:
+      - ".github/workflows/prune-superseded-artifacts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  prune:
+    name: Delete obsolete v0.6.0-v0.6.8 ZIP artifacts only
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Delete audited old artifacts by exact ID and version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Each ID was inspected from a successful historical run on this repo.
+          # Keep ALL v0.6.9, v0.7.0, v0.7.1, main-branch v0.5.7
+          # and security reports untouched.
+          declare -a old=(
+            "12951195215:0.6.0"
+            "12951334016:0.6.0"
+            "12950959377:0.6.0"
+            "12951390183:0.6.0"
+            "12953660196:0.6.2"
+            "12953016499:0.6.2"
+            "12956040342:0.6.4"
+            "12955985651:0.6.4"
+            "12958316871:0.6.5"
+            "12957998595:0.6.5"
+            "12961316152:0.6.8"
+            "12961017421:0.6.8"
+          )
+          sum=0
+          for item in "${old[@]}"; do
+            id="${item%%:*}"; version="${item##*:}"
+            if ! info="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" 2>/dev/null)"; then
+              echo "Skipping absent/deleted artifact ${id}"
+              continue
+            fi
+            name="$(jq -r '.name' <<< "${info}")"
+            bytes="$(jq -r '.size_in_bytes' <<< "${info}")"
+            case "${name}" in
+              Leo_Design_*"v${version}"*) ;;
+              *)
+                echo "::error::ABORT unexpected artifact ${id} name=${name}, expected v${version}"
+                exit 1
+                ;;
+            esac
+            echo "Removing superseded artifact: ${id} ${name} (${bytes} bytes)"
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" >/dev/null
+            sum=$((sum + bytes))
+          done
+          echo "Removed approximately $((sum / 1048576)) MiB of obsolete build artifacts"
+          echo "Retained v0.5.7, v0.6.9, v0.7.0 and v0.7.1, all source code, caches and workflow run logs."
+          {
+            echo "## Leo Design Artifact Cleanup"
+            echo "Obsolete artifact storage cleared: **$((sum / 1048576)) MiB**"
+            echo "Retained: v0.5.7, v0.6.9, v0.7.0, v0.7.1"
+            echo "Not deleted: code, caches, histories, settings, workspaces."
+          } >> "$GITHUB_STEP_SUMMARY"
