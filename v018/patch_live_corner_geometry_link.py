@@ -129,7 +129,7 @@ rep("crates/engine/src/cmd/path.rs",
     })?;''',
     '''    s.edit("Move", |d, selection| {
         let old = d.node(id).and_then(|n| n.path_data())
-            .and_then(|path| path.anchor(si, ai)).map(|a| a.p)
+            .and_then(|path| path.subpaths.get(si)?.anchors.get(ai)).map(|a| a.p)
             .ok_or_else(|| EngineError::Other("no such anchor".into()))?;
         let refs = BTreeSet::from([(si, ai)]);
         if let Some(next) = transform_live_corner_source(
