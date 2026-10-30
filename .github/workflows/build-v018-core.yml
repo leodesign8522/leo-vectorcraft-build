@@ -79,7 +79,10 @@ jobs:
           Leo Design VectorCraft Enhanced v0.6.2 — v0.18.0 Core Bridge preview
           This is a separate portable build from the official v0.18.0 source.
           DO NOT overwrite existing v0.5.7 or its VectorCraftData folder.
-          Extract into an EMPTY directory. Copy preferences only after backup.
+          Extract into an EMPTY directory; this portable EXE is a preview build.
+          The separate overlay installer replaces only the matching official EXE.
+          Export workspace/shortcut JSON before switching installs; ICC/font assets
+          are stored separately and not included in those JSON files.
           Includes Workspace/Shortcut JSON, Ctrl+Enter text finish, CJK paragraph
           Auto-height and Illustrator PDF/SVG font name compatibility.
           Includes the first v0.18 port of the native Image Pro Export sidebar.
