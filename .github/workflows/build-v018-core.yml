@@ -1,0 +1,91 @@
+name: Leo Design Core Bridge - VectorCraft v0.18 (Windows x64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v018-migration
+    paths:
+      - ".github/workflows/build-v018-core.yml"
+      - "v018/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leo-vectorcraft-v018-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: VectorCraft v0.18 + Leo Design Core Bridge
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout Leo Design migration source
+        uses: actions/checkout@v4
+      - name: Checkout official VectorCraft v0.18.0
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: v0.18.0
+          path: vectorcraft
+          persist-credentials: false
+      - name: Install Python for compatibility patches
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply modular Leo Design Core Bridge
+        shell: pwsh
+        run: |
+          python v018/patch_core_bridge.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Design Core Bridge source patch failed" }
+          git -C vectorcraft diff --check
+          if ($LASTEXITCODE -ne 0) { throw "Source whitespace validation failed" }
+          git -C vectorcraft diff --stat
+      - name: Install stable Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
+      - name: Cache v0.18 Rust release build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          shared-key: "leo-vectorcraft-v018-core-windows-release"
+          cache-all-crates: false
+      - name: Compile Windows x64 native EXE
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+          CARGO_TERM_COLOR: always
+        run: |
+          cargo build --release --locked -p vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Core Bridge Windows compilation failed" }
+      - name: Package portable v0.18 experimental build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
+          New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
+          @'
+          Leo Design VectorCraft Enhanced v0.6.0 — v0.18.0 Core Bridge preview
+          This is a separate portable build from the official v0.18.0 source.
+          DO NOT overwrite existing v0.5.7 or its VectorCraftData folder.
+          Extract into an EMPTY directory. Copy preferences only after backup.
+          Core Bridge preview starts with isolated workspace and shortcut preset tools.
+          Unsupported historical modules are NOT claimed to be ported yet.
+          '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
+          git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
+          & "dist/vectorcraft.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "EXE version smoke test failed" }
+      - name: Upload experimental Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.6.0_Windows_x64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
