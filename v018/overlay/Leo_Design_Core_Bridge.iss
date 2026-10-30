@@ -2,7 +2,7 @@
   #define SourceExe "dist\vectorcraft.exe"
 #endif
 
-#define BridgeVersion "0.6.0"
+#define BridgeVersion "0.6.2"
 #define UpstreamVersion "0.18.0"
 
 [Setup]
@@ -32,8 +32,7 @@ SetupLogging=yes
 ; It must be rebuilt against each supported upstream release.
 
 [Files]
-Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "vectorcraft.exe"; Flags: ignoreversion; BeforeInstall: BackupOriginalExecutable
-Source: "Restore_Official_VectorCraft.cmd"; DestDir: "{app}\LeoDesign"; Flags: ignoreversion
+Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "vectorcraft.exe"; Flags: ignoreversion
 
 [Code]
 function TargetExe(): String;
@@ -55,6 +54,8 @@ begin
     Exit;
   end;
 
+  // Leo Design: only overwrite the matching official version.
+  // Users can reinstall the official program; no program backup is created.
   // Where the Windows file version is present, block incompatible releases.
   if GetVersionNumbersString(ExePath, S) then
   begin
@@ -83,21 +84,3 @@ begin
     Result := '找不到兼容的 VectorCraft v0.18 主程序。请检查安装路径和程序版本。';
 end;
 
-procedure BackupOriginalExecutable();
-var
-  DestDir, OriginalExe, BackupExe: String;
-begin
-  OriginalExe := ExpandConstant('{app}\vectorcraft.exe');
-  DestDir := ExpandConstant('{app}\LeoDesign\Backup');
-  BackupExe := DestDir + '\VectorCraft_original_v0.18.exe';
-  if not FileExists(OriginalExe) then
-    RaiseException('无法找到待备份的 VectorCraft 主程序。');
-  if not DirExists(DestDir) and not ForceDirectories(DestDir) then
-    RaiseException('无法创建原版程序备份目录：' + DestDir);
-  // Never overwrite the initial backup with an already enhanced executable.
-  if not FileExists(BackupExe) then
-  begin
-    if not FileCopy(OriginalExe, BackupExe, False) then
-      RaiseException('无法备份官方程序。覆盖安装已中止：' + BackupExe);
-  end;
-end;
