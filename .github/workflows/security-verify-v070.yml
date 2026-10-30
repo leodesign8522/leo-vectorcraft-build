@@ -1,0 +1,76 @@
+name: Leo Design v0.7.0 - Windows installer security verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v018-migration
+    paths:
+      - ".github/workflows/security-verify-v070.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify:
+    name: Verify Windows v0.7.0 installer and portable build
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Download v0.7.0 installation artifacts from successful build
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41031544358
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: Leo_Design_*v0.7.0*
+          merge-multiple: false
+          path: verified-files
+
+      - name: Generate SHA256 and code-signature transparency report
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force verification-report | Out-Null
+          $files = @(Get-ChildItem "verified-files" -Recurse -File -Include *.exe)
+          if ($files.Count -lt 2) { throw "Expected both portable and installer executables; found $($files.Count)" }
+          $report = @(
+            "Leo Design Core Bridge v0.7.0",
+            "Source: https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41031544358",
+            "These hashes identify bytes, NOT malware safety or a trusted publisher signature.",
+            ""
+          )
+          foreach ($file in $files) {
+            $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256
+            $signature = Get-AuthenticodeSignature $file.FullName
+            $report += "$($hash.Hash)  $($file.Name) [Signature=$($signature.Status)]"
+          }
+          $report | Set-Content "verification-report/SHA256.txt" -Encoding utf8
+          Get-Content "verification-report/SHA256.txt"
+
+      - name: Microsoft Defender signature update and targeted scan
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $state = Get-MpComputerStatus -ErrorAction Stop
+          if (-not $state.AntivirusEnabled -or -not $state.AMServiceEnabled) {
+            throw "Microsoft Defender antivirus is not enabled on this runner; cannot claim a clean scan."
+          }
+          Update-MpSignature -ErrorAction Stop
+          $started = Get-Date
+          Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path "verified-files").Path -ErrorAction Stop
+          $hits = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -ge $started })
+          if ($hits.Count -gt 0) {
+            $hits | Format-List * | Out-String | Set-Content "verification-report/DEFENDER_DETECTIONS.txt"
+            throw "Microsoft Defender found $($hits.Count) threat detection(s). Do not use these binaries."
+          }
+          "Microsoft Defender scan finished with no reported threats on this GitHub runner. This does not prove that the software is safe." | Set-Content "verification-report/DEFENDER_RESULT.txt" -Encoding utf8
+
+      - name: Upload checksums and Defender verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_v0.7.0_Security_Verification_Report
+          path: verification-report/*
+          if-no-files-found: warn
+          retention-days: 30
