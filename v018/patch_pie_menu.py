@@ -74,16 +74,16 @@ change("crates/ui-egui/src/state.rs",
             screen_mode: 0,''',
  "default config on fresh installations and migration")
 change("crates/ui-egui/src/shortcuts.rs",
- '''    ctx.input_mut(unclip_chords);
-    // Tab is ours when no field has the keyboard''',
- '''    // Leo Design: user-chosen Pie Menu keyboard shortcut takes precedence
-    // when no editor, IME or dialog owns the keyboard.
+ '''    let composing = app.session.tool_composing();
+    // Tool keys first''',
+ '''    let composing = app.session.tool_composing();
+    // Leo Design: intercept before Enter/Escape tool handlers so Escape
+    // reliably dismisses the radial menu rather than changing a path.
     if crate::leo_pie_menu::keyboard_frame(app, ctx) {
         return;
     }
-    ctx.input_mut(unclip_chords);
-    // Tab is ours when no field has the keyboard''',
- "intercept user-configured Shift+Space and other keyboard chords")
+    // Tool keys first''',
+ "intercept configured shortcuts and Escape before tool handlers")
 change("crates/ui-egui/src/canvas.rs",
  '''    let resp = ui.interact(rect, egui::Id::unique("canvas"), Sense::click_and_drag());
     // A press on the canvas''',
