@@ -24,7 +24,7 @@
 | LC-001 | Smart Select | Ctrl 直接选中组内对象、不拆组的选取/拖动逻辑 | `v018/patch_smart_interactions.py` | 已有代码·构建通过 |
 | LC-002 | Group Anchor Move | A 工具配合修饰键拖动组内锚点，实现整组位置移动 | `v018/patch_smart_interactions.py` | 已有代码·构建通过 |
 | LC-003 | Smart Guides | 10 类彩色辅助线、3 套预设、自定义颜色及参数 | `v018/patch_smart_guide_colors.py` | 已有代码·构建通过；吸附现场体验待验收 |
-| LC-004 | ICC 工作空间 | 工作 RGB / CMYK 配置、配置持久化及重新载入 | `scripts/patch_color_preferences.py`，由 `v018/patch_essential_features.py` 集成 | 已有代码·构建通过；色彩流程需独立检查 |
+| LC-004 | ICC 工作空间 | 工作 RGB / CMYK 配置持久化（历史 v0.17 版） | `scripts/patch_color_preferences.py` | **仅 v0.17 main 确认已集成**；该脚本未出现在 v0.18 最新构建流程，v0.18 增强版不应宣称已恢复 |
 | LC-005 | 颜色面板显示模式 | 固定 CMYK 显示，避免面板自动切回 RGB | `scripts/patch_color_panel_lock.py` | 已有代码·构建通过 |
 | LC-006 | Illustrator 文字兼容 | AI/PDF/SVG 文字名及字体兼容补丁（非所有字体段落效果完全无损） | `scripts/patch_illustrator_text_bridge.py` | 已有代码·构建通过；精确还原待验收 |
 | LC-007 | CJK PDF 字体映射 | 处理嵌入 PDF 剪贴板的 CID/CJK 编码后缀与字体族识别 | `scripts/patch_pdf_cjk_font_names.py` | 已有代码·构建通过 |
@@ -42,6 +42,11 @@
 | LC-019 | Pie Menu（饼菜单） | 多菜单、可录制键盘/修饰键+右键、8 槽位、快捷甩动、方向编辑器、圆形/列表布局、搜索原生命令、JSON 配置 | `v018/pie-menu/leo_pie_menu.rs`, `v018/patch_pie_menu.py` | **已有代码·单测通过**；真实鼠标触发、UI 手感仍需验收 |
 
 **全局集成入口：** [`.github/workflows/build-v018-core.yml`](.github/workflows/build-v018-core.yml)。每个功能的脚本顺序、原生 Rust 编译和测试都能从这里复核。
+
+### 审计发现的迁移缺口
+
+- **LC-004 ICC 工作空间持久化**：`scripts/patch_color_preferences.py` 在历史主分支的 v0.17 编译流水线中有调用，然而最新 v0.18 构建流水线并**未调用它**；不能把该功能记成 v0.18 已完成。v0.19 迁移前先验证官方是否已有等价实现，若没有再移植。
+- **LC-012 Workspace Pro**：v0.18 已有面板和停靠尺寸改动，但原 `scripts/patch_workspace_pro.py` 并没有直接加入 v0.18 构建流程。自由面板组合的完整旧功能要逐项核对，不得因为构建成功就当作全部恢复。
 
 ## B. 独立扩展（不属于主程序 Overlay）
 
