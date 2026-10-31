@@ -352,6 +352,104 @@ fn builtin_commands()->Vec<(String,String)>{
     v.dedup_by(|a,b|a.1==b.1);
     v
 }
+/// Geometry of the eight slots in the same order as the *runtime* pie:
+/// Right, Down-Right, Down, Down-Left, Left, Up-Left, Up, Up-Right.
+/// egui's Y grows downward; this is the exact angle convention of OpenPie.
+fn editor_slot_position(center: Pos2, radius: f32, slot: usize) -> Pos2 {
+    center + Vec2::angled(slot as f32 * std::f32::consts::FRAC_PI_4) * radius
+}
+
+/// Real, clickable 8-way layout (not a text-only representation).
+/// All operations still edit the very same PieConfig/slots as list mode.
+fn editor_radial_slots(
+    ui: &mut Ui,
+    config: &PieConfig,
+    selected: &mut usize,
+    test_slot: &mut Option<usize>,
+) {
+    let width = ui.available_width().clamp(282.0, 432.0);
+    let (area, _) = ui.allocate_exact_size(Vec2::new(width, 326.0), egui::Sense::hover());
+    let center = area.center();
+    let radius = (width * 0.312).clamp(96.0, 132.0);
+    let pill_width = (width * 0.275).clamp(84.0, 119.0);
+    let painter = ui.painter();
+    painter.circle_stroke(center, radius, Stroke::new(1.0, Color32::from_gray(77)));
+    // Full disk background is intentionally avoided: clarity and resemblance
+    // to the lightweight radial command menu matter more than decoration.
+    let directions = ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"];
+    for i in 0..8 {
+        let at = editor_slot_position(center, radius, i);
+        let rect = Rect::from_center_size(at, Vec2::new(pill_width, 37.0));
+        let response = ui.interact(rect, ui.id().with(("leo-pie-editor-slot", i)), egui::Sense::click());
+        if response.clicked() {
+            *selected = i;
+        }
+        let active = *selected == i;
+        let is_empty = config.slots[i].command.trim().is_empty();
+        let fill = if active {
+            Color32::from_rgb(143, 75, 65)
+        } else if response.hovered() {
+            Color32::from_rgb(64, 82, 105)
+        } else {
+            Color32::from_rgb(44, 53, 67)
+        };
+        ui.painter().rect_filled(rect, egui::CornerRadius::same(8), fill);
+        ui.painter().rect_stroke(
+            rect,
+            egui::CornerRadius::same(8),
+            Stroke::new(if active { 1.6 } else { 0.8 }, if active {
+                Color32::from_rgb(231, 162, 140)
+            } else {
+                Color32::from_rgb(79, 94, 110)
+            }),
+            egui::StrokeKind::Inside,
+        );
+        let name: String = if is_empty {
+            "＋ 添加".to_owned()
+        } else if config.slots[i].name.trim().is_empty() {
+            "未命名".to_owned()
+        } else {
+            let name = config.slots[i].name.trim();
+            let text: String = name.chars().take(5).collect();
+            if name.chars().count() > 5 { format!("{text}…") } else { text }
+        };
+        ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER,
+            format!("{} {}", directions[i], name),
+            egui::FontId::proportional(12.2),
+            if is_empty { Color32::from_rgb(160, 177, 193) } else { Color32::WHITE },
+        );
+        response.on_hover_text(
+            format!("方向：{} · {}\n命令：{}\n点击选择此方向",
+                directions[i],
+                if config.slots[i].name.trim().is_empty() { "空槽位" } else { &config.slots[i].name },
+                if is_empty { "未绑定" } else { &config.slots[i].command }),
+        );
+    }
+    // Center previews the active configuration; click explicitly tests
+    // the currently selected direction, without closing this editor.
+    let middle = Rect::from_center_size(center, Vec2::new(148.0, 74.0));
+    let response = ui.interact(middle, ui.id().with("leo-pie-center-test"), egui::Sense::click());
+    ui.painter().rect_filled(middle, egui::CornerRadius::same(14),
+        if response.hovered() { Color32::from_rgb(48, 72, 96) }
+        else { Color32::from_rgb(30, 39, 52) });
+    ui.painter().rect_stroke(middle, egui::CornerRadius::same(14),
+        Stroke::new(1.2, Color32::from_rgb(110, 141, 175)), egui::StrokeKind::Inside);
+    let name: String = config.name.chars().take(9).collect();
+    ui.painter().text(center + Vec2::new(0.0, -19.0),
+        egui::Align2::CENTER_CENTER, if name.is_empty() { "Leo Design" } else { &name },
+        egui::FontId::proportional(13.0), Color32::WHITE);
+    ui.painter().text(center + Vec2::new(0.0, 2.0),
+        egui::Align2::CENTER_CENTER, format!("已选方向 {}", *selected + 1),
+        egui::FontId::proportional(11.0), Color32::from_rgb(168, 187, 213));
+    ui.painter().text(center + Vec2::new(0.0, 22.0),
+        egui::Align2::CENTER_CENTER, "▶ 测试当前功能",
+        egui::FontId::proportional(11.5), Color32::from_rgb(153, 212, 252));
+    if response.clicked() && !config.slots[*selected].command.trim().is_empty() {
+        *test_slot = Some(*selected);
+    }
+    response.on_hover_text("点击运行当前选中的槽位命令；不会关闭编辑器");
+}
+
 pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     if !app.ui.leo_pie_editor{return;}
     let mut menus=app.ui.leo_pies.clone();
@@ -464,29 +562,42 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             changed|=ui.checkbox(&mut menu.allow_keyboard_override,"允许饼菜单覆盖此原生键位").changed();
         }
         ui.separator();
-        ui.label("八方向槽位：点击一个方向，再从右侧原生命令目录添加功能");
+        ui.horizontal(|ui|{
+            ui.label(egui::RichText::new("八方向功能").strong());
+            ui.separator();
+            ui.selectable_value(&mut app.ui.leo_pie_list_view, false, "◉ 圆形视图");
+            ui.selectable_value(&mut app.ui.leo_pie_list_view, true, "☷ 列表视图");
+            ui.label(egui::RichText::new("点击方向选择，再从右侧添加功能").small().weak());
+        });
         ui.columns(2,|cols|{
             cols[0].vertical(|ui|{
-                for (i,label) in ["→ 右","↘ 右下","↓ 下","↙ 左下","← 左","↖ 左上","↑ 上","↗ 右上"].iter().enumerate() {
-                    let title=format!("{}  {}",label,if menu.slots[i].name.is_empty(){"(空)"}else{&menu.slots[i].name});
-                    ui.selectable_value(&mut sector,i,title);
+                if app.ui.leo_pie_list_view {
+                    ui.label("八个方向（列表）");
+                    for (i,label) in ["→ 右","↘ 右下","↓ 下","↙ 左下","← 左","↖ 左上","↑ 上","↗ 右上"].iter().enumerate() {
+                        let title=format!("{}  {}",label,if menu.slots[i].command.is_empty(){"＋ 添加"}else{&menu.slots[i].name});
+                        ui.selectable_value(&mut sector,i,title);
+                    }
+                } else {
+                    editor_radial_slots(ui, menu, &mut sector, &mut test_slot);
                 }
                 ui.separator();
-                ui.label(format!("当前槽位：{}",sector+1));
+                ui.label(egui::RichText::new(format!("编辑当前方向：{}",["→ 右","↘ 右下","↓ 下","↙ 左下","← 左","↖ 左上","↑ 上","↗ 右上"][sector])).strong());
                 ui.label("显示名称");
                 changed|=ui.text_edit_singleline(&mut menu.slots[sector].name).changed();
                 ui.label("命令 ID（高级）");
                 changed|=ui.text_edit_singleline(&mut menu.slots[sector].command).changed();
-                if ui.button("清空此方向").clicked(){menu.slots[sector]=PieSlot::default();changed=true;}
+                if ui.button("清空此方向").clicked() {
+                    menu.slots[sector]=PieSlot::default();changed=true;
+                }
             });
             cols[1].vertical(|ui|{
                 ui.label("搜索并添加 VectorCraft 功能");
                 ui.text_edit_singleline(&mut query);
                 let needle=query.trim().to_lowercase();
-                egui::ScrollArea::vertical().max_height(210.0).show(ui,|ui|{
+                egui::ScrollArea::vertical().max_height(340.0).show(ui,|ui|{
                     for (label,id) in commands.iter().filter(|(name,id)|{
                         needle.is_empty() || name.to_lowercase().contains(&needle) || id.to_lowercase().contains(&needle)
-                    }).take(60) {
+                    }).take(80) {
                         if ui.button(format!("＋ {label}")).on_hover_text(id).clicked(){
                             menu.slots[sector]=PieSlot{name:label.rsplit(" › ").next().unwrap_or(label).to_owned(),command:id.clone()};
                             changed=true;
@@ -589,6 +700,16 @@ mod tests {
         let p:PieConfig=serde_json::from_str(r#"{"name":"旧菜单","keyboard":"","mouse":"Shift+Alt+RMB","slots":[]}"#).unwrap();
         assert_eq!(p.flick_threshold,24.0);
         assert_eq!(p.menu_radius,106.0);
+    }
+    #[test] fn editor_directions_match_runtime_sector_order() {
+        let c=Pos2::new(300.0,300.0);
+        let open=OpenPie{menu:0,origin:c,mouse:false,key:None,last_sector:None};
+        for i in 0..8 {
+            let at=editor_slot_position(c,120.0,i);
+            assert_eq!(open.sector(at,24.0),Some(i),"mismatched direction index {}",i);
+        }
+        assert!(editor_slot_position(c,120.0,6).y < c.y,"up should be above center");
+        assert!(editor_slot_position(c,120.0,0).x > c.x,"right should be right of center");
     }
     #[test] fn json_roundtrip_retains_all_eight_slots() {
         let p=defaults();let s=serde_json::to_string(&p).unwrap();
