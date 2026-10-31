@@ -237,7 +237,7 @@ pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> 
         let at=pointer.hover_pos().or_else(||pointer.interact_pos());
         if let Some(p)=at { active.last_sector=active.sector(p,threshold); }
         if active.mouse && pointer.button_released(PointerButton::Secondary) {
-            let slot=if at.is_some(){active.last_sector}else{active.last_sector};
+            let slot=active.last_sector;
             app.ui.leo_pie_open=None;
             if let Some(slot)=slot {run_slot(app,active.menu,slot);}
             return true;
