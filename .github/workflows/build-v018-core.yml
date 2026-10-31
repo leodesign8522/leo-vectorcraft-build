@@ -93,7 +93,7 @@ jobs:
           python ../v018/patch_craft_ui_flyout.py
           if ($LASTEXITCODE -ne 0) { throw "craft-ui in-place flyout resize patch failed" }
           # The Rust cache includes a precompiled craft-ui. Cargo did not
-          # recompile it after editing the pinned git checkout in v0.7.3.
+          # recompile it after editing the pinned git checkout in v0.7.4.
           # Force invalidation so the patched flyout renderer is in the EXE.
           cargo clean --release -p craft-ui
           if ($LASTEXITCODE -ne 0) { throw "Unable to invalidate cached craft-ui" }
@@ -131,7 +131,7 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design VectorCraft Enhanced v0.7.3 — v0.18.0 Core Bridge preview
+          Leo Design VectorCraft Enhanced v0.7.4 — v0.18.0 Core Bridge preview
           This is a separate portable build from the official v0.18.0 source.
           DO NOT overwrite existing v0.5.7 or its VectorCraftData folder.
           Extract into an EMPTY directory; this portable EXE is a preview build.
@@ -149,7 +149,7 @@ jobs:
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.7.3_Windows_x64
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.7.4_Windows_x64
           path: dist/
           if-no-files-found: error
           retention-days: 30
@@ -165,7 +165,7 @@ jobs:
       - name: Fetch enhanced VectorCraft v0.18 EXE
         uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.7.3_Windows_x64
+          name: Leo_Design_VectorCraft_v018_Core_Bridge_v0.7.4_Windows_x64
           path: overlay-source
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -190,7 +190,7 @@ jobs:
       - name: Upload one-click overlay installer
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Core_Bridge_v0.7.3_Overlay_Installer_for_VectorCraft_v0.18
+          name: Leo_Design_Core_Bridge_v0.7.4_Overlay_Installer_for_VectorCraft_v0.18
           path: overlay-output/*.exe
           if-no-files-found: error
           retention-days: 30
