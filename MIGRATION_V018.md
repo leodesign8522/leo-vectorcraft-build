@@ -1,6 +1,6 @@
 # Leo Design VectorCraft → official v0.18.0 migration
 
-Status: **Compatibility work not completed. Do not distribute this branch as an enhanced v0.18.0 build.**
+Status (2026-10-31): **v0.18 enhanced v0.7.5 successfully compiled and its installer was produced** ([CI #41179333762](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41179333762)). This document below preserves the ORIGINAL migration plan; it is not a comprehensive up-to-date feature checklist or Windows GUI acceptance report. See [LEO_DESIGN_FEATURE_REGISTRY.md](LEO_DESIGN_FEATURE_REGISTRY.md) for current evidence and [v019/MIGRATION_CHECKLIST.md](v019/MIGRATION_CHECKLIST.md) on the v0.19 branch for the next port.
 
 ## Existing safe baseline
 - Repository main: Leo Design VectorCraft Enhanced v0.5.7 (Windows x64) built on official VectorCraft v0.17.0.
