@@ -3,7 +3,7 @@
 //! native command picker, and JSON import/export. No OS-global mouse hook.
 use egui::{Color32, Key, Modifiers, PointerButton, Pos2, Rect, Stroke, Ui, Vec2};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::json;
 use crate::VectorcraftApp;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -155,7 +155,7 @@ fn run_slot(app: &mut VectorcraftApp, selected: usize, sector: usize) {
 /// Never trigger over a focused editor, dialog, IME or command palette.
 pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
     if app.ui.dialog.is_some() || app.ui.palette_open || app.ui.leo_pie_editor
-        || ctx.wants_keyboard_input() || app.session.tool_wants_text() || app.session.tool_composing() {
+        || ctx.egui_wants_keyboard_input() || app.session.tool_wants_text() || app.session.tool_composing() {
         return false;
     }
     if app.ui.leo_pie_open.is_some() {
