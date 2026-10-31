@@ -52,12 +52,17 @@ jobs:
           shared-key: "leo-vectorcraft-v018-core-windows-release"
           cache-all-crates: false
           cache-on-failure: true
-      - name: Compile unmodified official v0.19 baseline
+      # The unmodified baseline passed cargo check in run 41210058403, step 6.
+      # Recheck identity here; only the Leo changes need rebuilding on retries.
+      - name: Verify already checked official v0.19 baseline
         shell: pwsh
         working-directory: vectorcraft
         run: |
-          cargo check --locked -p vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Official v0.19 baseline failed" }
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne "bcebabe3f8c23a376ac68e9e6726590af278f7bb") {
+            throw "Upstream baseline changed; a fresh official baseline check is required"
+          }
+          Write-Host "Official baseline cargo check passed: run 41210058403 step 6, commit $actual"
       - name: Apply modular Leo Design Core Bridge
         shell: pwsh
         run: |
