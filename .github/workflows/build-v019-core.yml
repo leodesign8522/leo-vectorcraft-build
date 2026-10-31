@@ -153,7 +153,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ICO encoder regression failed" }
           cargo test --locked -p vectorcraft-tools marquee -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native marquee regression failed" }
-          cargo test --locked -p vectorcraft-ui-egui shortcuts::paste::tests -- --nocapture
+          cargo test --locked -p vectorcraft-ui-egui shortcuts::paste::leo_screenshot_paste_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Screenshot paste regression failed" }
           cargo test --locked -p vectorcraft-ui-egui leo_image_export -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "JPEG/PNG export option regression failed" }

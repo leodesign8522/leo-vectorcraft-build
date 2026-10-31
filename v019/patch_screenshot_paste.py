@@ -89,7 +89,7 @@ change(
             let captured = fallback.get_image().ok()?;
             let w = u32::try_from(captured.width).ok()?;
             let h = u32::try_from(captured.height).ok()?;
-            if w == 0 || h == 0 || w > MAX_SIDE || h > MAX_SIDE {
+            if w == 0 || h == 0 || w > crate::clipboard::MAX_SIDE || h > crate::clipboard::MAX_SIDE {
                 return None;
             }
             let rgba = image::RgbaImage::from_raw(w, h, captured.bytes.into_owned())?;
