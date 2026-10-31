@@ -1,4 +1,4 @@
-//! Leo Design Pie Menu v0.1.0 — native VectorCraft canvas radial commands.
+//! Leo Design Pie Menu v0.2.0 — native VectorCraft canvas radial commands.
 //! Multiple configurable menus, keyboard and modifier+RMB bindings, a searchable
 //! native command picker, and JSON import/export. No OS-global mouse hook.
 use egui::{Color32, Key, Modifiers, PointerButton, Pos2, Rect, Stroke, Ui, Vec2};
@@ -25,6 +25,12 @@ pub struct PieConfig {
     pub mouse: String,
     /// Explicit consent before overriding a built-in keyboard/nav shortcut.
     pub allow_keyboard_override: bool,
+    /// Mouse travel (in screen points) required before a gesture is valid.
+    pub flick_threshold: f32,
+    /// Radial label layout size, independent of gesture distance.
+    pub menu_radius: f32,
+    /// Blender-style hold/flick/release mode for keyboard shortcuts.
+    pub keyboard_release_select: bool,
     pub slots: Vec<PieSlot>,
 }
 impl Default for PieConfig {
@@ -34,6 +40,9 @@ impl Default for PieConfig {
             keyboard: String::new(),
             mouse: "Shift+Alt+RMB".into(),
             allow_keyboard_override: false,
+            flick_threshold: 24.0,
+            menu_radius: 106.0,
+            keyboard_release_select: false,
             slots: vec![PieSlot::default(); 8],
         }
     }
@@ -60,11 +69,15 @@ pub struct OpenPie {
     pub menu: usize,
     pub origin: Pos2,
     pub mouse: bool,
+    pub key: Option<Key>,
+    pub last_sector: Option<usize>,
 }
 impl OpenPie {
-    pub fn sector(&self, at: Pos2) -> Option<usize> {
+    pub fn sector(&self, at: Pos2, threshold: f32) -> Option<usize> {
         let d = at - self.origin;
-        if d.length() < 38.0 || d.length() > 240.0 { return None; }
+        // Blender-like flick selection: only a small inner deadzone;
+        // NEVER impose a maximum distance (fast gestures often overshoot).
+        if d.length_sq() < threshold.clamp(8.0,64.0).powi(2) { return None; }
         let theta = d.y.atan2(d.x);
         Some(((theta + std::f32::consts::FRAC_PI_8).rem_euclid(std::f32::consts::TAU)
             / std::f32::consts::FRAC_PI_4).floor() as usize % 8)
@@ -128,6 +141,10 @@ fn validate(configs: &[PieConfig]) -> Result<(), String> {
     let mut bindings=std::collections::HashSet::new();
     for config in configs {
         if config.slots.len()!=8 { return Err(format!("「{}」必须恰好有 8 个方向",config.name)); }
+        if !config.flick_threshold.is_finite() || !(8.0..=64.0).contains(&config.flick_threshold)
+            || !config.menu_radius.is_finite() || !(70.0..=180.0).contains(&config.menu_radius) {
+            return Err(format!("「{}」的手势距离或菜单尺寸无效",config.name));
+        }
         if !valid_binding(&config.keyboard,false) || !valid_binding(&config.mouse,true) {
             return Err(format!("「{}」的快捷键格式无效",config.name));
         }
@@ -158,12 +175,28 @@ pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
         || ctx.egui_wants_keyboard_input() || app.session.tool_wants_text() || app.session.tool_composing() {
         return false;
     }
-    if app.ui.leo_pie_open.is_some() {
+    if let Some(open) = app.ui.leo_pie_open.clone() {
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             app.ui.leo_pie_open = None;
             return true;
         }
-        return false;
+        // Optional Blender-style keyboard chord: hold the key, move the
+        // cursor toward a sector, release the same key to execute.
+        if let Some(key) = open.key {
+            let release_enabled = app.ui.leo_pies.get(open.menu)
+                .is_some_and(|m| m.keyboard_release_select);
+            if release_enabled && ctx.input(|i| i.key_released(key)) {
+                let at = ctx.input(|i| i.pointer.hover_pos());
+                let threshold = app.ui.leo_pies[open.menu].flick_threshold;
+                let slot = at.and_then(|p| open.sector(p,threshold)).or(open.last_sector);
+                app.ui.leo_pie_open = None;
+                if let Some(slot) = slot { run_slot(app,open.menu,slot); }
+                return true;
+            }
+        }
+        // While the menu is open, don't let tool-specific keyboard bindings
+        // alter the active document under the menu.
+        return true;
     }
     let found = ctx.input(|i| i.events.iter().find_map(|e| {
         if let egui::Event::Key {key,pressed:true,modifiers,..}=e {
@@ -177,7 +210,7 @@ pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
     }));
     if let Some((menu,key,mods)) = found {
         let origin = ctx.input(|i| i.pointer.hover_pos()).or_else(|| app.canvas_rect.map(|r|r.center())).unwrap_or(Pos2::new(400.0,300.0));
-        app.ui.leo_pie_open=Some(OpenPie{menu,origin,mouse:false});
+        app.ui.leo_pie_open=Some(OpenPie{menu,origin,mouse:false,key:Some(key),last_sector:None});
         ctx.input_mut(|i| { i.consume_key(mods,key); });
         return true;
     }
@@ -193,23 +226,33 @@ pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> 
     }
     let input = ui.input(|i| (i.pointer.clone(), i.modifiers, i.key_pressed(Key::Escape)));
     let (pointer, mods, escape) = input;
-    if let Some(active)=app.ui.leo_pie_open.clone() {
+    if let Some(mut active)=app.ui.leo_pie_open.clone() {
         if escape {
             app.ui.leo_pie_open=None;
             return true;
         }
+        let threshold=app.ui.leo_pies.get(active.menu).map_or(24.0,|m|m.flick_threshold);
+        // hover_pos remains available even after button release; interact_pos
+        // may vanish on the release frame, which formerly lost fast flicks.
+        let at=pointer.hover_pos().or_else(||pointer.interact_pos());
+        if let Some(p)=at { active.last_sector=active.sector(p,threshold); }
         if active.mouse && pointer.button_released(PointerButton::Secondary) {
-            let slot=pointer.interact_pos().and_then(|p|active.sector(p));
+            let slot=if at.is_some(){active.last_sector}else{active.last_sector};
             app.ui.leo_pie_open=None;
             if let Some(slot)=slot {run_slot(app,active.menu,slot);}
             return true;
         }
         if !active.mouse && pointer.button_pressed(PointerButton::Primary) {
-            let slot=pointer.interact_pos().and_then(|p|active.sector(p));
+            let slot=active.last_sector;
             app.ui.leo_pie_open=None;
             if let Some(slot)=slot {run_slot(app,active.menu,slot);}
             return true;
         }
+        if active.mouse && !pointer.button_down(PointerButton::Secondary) {
+            app.ui.leo_pie_open=None; // lost focus: never leave a stuck menu
+            return true;
+        }
+        app.ui.leo_pie_open=Some(active);
         return true;
     }
     if !resp.hovered() || !pointer.button_pressed(PointerButton::Secondary) {
@@ -217,7 +260,7 @@ pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> 
     }
     if let Some((menu,_))=app.ui.leo_pies.iter().enumerate().find(|(_,p)|mouse_binding(&p.mouse,mods)) {
         if let Some(pos)=pointer.interact_pos() {
-            app.ui.leo_pie_open=Some(OpenPie{menu,origin:pos,mouse:true});
+            app.ui.leo_pie_open=Some(OpenPie{menu,origin:pos,mouse:true,key:None,last_sector:None});
             return true;
         }
     }
@@ -228,36 +271,55 @@ pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> 
 /// application context menu on a normal (unmodified) RMB click.
 pub fn paint(ui: &Ui, app: &VectorcraftApp) {
     let Some(open)=&app.ui.leo_pie_open else {return;};
-    let Some(cfg)=app.ui.leo_pies.get(open.menu) else{return;};
-    let cursor=ui.input(|i|i.pointer.hover_pos());
-    let picked=cursor.and_then(|p|open.sector(p));
-    let p=ui.painter();
-    let c=open.origin;
-    let outer=126.0;
+    let Some(cfg)=app.ui.leo_pies.get(open.menu) else {return;};
+    let pointer=ui.input(|i|i.pointer.hover_pos());
+    let picked=pointer.and_then(|p|open.sector(p,cfg.flick_threshold));
+    let radius=cfg.menu_radius.clamp(70.0,180.0);
+    let painter=ui.painter();
+    // Preserve the actual gesture origin; only the VISUAL layout is clamped
+    // away from viewport edges so all eight options stay visible.
+    let clip=ui.clip_rect();
+    let margin=radius+46.0;
+    let center=Pos2::new(
+        if clip.width()>2.0*margin {open.origin.x.clamp(clip.min.x+margin,clip.max.x-margin)} else {clip.center().x},
+        if clip.height()>2.0*margin {open.origin.y.clamp(clip.min.y+margin,clip.max.y-margin)} else {clip.center().y},
+    );
+    // Keep the visual weight low. Distinct command labels and a fast
+    // directional highlight matter more than a giant opaque 8-slice disc.
+    painter.circle_filled(center,31.0,Color32::from_rgba_unmultiplied(24,30,40,226));
+    painter.circle_stroke(center,31.0,Stroke::new(1.4,Color32::from_rgb(112,138,170)));
+    let active_color=Color32::from_rgb(115,182,250);
     for sector in 0..8 {
-        let base=sector as f32 * std::f32::consts::FRAC_PI_4;
-        let a=base-std::f32::consts::FRAC_PI_8;
-        let b=base+std::f32::consts::FRAC_PI_8;
-        let mut verts=vec![c];
-        for j in 0..=8 {
-            let angle=a+(b-a)*(j as f32/8.0);
-            verts.push(c + Vec2::angled(angle)*outer);
-        }
-        let selected=picked==Some(sector);
-        let fill=if selected {Color32::from_rgb(56,103,158)}
-            else if sector%2==0 {Color32::from_rgb(43,51,66)}
-            else {Color32::from_rgb(36,44,58)};
-        p.add(egui::Shape::convex_polygon(verts,fill,Stroke::new(1.0,Color32::from_gray(95))));
-        let at=c+Vec2::angled(base)*83.0;
+        let a=sector as f32*std::f32::consts::FRAC_PI_4;
+        let direction=Vec2::angled(a);
+        let at=center+direction*radius;
+        let is_active=picked==Some(sector);
         let name=cfg.slots.get(sector).map(|x|x.name.as_str()).unwrap_or("");
-        let name=if name.is_empty(){"＋"}else{name};
-        p.text(at,egui::Align2::CENTER_CENTER,name,egui::FontId::proportional(13.0),Color32::WHITE);
+        let is_empty=name.trim().is_empty();
+        let label=if is_empty{"＋ 添加"}else{name};
+        let text_size=if radius<88.0{11.0}else{13.0};
+        // Compact, elongated pills mimic Blender's readable option layout.
+        let text_width=(label.chars().count() as f32*text_size*0.77+22.0).clamp(66.0,148.0);
+        let box_rect=Rect::from_center_size(at,Vec2::new(text_width,29.0));
+        let fill=if is_active {Color32::from_rgb(65,106,157)}
+            else {Color32::from_rgba_unmultiplied(38,46,58,235)};
+        painter.rect_filled(box_rect,egui::CornerRadius::same(7),fill);
+        painter.rect_stroke(box_rect,egui::CornerRadius::same(7),
+            Stroke::new(if is_active{1.8}else{0.7},
+                if is_active{active_color}else{Color32::from_rgb(69,82,100)}),
+                egui::StrokeKind::Inside);
+        if is_active {
+            painter.line_segment([center+direction*34.0,at-direction*(text_width*0.5+4.0)],
+                Stroke::new(2.0,active_color));
+        }
+        painter.text(at,egui::Align2::CENTER_CENTER,label,
+            egui::FontId::proportional(text_size),
+            if is_empty{Color32::from_rgb(150,162,178)}else{Color32::WHITE});
     }
-    p.circle_filled(c,41.0,Color32::from_rgb(20,27,38));
-    p.circle_stroke(c,41.0,Stroke::new(2.0,Color32::from_rgb(115,151,194)));
-    p.text(c,egui::Align2::CENTER_CENTER,&cfg.name,egui::FontId::proportional(11.0),Color32::WHITE);
-    p.text(c+Vec2::new(0.0,18.0),egui::Align2::CENTER_CENTER,"Esc 取消",egui::FontId::proportional(10.0),Color32::LIGHT_GRAY);
-    ui.ctx().request_repaint();
+    painter.text(center,egui::Align2::CENTER_CENTER,"Leo",
+        egui::FontId::proportional(12.5),Color32::WHITE);
+    // No unconditional request_repaint(). Native pointer input already
+    // requests another frame; forcing redraw every frame wastes CPU/GPU.
 }
 
 fn builtin_commands()->Vec<(String,String)>{
@@ -321,8 +383,13 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             if let Some((key,mods))=ctx.input(|i|i.events.iter().find_map(|e|{
                 match e { egui::Event::Key{key,pressed:true,modifiers,..}=>Some((*key,*modifiers)),_=>None }
             })) {
-                if key==Key::Escape{recording.clear();}
-                else { menu.keyboard=keyboard_text(key,mods);recording.clear();changed=true; }
+                let k=format!("{key:?}");
+                if key==Key::Escape {recording.clear();}
+                else if !(k.starts_with("Control") || k.starts_with("Shift")
+                    || k.starts_with("Alt") || k.starts_with("Meta")
+                    || k.starts_with("Super") || k.starts_with("Command")) {
+                    menu.keyboard=keyboard_text(key,mods);recording.clear();changed=true;
+                }
             }
         }
         if recording=="mouse" && ctx.input(|i|i.pointer.button_pressed(PointerButton::Secondary)) {
@@ -333,6 +400,19 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             recording.clear();
         }
         ui.label(egui::RichText::new("例如 Shift+Space、Shift+Alt+RMB、Shift+Ctrl+RMB；普通右键不改变。").small().weak());
+        ui.separator();
+        ui.label("Blender 式快捷手势");
+        ui.horizontal(|ui|{
+            ui.label("甩动灵敏度");
+            changed |= ui.add(egui::Slider::new(&mut menu.flick_threshold,8.0..=64.0)
+                .suffix(" pt")).changed();
+            ui.label("菜单紧凑度");
+            changed |= ui.add(egui::Slider::new(&mut menu.menu_radius,70.0..=180.0)
+                .suffix(" pt")).changed();
+        });
+        changed |= ui.checkbox(&mut menu.keyboard_release_select,
+            "键盘快捷键：按住 → 甩动 → 松开执行（Blender 模式）").changed();
+        ui.label(egui::RichText::new("右键手势始终为按住 → 甩动 → 松开，越过灵敏度距离就能选中；无需甩到菜单文字上。").small().weak());
         let key_conflicts=crate::shortcut_editor::conflicts_with(&app.ui.shortcut_overrides,&menu.keyboard,"ui.leoPieSettings");
         let conflict=normalize(&menu.keyboard)=="SHIFT+SPACE" || !key_conflicts.is_empty();
         if conflict {
@@ -383,10 +463,14 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
         ui.label("导入 JSON：将导出的配置粘贴到下方，再点导入");
         ui.add(egui::TextEdit::multiline(&mut import).desired_rows(2).hint_text("粘贴 JSON 配置"));
         if ui.button("验证并导入 JSON").clicked() {
+            if import.trim().is_empty() {
+                status="请先粘贴导出的 JSON 配置".into();
+            } else {
             match serde_json::from_str::<Vec<PieConfig>>(&import)
                 .map_err(|e|e.to_string()).and_then(|x|{validate(&x)?;Ok(x)}) {
                 Ok(v)=>{menus=v;index=0;changed=true;status="导入成功".into();}
                 Err(e)=>status=format!("导入失败：{e}"),
+            }
             }
         }
         if let Err(e)=validate(&menus){ui.colored_label(Color32::from_rgb(255,130,100),format!("配置冲突：{e}"));}
@@ -424,6 +508,18 @@ mod tests {
         let mut pies=defaults();
         pies[1].mouse=pies[0].mouse.clone();
         assert!(validate(&pies).is_err());
+    }
+    #[test] fn flick_beyond_old_240pt_limit_still_selects() {
+        let o=OpenPie{menu:0,origin:Pos2::new(0.0,0.0),mouse:true,key:None,last_sector:None};
+        assert_eq!(o.sector(Pos2::new(500.0,0.0),24.0),Some(0));
+        assert_eq!(o.sector(Pos2::new(12.0,0.0),24.0),None);
+        assert_eq!(o.sector(Pos2::new(0.0,400.0),24.0),Some(2));
+        assert_eq!(o.sector(Pos2::new(-400.0,0.0),24.0),Some(4));
+    }
+    #[test] fn compact_pie_config_is_backward_compatible() {
+        let p:PieConfig=serde_json::from_str(r#"{"name":"旧菜单","keyboard":"","mouse":"Shift+Alt+RMB","slots":[]}"#).unwrap();
+        assert_eq!(p.flick_threshold,24.0);
+        assert_eq!(p.menu_radius,106.0);
     }
     #[test] fn json_roundtrip_retains_all_eight_slots() {
         let p=defaults();let s=serde_json::to_string(&p).unwrap();
