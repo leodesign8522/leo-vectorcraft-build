@@ -96,12 +96,12 @@ change("crates/ui-egui/src/canvas.rs",
 change("crates/ui-egui/src/canvas.rs",
  '''    } else {
         handle_input(app, ui, &resp, rect);
-        // \`hover_doc\`''',
+        // `hover_doc`''',
  '''    } else if leo_pie_owns_canvas {
         // Suppress normal tool pan/selection while the radial menu owns input.
     } else {
         handle_input(app, ui, &resp, rect);
-        // \`hover_doc\`''',
+        // `hover_doc`''',
  "avoid changing artwork while selecting a pie menu direction")
 change("crates/ui-egui/src/canvas.rs",
  '''    if app.ui.screen_mode < 3 {
