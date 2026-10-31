@@ -131,9 +131,14 @@ fn valid_binding(s: &str, mouse: bool) -> bool {
     }
     if mouse { parts.last() == Some(&"RMB") && parts.len()>1 }
     else {
+        // There is no hardcoded list of allowed letters, Fn keys or special
+        // keys. Accept any keyboard key exposed by this version of egui.
+        // That includes Shift+D, Ctrl+Shift+D and combinations with arrows,
+        // punctuation and function keys. Dedicated modifier keys alone are
+        // still rejected.
         let name=*parts.last().unwrap_or(&"");
-        name == "SPACE" || name.len() == 1 && name.as_bytes()[0].is_ascii_alphanumeric()
-            || matches!(name, "ENTER"|"TAB"|"BACKSPACE"|"DELETE"|"F1"|"F2"|"F3"|"F4"|"F5"|"F6"|"F7"|"F8"|"F9"|"F10"|"F11"|"F12")
+        !name.is_empty() && egui::Key::ALL.iter().any(|key|
+            format!("{key:?}").eq_ignore_ascii_case(name))
     }
 }
 fn validate(configs: &[PieConfig]) -> Result<(), String> {
@@ -379,7 +384,7 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
         ui.horizontal_wrapped(|ui|{
             ui.label(egui::RichText::new("实时编辑：无需关闭此窗口，在画布上直接测试快捷键/甩动。").strong());
             ui.menu_button("单击测试命令",|ui|{
-                for (i,slot) in menus[index].slots.iter().enumerate() {
+                for (i,slot) in menu.slots.iter().enumerate() {
                     if !slot.command.is_empty()
                         && ui.button(format!("{}  {}",i+1,slot.name)).clicked() {
                         test_slot=Some(i);
@@ -389,7 +394,7 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             });
         });
         ui.label(egui::RichText::new("若正在输入文字，先点击画布空白处解除焦点，再按键盘快捷键。").small().weak());
-        ui.label("触发快捷键（可以输入，也可以录制）");
+        ui.label("触发快捷键（可以输入，也可以录制，不限制常用字母与功能键）");
         ui.horizontal(|ui|{
             ui.label("键盘");
             changed|=ui.text_edit_singleline(&mut menu.keyboard).changed();
@@ -434,6 +439,13 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
         changed |= ui.checkbox(&mut menu.keyboard_release_select,
             "键盘快捷键：按住 → 甩动 → 松开执行（Blender 模式）").changed();
         ui.label(egui::RichText::new("右键手势始终为按住 → 甩动 → 松开，越过灵敏度距离就能选中；无需甩到菜单文字上。").small().weak());
+        if !menu.keyboard.trim().is_empty() {
+            if !valid_binding(&menu.keyboard,false) {
+                ui.colored_label(Color32::from_rgb(250,153,109),"键盘快捷键格式错误，请使用如 Shift+D、Ctrl+Shift+D 或 Shift+Space");
+            } else {
+                ui.label(egui::RichText::new(format!("✓ 支持的键盘组合：{}",menu.keyboard)).color(Color32::from_rgb(134,212,158)));
+            }
+        }
         let key_conflicts=crate::shortcut_editor::conflicts_with(&app.ui.shortcut_overrides,&menu.keyboard,"ui.leoPieSettings");
         let conflict=normalize(&menu.keyboard)=="SHIFT+SPACE" || !key_conflicts.is_empty();
         if conflict {
@@ -520,6 +532,16 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn shift_d_and_common_shortcuts_are_accepted() {
+        assert!(valid_binding("Shift+D",false));
+        assert!(valid_binding("Shift + D",false));
+        assert!(valid_binding("Ctrl+Shift+D",false));
+        assert!(valid_binding("Alt+Shift+ArrowUp",false));
+        assert!(valid_binding("Ctrl+Alt+F12",false));
+        assert!(keyboard_binding("Shift+D", Key::D, Modifiers {shift:true,..Default::default()}));
+        assert!(!keyboard_binding("Shift+D", Key::D, Modifiers::NONE));
+        assert!(!valid_binding("Shift",false));
+    }
     #[test] fn keyboard_binding_is_exact() {
         assert!(keyboard_binding("Shift+Space",Key::Space,Modifiers{shift:true,..Default::default()}));
         assert!(!keyboard_binding("Shift+Space",Key::Space,Modifiers{shift:true,ctrl:true,..Default::default()}));
