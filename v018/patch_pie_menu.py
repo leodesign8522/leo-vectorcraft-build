@@ -46,6 +46,9 @@ change("crates/ui-egui/src/state.rs",
     pub leo_pie_selected: usize,
     #[serde(skip)]
     pub leo_pie_slot: usize,
+    /// Nonpersistent editor layout preference; legacy configs stay valid.
+    #[serde(skip)]
+    pub leo_pie_list_view: bool,
     #[serde(skip)]
     pub leo_pie_query: String,
     #[serde(skip)]
@@ -67,6 +70,7 @@ change("crates/ui-egui/src/state.rs",
             leo_pie_editor: false,
             leo_pie_selected: 0,
             leo_pie_slot: 0,
+            leo_pie_list_view: false,
             leo_pie_query: String::new(),
             leo_pie_recording: String::new(),
             leo_pie_import: String::new(),
@@ -153,4 +157,4 @@ change("crates/ui-egui/src/menus/run.rs",
     // The Window menu's panel items toggle like its other checked items''',
  "route the UI command directly to the editor")
 
-print("SUCCESS Leo Design Pie Menu v0.1.0 integrated, including self-configurable shortcuts and searchable command binding")
+print("SUCCESS Leo Design Pie Menu v0.3.0 integrated, including self-configurable shortcuts and searchable command binding")
