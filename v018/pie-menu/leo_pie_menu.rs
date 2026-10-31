@@ -23,6 +23,8 @@ pub struct PieConfig {
     pub name: String,
     pub keyboard: String,
     pub mouse: String,
+    /// Explicit consent before overriding a built-in keyboard/nav shortcut.
+    pub allow_keyboard_override: bool,
     pub slots: Vec<PieSlot>,
 }
 impl Default for PieConfig {
@@ -31,6 +33,7 @@ impl Default for PieConfig {
             name: "我的常用设计".into(),
             keyboard: String::new(),
             mouse: "Shift+Alt+RMB".into(),
+            allow_keyboard_override: false,
             slots: vec![PieSlot::default(); 8],
         }
     }
@@ -164,8 +167,12 @@ pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
     }
     let found = ctx.input(|i| i.events.iter().find_map(|e| {
         if let egui::Event::Key {key,pressed:true,modifiers,..}=e {
-            app.ui.leo_pies.iter().enumerate().find(|(_,p)|keyboard_binding(&p.keyboard,*key,*modifiers))
-                .map(|(idx,_)|(idx,*key,*modifiers))
+            app.ui.leo_pies.iter().enumerate().find(|(_,p)|{
+                keyboard_binding(&p.keyboard,*key,*modifiers) && (
+                    p.allow_keyboard_override ||
+                    (normalize(&p.keyboard) != "SHIFT+SPACE"
+                        && crate::shortcut_editor::conflicts_with(&app.ui.shortcut_overrides,&p.keyboard,"ui.leoPieSettings").is_empty()))
+            }).map(|(idx,_)|(idx,*key,*modifiers))
         } else { None }
     }));
     if let Some((menu,key,mods)) = found {
@@ -180,7 +187,8 @@ pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
 /// Returns true when the radial overlay owns the canvas and must suppress
 /// the ordinary right-click popup and document tool pointer handling.
 pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> bool {
-    if app.ui.leo_pie_editor || app.ui.dialog.is_some() || app.ui.screen_mode>=3 {
+    if app.ui.leo_pie_editor || app.ui.dialog.is_some() || app.ui.screen_mode>=3
+        || app.session.tool_wants_text() || app.session.tool_composing() {
         return false;
     }
     let input = ui.input(|i| (i.pointer.clone(), i.modifiers, i.key_pressed(Key::Escape)));
@@ -325,6 +333,14 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             recording.clear();
         }
         ui.label(egui::RichText::new("例如 Shift+Space、Shift+Alt+RMB、Shift+Ctrl+RMB；普通右键不改变。").small().weak());
+        let key_conflicts=crate::shortcut_editor::conflicts_with(&app.ui.shortcut_overrides,&menu.keyboard,"ui.leoPieSettings");
+        let conflict=normalize(&menu.keyboard)=="SHIFT+SPACE" || !key_conflicts.is_empty();
+        if conflict {
+            ui.colored_label(Color32::from_rgb(250,176,93),
+                format!("可能与原生导航/快捷键冲突：{}",
+                    if key_conflicts.is_empty() {"画布空格导航".to_owned()}else{key_conflicts.join(", ")}));
+            changed|=ui.checkbox(&mut menu.allow_keyboard_override,"允许饼菜单覆盖此原生键位").changed();
+        }
         ui.separator();
         ui.label("八方向槽位：点击一个方向，再从右侧原生命令目录添加功能");
         ui.columns(2,|cols|{
@@ -377,10 +393,10 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
         if !status.is_empty(){ui.label(status.as_str());}
     });
     if changed {
-        match validate(&menus) {
-            Ok(())=>{app.ui.leo_pies=menus;app.prefs_changed=true;},
-            Err(e)=>{status=e;}
-        }
+        // Keep in-progress text edits (including temporarily invalid strings),
+        // but validate before interpreting any gesture or importing JSON.
+        app.ui.leo_pies=menus;
+        app.prefs_changed=true;
     }
     app.ui.leo_pie_selected=index;
     app.ui.leo_pie_slot=sector;
