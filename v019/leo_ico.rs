@@ -154,4 +154,25 @@ mod tests {
         assert!(selected_sizes(&serde_json::json!({"icoSizes":[512]})).is_err());
         assert!(selected_sizes(&serde_json::json!({"icoSizes":[]})).is_err());
     }
+    #[test]
+    fn non_square_artboard_renders_all_icon_sizes_with_transparent_margins() {
+        let mut s = crate::Session::new();
+        s.execute("file.new", &serde_json::json!({"width": 100, "height": 50})).unwrap();
+        s.execute("paint.setStroke", &serde_json::json!({"none": true})).unwrap();
+        s.execute("shape.rectangle", &serde_json::json!({"x": 0, "y": 0, "width": 100, "height": 50})).unwrap();
+        let enc = encode(&s.doc().unwrap().doc, &serde_json::json!({"icoSizes": [16, 32, 256]}), Some(true)).unwrap();
+        assert_eq!(enc.files.len(), 1);
+        let bytes = &enc.files[0].1;
+        assert_eq!(u16::from_le_bytes(bytes[4..6].try_into().unwrap()), 3);
+        for (i, side) in [16u32, 32, 256].into_iter().enumerate() {
+            let entry = 6 + i * 16;
+            let len = u32::from_le_bytes(bytes[entry+8..entry+12].try_into().unwrap()) as usize;
+            let offset = u32::from_le_bytes(bytes[entry+12..entry+16].try_into().unwrap()) as usize;
+            let image = image::load_from_memory(&bytes[offset..offset+len]).unwrap().to_rgba8();
+            assert_eq!(image.dimensions(), (side, side));
+            assert_eq!(image.get_pixel(side/2, 0).0[3], 0, "square padding must stay transparent");
+            assert!(image.get_pixel(side/2, side/2).0[3] > 0, "vector art must be rendered");
+        }
+    }
+
 }

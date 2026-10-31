@@ -41,8 +41,8 @@ replace(
     '    v.push(Item::Cmd("Manage Workspaces…", "window.workspace.manage", Value::Null));\n',
     '''    v.push(Item::Cmd("Manage Workspaces…", "window.workspace.manage", Value::Null));
     v.push(Item::Sep);
-    v.push(Item::Cmd("Leo Design · 导出当前工作区…", "window.workspace.export", Value::Null));
-    v.push(Item::Cmd("Leo Design · 导入工作区…", "window.workspace.import", Value::Null));
+    v.push(Item::Cmd("Leo Design 导出当前工作区…", "window.workspace.export", Value::Null));
+    v.push(Item::Cmd("Leo Design 导入工作区…", "window.workspace.import", Value::Null));
 ''',
     "add workspace actions to native Window menu and workspace switcher"
 )
@@ -67,7 +67,7 @@ replace(
     '''                c("Keyboard Shortcuts…", "edit.keyboardShortcuts"),
                 c("Preferences…", "edit.preferences"),''',
     '''                c("Keyboard Shortcuts…", "edit.keyboardShortcuts"),
-                sub("Leo Design · 快捷键备份", vec![
+                sub("Leo Design 快捷键备份", vec![
                     c("导出快捷键 JSON…", "shortcuts.export"),
                     c("导入快捷键 JSON / KYS…", "shortcuts.import"),
                 ]),

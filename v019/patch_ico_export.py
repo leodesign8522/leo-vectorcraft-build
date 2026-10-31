@@ -140,7 +140,7 @@ rep(panel,
         row["antiAlias"] = json!("art");
         // Windows ICO is RGB with straight alpha; DPI, ICC and JPEG settings
         // have no meaning in .ico files and are intentionally ignored.
-        row.as_object_mut().unwrap().remove("ppi");
+        if let Some(fields) = row.as_object_mut() { fields.remove("ppi"); }
     }
     if format == "jpg" {
         let color = d.str("colorModel");''',

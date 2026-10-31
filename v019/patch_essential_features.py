@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Leo Design v0.19 enhancement modules: CJK clipboard, paragraph, Ctrl+Enter.
 Only apply after base Core Bridge; all anchors are checked. These port the
-tested v0.17 behavior to the v0.19 source without replacing the main program.
+historical v0.17 behavior to v0.19 source before rebuilding the main program.
 """
 from pathlib import Path
 import subprocess

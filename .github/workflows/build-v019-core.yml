@@ -21,6 +21,9 @@ jobs:
     name: VectorCraft v0.19 + Leo Design Core Bridge
     runs-on: windows-latest
     timeout-minutes: 180
+    env:
+      CARGO_PROFILE_TEST_OPT_LEVEL: "0"
+      CARGO_PROFILE_TEST_CODEGEN_UNITS: "256"
     steps:
       - name: Checkout Leo Design migration source
         uses: actions/checkout@v4
@@ -40,6 +43,15 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
+      - name: Cache v0.19 Rust release build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          # Reuse compatible v018 dependency artifacts; Cargo fingerprints
+          # and the new Cargo.lock still invalidate changed crates.
+          shared-key: "leo-vectorcraft-v018-core-windows-release"
+          cache-all-crates: false
+          cache-on-failure: true
       - name: Compile unmodified official v0.19 baseline
         shell: pwsh
         working-directory: vectorcraft
@@ -82,19 +94,6 @@ jobs:
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Source whitespace validation failed" }
           git -C vectorcraft diff --stat
-      - name: Install stable Rust toolchain
-        shell: pwsh
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          rustc --version
-          cargo --version
-      - name: Cache v0.19 Rust release build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "vectorcraft -> target"
-          shared-key: "leo-vectorcraft-v019-core-windows-release"
-          cache-all-crates: false
       - name: Apply pinned craft-ui docked flyout resizing
         shell: pwsh
         working-directory: vectorcraft
@@ -129,9 +128,9 @@ jobs:
         env:
           CARGO_INCREMENTAL: "0"
         run: |
-          cargo test --release --locked -p vectorcraft-engine leo_open_path_corner_stays_live_after_endpoint_move_and_undo -- --nocapture
+          cargo test --locked -p vectorcraft-engine leo_open_path_corner_stays_live_after_endpoint_move_and_undo -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Live corner drag regression failed" }
-          cargo test --release --locked -p vectorcraft-engine leo_move_anchor_endpoint_keeps_live_corner -- --nocapture
+          cargo test --locked -p vectorcraft-engine leo_move_anchor_endpoint_keeps_live_corner -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Live corner explicit move regression failed" }
       - name: Test native Leo Design Pie Menu gestures and configuration
         shell: pwsh
@@ -139,18 +138,22 @@ jobs:
         env:
           CARGO_INCREMENTAL: "0"
         run: |
-          cargo test --release --locked -p vectorcraft-ui-egui leo_pie_menu::tests -- --nocapture
+          cargo test --locked -p vectorcraft-ui-egui leo_pie_menu::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Leo Pie Menu gesture and config regressions failed" }
       - name: Test ICO encoder and native segment selection
         shell: pwsh
         working-directory: vectorcraft
         run: |
-          cargo test --release --locked -p vectorcraft-engine leo_ico::tests -- --nocapture
+          cargo test --locked -p vectorcraft-engine leo_ico::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "ICO encoder regression failed" }
-          cargo test --release --locked -p vectorcraft-tools marquee -- --nocapture
+          cargo test --locked -p vectorcraft-tools marquee -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native marquee regression failed" }
-          cargo test --release --locked -p vectorcraft-ui-egui shortcuts::paste::tests -- --nocapture
+          cargo test --locked -p vectorcraft-ui-egui shortcuts::paste::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Screenshot paste regression failed" }
+          cargo test --locked -p vectorcraft-ui-egui leo_image_export -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "JPEG/PNG export option regression failed" }
+          cargo test --locked -p vectorcraft-ui-egui leo_core_bridge::workspace_io::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Workspace JSON compatibility regression failed" }
       - name: Package portable v0.19 experimental build
         shell: pwsh
         run: |
@@ -158,14 +161,39 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design Core Bridge v0.8.0 / VectorCraft v0.19.0 preview
-          Experimental migration build. Windows GUI acceptance is pending.
-          Extract into an EMPTY directory. Existing user settings are not deleted.
-          A-tool segment marquee uses the official v0.19 implementation.
-          Includes Leo selection, guides, text, image export, ICO and Pie Menu.
-          ICC persistence and fully free workspace layout remain unverified.
-          See LEO_DESIGN_FEATURE_REGISTRY.md and MIGRATION_CHECKLIST.md.
+          Leo Design Core Bridge v0.8.0
+          适用官方版本：VectorCraft v0.19.0
+          状态：迁移预览版，Windows 实际操作与安装体验仍需验收。
+
+          便携版：解压到空文件夹，双击 vectorcraft.exe。
+          覆盖安装器：关闭 VectorCraft 后，选择官方 v0.19.0 安装目录。
+          两种方式任选其一。覆盖安装器只替换程序 EXE，不删除用户设置。
+          便携版的独立设置目录不等于自动迁移原安装版的配置。
+
+          保留：智能选择、锚点移动整组、彩色辅助线、文字增强、截图粘贴、
+          JPEG/PNG/ICO 导出、停靠面板尺寸、快捷设置及八方向饼菜单。
+          A 工具框选路径段采用官方 v0.19 原生实现。
+          历史缺口：ICC 工作空间设置记忆、完整自由工作区仍未确认恢复。
+
+          功能逐项说明见 LEO_DESIGN_FEATURE_REGISTRY.md。
+          本构建的自动验证范围见 BUILD_VALIDATION.txt。
+          编译与自动测试通过，不代表所有 Windows GUI 场景已验收。
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
+          @'
+          Automated validation for this preview:
+          - Unmodified official v0.19.0 baseline: cargo check passed.
+          - Enhanced Windows x64 native EXE: release build passed.
+          - Live Corner source-anchor movement and undo tests passed.
+          - Pie Menu gesture and JSON tests passed.
+          - ICO container, sizes, rendering and transparency tests passed.
+          - Official marquee selection tests passed.
+          - Screenshot paste shortcut tests passed.
+          - JPEG/PNG export option tests passed.
+          - Workspace JSON import validation tests passed.
+          Windows GUI gestures, installer execution and real user configuration
+          migration still require manual acceptance. ICC working-space persistence
+          and fully free workspace layout remain historical gaps.
+          '@ | Set-Content "dist/BUILD_VALIDATION.txt" -Encoding utf8
           Copy-Item LEO_DESIGN_FEATURE_REGISTRY.md dist/
           Copy-Item v019/MIGRATION_CHECKLIST.md dist/
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
