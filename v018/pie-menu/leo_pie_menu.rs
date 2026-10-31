@@ -171,8 +171,12 @@ fn run_slot(app: &mut VectorcraftApp, selected: usize, sector: usize) {
 /// Keyboard events are intercepted *before* VectorCraft's regular keymap.
 /// Never trigger over a focused editor, dialog, IME or command palette.
 pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
-    if app.ui.dialog.is_some() || app.ui.palette_open || app.ui.leo_pie_editor
-        || ctx.egui_wants_keyboard_input() || app.session.tool_wants_text() || app.session.tool_composing() {
+    // An open Pie Menu editor is a NON-MODAL configuration panel: the user
+    // must be able to try gestures on the document without closing it.
+    // The focus guard below still prevents shortcut activation while the
+    // user types into any of its name, command, search or JSON fields.
+    if app.ui.dialog.is_some() || app.ui.palette_open || ctx.egui_wants_keyboard_input()
+        || app.session.tool_wants_text() || app.session.tool_composing() {
         return false;
     }
     if let Some(open) = app.ui.leo_pie_open.clone() {
@@ -220,7 +224,10 @@ pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
 /// Returns true when the radial overlay owns the canvas and must suppress
 /// the ordinary right-click popup and document tool pointer handling.
 pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> bool {
-    if app.ui.leo_pie_editor || app.ui.dialog.is_some() || app.ui.screen_mode>=3
+    // Don't block canvas mouse shortcuts just because the (non-modal)
+    // editor is open. resp.hovered() gates activation to the actual canvas,
+    // so editing the form or using its dropdowns never triggers a pie.
+    if app.ui.dialog.is_some() || app.ui.screen_mode>=3
         || app.session.tool_wants_text() || app.session.tool_composing() {
         return false;
     }
@@ -342,10 +349,11 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let mut status=app.ui.leo_pie_message.clone();
     let mut open=true;
     let mut changed=false;
+    let mut test_slot=None;
     let commands=builtin_commands();
     egui::Window::new("Leo Design · 饼菜单编辑器")
         .id(egui::Id::new("leo-pie-config-window"))
-        .open(&mut open).default_size([740.0,630.0])
+        .open(&mut open).default_pos([60.0,70.0]).default_size([710.0,540.0])
         .resizable(true).show(ctx,|ui|{
         ui.horizontal_wrapped(|ui|{
             ui.label("饼菜单");
@@ -368,6 +376,19 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             changed|=ui.text_edit_singleline(&mut menu.name).changed();
         });
         ui.separator();
+        ui.horizontal_wrapped(|ui|{
+            ui.label(egui::RichText::new("实时编辑：无需关闭此窗口，在画布上直接测试快捷键/甩动。").strong());
+            ui.menu_button("单击测试命令",|ui|{
+                for (i,slot) in menus[index].slots.iter().enumerate() {
+                    if !slot.command.is_empty()
+                        && ui.button(format!("{}  {}",i+1,slot.name)).clicked() {
+                        test_slot=Some(i);
+                        ui.close();
+                    }
+                }
+            });
+        });
+        ui.label(egui::RichText::new("若正在输入文字，先点击画布空白处解除焦点，再按键盘快捷键。").small().weak());
         ui.label("触发快捷键（可以输入，也可以录制）");
         ui.horizontal(|ui|{
             ui.label("键盘");
@@ -489,6 +510,11 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     app.ui.leo_pie_import=import;
     app.ui.leo_pie_message=status;
     app.ui.leo_pie_editor=open;
+    // A command test is performed only after the live edits above have been
+    // committed to UiState; the editor stays open during the action.
+    if let Some(slot)=test_slot {
+        run_slot(app,index,slot);
+    }
 }
 
 #[cfg(test)]
@@ -497,6 +523,16 @@ mod tests {
     #[test] fn keyboard_binding_is_exact() {
         assert!(keyboard_binding("Shift+Space",Key::Space,Modifiers{shift:true,..Default::default()}));
         assert!(!keyboard_binding("Shift+Space",Key::Space,Modifiers{shift:true,ctrl:true,..Default::default()}));
+    }
+    #[test] fn live_editor_does_not_modify_mouse_chord_rules() {
+        // Canvas hit testing (resp.hovered) keeps the editor's text inputs
+        // separate from modifier+RMB gestures.
+        assert!(mouse_binding("Ctrl+Shift+RMB",Modifiers {
+            ctrl:true,shift:true,..Default::default()
+        }));
+        assert!(!mouse_binding("Ctrl+Shift+RMB",Modifiers {
+            ctrl:true,..Default::default()
+        }));
     }
     #[test] fn mouse_chords_do_not_swallow_normal_right_click() {
         assert!(mouse_binding("Shift+Alt+RMB",Modifiers{shift:true,alt:true,..Default::default()}));
