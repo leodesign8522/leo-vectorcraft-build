@@ -137,8 +137,17 @@ fn valid_binding(s: &str, mouse: bool) -> bool {
         // punctuation and function keys. Dedicated modifier keys alone are
         // still rejected.
         let name=*parts.last().unwrap_or(&"");
-        !name.is_empty() && egui::Key::ALL.iter().any(|key|
-            format!("{key:?}").eq_ignore_ascii_case(name))
+        !name.is_empty() && egui::Key::ALL.iter().any(|key| {
+            // Modifier-key press/release events themselves cannot be the
+            // terminal shortcut key; they made Ctrl+ControlLeft appear valid.
+            let k = format!("{key:?}");
+            !matches!(*key,
+                Key::ShiftLeft | Key::ShiftRight |
+                Key::ControlLeft | Key::ControlRight |
+                Key::AltLeft | Key::AltRight |
+                Key::SuperLeft | Key::SuperRight)
+                && k.eq_ignore_ascii_case(name)
+        })
     }
 }
 fn validate(configs: &[PieConfig]) -> Result<(), String> {
@@ -541,6 +550,8 @@ mod tests {
         assert!(keyboard_binding("Shift+D", Key::D, Modifiers {shift:true,..Default::default()}));
         assert!(!keyboard_binding("Shift+D", Key::D, Modifiers::NONE));
         assert!(!valid_binding("Shift",false));
+        assert!(!valid_binding("Ctrl+ControlLeft",false));
+        assert!(!valid_binding("Shift+ShiftLeft",false));
     }
     #[test] fn keyboard_binding_is_exact() {
         assert!(keyboard_binding("Shift+Space",Key::Space,Modifiers{shift:true,..Default::default()}));
