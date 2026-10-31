@@ -2,7 +2,7 @@
 
 **项目：** `leodesign8522/leo-vectorcraft-build`  
 **日期：** 2026-10-31  
-**状态：** **已创建迁移分支，但尚未移植或编译。** 不要将 v0.18 Overlay Installer 装在 v0.19 官方版上。
+**状态：** **v0.8.0 迁移补丁已完成本地源码应用检查，Windows 编译与功能测试待运行。** 不要将 v0.18 Overlay Installer 装在 v0.19 官方版上。
 
 ## 已确认的版本基线
 
@@ -51,3 +51,18 @@
 3. 覆盖安装器必须验证官方版本，阻止 v0.18 安装器覆盖 v0.19 和反向覆盖。
 4. 配置文件优先保持独立；用户日常仅导出工作区/快捷键 JSON 可以，但不能用这两份文件替代完整 ICC/饼菜单资源的安全方案。
 5. 每完成一项功能，更新 [LEO_DESIGN_FEATURE_REGISTRY.md](../LEO_DESIGN_FEATURE_REGISTRY.md)；新功能另设唯一 LC 编号。未完成项不得标绿色。
+
+## v0.8.0 迁移记录
+
+- 上游固定为 `v0.19.0` / `bcebabe3f8c23a376ac68e9e6726590af278f7bb`。
+- v019 使用独立补丁，不修改 v018 回退版本。
+- 所有 Core Bridge 补丁已在干净的官方 v0.19 源码上顺序应用通过。
+- 修复 ICO 格式注册锚点：保留官方新增 PCX 格式。
+- 适配 Selection / Direct Selection 方法拆分，保留官方 selected-source 命中范围。
+- Live Corners 迁移保留官方 outermost 过滤，避免父子对象重复移动。
+- LC-017 使用官方原生 crossed_segments + select.segments，旧框选补丁不再重复注入。
+- 饼菜单适配 canvas_input / canvas_cursor 拆分，呼出时阻止画布工具收到同一输入。
+- craft-ui 补丁按 Cargo.lock 精确选择依赖提交，避免改错缓存中的另一个版本。
+- 覆盖安装器只接收 v0.19.0；无法读取版本时停止。
+- LC-004 ICC 持久化仍未恢复；LC-012 完整自由布局仍待核对。未宣称所有历史需求均已完成。
+- Windows GUI、实际安装、真实文件和配置迁移尚未验收。

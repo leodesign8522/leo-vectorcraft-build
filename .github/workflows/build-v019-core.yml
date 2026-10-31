@@ -1,0 +1,221 @@
+name: Leo Design Core Bridge - VectorCraft v0.19 (Windows x64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v019-migration
+    paths:
+      - ".github/workflows/build-v019-core.yml"
+      - "v019/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leo-vectorcraft-v019-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: VectorCraft v0.19 + Leo Design Core Bridge
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout Leo Design migration source
+        uses: actions/checkout@v4
+      - name: Checkout official VectorCraft v0.19.0
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: v0.19.0
+          path: vectorcraft
+          persist-credentials: false
+      - name: Install Python for compatibility patches
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install stable Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Compile unmodified official v0.19 baseline
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo check --locked -p vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Official v0.19 baseline failed" }
+      - name: Apply modular Leo Design Core Bridge
+        shell: pwsh
+        run: |
+          python v019/patch_core_bridge.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Design Core Bridge source patch failed" }
+          python v019/patch_screenshot_paste.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Screenshot Paste patch failed" }
+          python v019/patch_essential_features.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Design essential v0.19 patches failed" }
+          python v019/patch_image_export.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Image Pro Export v0.19 integration failed" }
+          python v019/patch_panel_usability.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo panel size and scrolling patch failed" }
+          python v019/patch_ico_export.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Windows ICO export integration failed" }
+          python v019/patch_docked_panel_sizes.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo docked panel size state patch failed" }
+          python v019/patch_workspace_flyout_sizes.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo per-workspace flyout size save/restore failed" }
+          python v019/patch_smart_interactions.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Smart Select and Group Anchor Move patch failed" }
+          python v019/patch_live_corner_geometry_link.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Live Corner Geometry Link patch failed" }
+          python v019/patch_direct_marquee_edges.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Direct Selection marquee edge patch failed" }
+          python v019/patch_smart_guide_colors.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo multi-colour Smart Guides patch failed" }
+          python v019/patch_quick_settings.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Units and Colour dock panels patch failed" }
+          python v019/patch_pie_menu.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Design Pie Menu source integration failed" }
+          python scripts/patch_color_panel_lock.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo CMYK display-mode lock patch failed" }
+          git -C vectorcraft diff --check
+          if ($LASTEXITCODE -ne 0) { throw "Source whitespace validation failed" }
+          git -C vectorcraft diff --stat
+      - name: Install stable Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
+      - name: Cache v0.19 Rust release build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          shared-key: "leo-vectorcraft-v019-core-windows-release"
+          cache-all-crates: false
+      - name: Apply pinned craft-ui docked flyout resizing
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo fetch --locked
+          if ($LASTEXITCODE -ne 0) { throw "Unable to fetch pinned craft-ui git dependency" }
+          python ../v019/patch_craft_ui_flyout.py
+          if ($LASTEXITCODE -ne 0) { throw "craft-ui in-place flyout resize patch failed" }
+          # The Rust cache includes a precompiled craft-ui. Cargo did not
+          # recompile it after editing the pinned git checkout in v0.8.0.
+          # Force invalidation so the patched flyout renderer is in the EXE.
+          cargo clean --release -p craft-ui
+          if ($LASTEXITCODE -ne 0) { throw "Unable to invalidate cached craft-ui" }
+      - name: Format migrated Rust source
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Compile Windows x64 native EXE
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+          CARGO_TERM_COLOR: always
+        run: |
+          cargo build --release --locked -p vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Core Bridge Windows compilation failed" }
+      - name: Test live corner endpoint movement, regeneration and undo
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          cargo test --release --locked -p vectorcraft-engine leo_open_path_corner_stays_live_after_endpoint_move_and_undo -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Live corner drag regression failed" }
+          cargo test --release --locked -p vectorcraft-engine leo_move_anchor_endpoint_keeps_live_corner -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Live corner explicit move regression failed" }
+      - name: Test native Leo Design Pie Menu gestures and configuration
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          cargo test --release --locked -p vectorcraft-ui-egui leo_pie_menu::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Leo Pie Menu gesture and config regressions failed" }
+      - name: Test ICO encoder and native segment selection
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --release --locked -p vectorcraft-engine leo_ico::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "ICO encoder regression failed" }
+          cargo test --release --locked -p vectorcraft-tools marquee -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native marquee regression failed" }
+          cargo test --release --locked -p vectorcraft-ui-egui shortcuts::paste::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Screenshot paste regression failed" }
+      - name: Package portable v0.19 experimental build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
+          New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
+          @'
+          Leo Design Core Bridge v0.8.0 / VectorCraft v0.19.0 preview
+          Experimental migration build. Windows GUI acceptance is pending.
+          Extract into an EMPTY directory. Existing user settings are not deleted.
+          A-tool segment marquee uses the official v0.19 implementation.
+          Includes Leo selection, guides, text, image export, ICO and Pie Menu.
+          ICC persistence and fully free workspace layout remain unverified.
+          See LEO_DESIGN_FEATURE_REGISTRY.md and MIGRATION_CHECKLIST.md.
+          '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
+          Copy-Item LEO_DESIGN_FEATURE_REGISTRY.md dist/
+          Copy-Item v019/MIGRATION_CHECKLIST.md dist/
+          git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
+          & "dist/vectorcraft.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "EXE version smoke test failed" }
+      - name: Upload experimental Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_v019_Core_Bridge_v0.8.0_Windows_x64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  overlay-installer:
+    name: Build Leo Design overlay installer
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Leo Design installer recipe
+        uses: actions/checkout@v4
+      - name: Fetch enhanced VectorCraft v0.19 EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_v019_Core_Bridge_v0.8.0_Windows_x64
+          path: overlay-source
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          $compiler = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          if (-not (Test-Path $compiler)) { throw "ISCC.exe was not found" }
+      - name: Compile version-checked overlay installer
+        shell: pwsh
+        run: |
+          $compiler = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+          $source = (Resolve-Path "overlay-source/vectorcraft.exe").Path
+          $outDir = (New-Item -ItemType Directory -Force -Path "overlay-output").FullName
+          & $compiler "/DSourceExe=$source" "/O$outDir" "v019/overlay/Leo_Design_Core_Bridge.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Overlay installer compilation failed" }
+          $installer = Get-ChildItem -Path $outDir -Filter "Leo_Design_Core_Bridge*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "Overlay installer executable not created" }
+          Write-Host "Ready: $($installer.FullName) / $($installer.Length) bytes"
+      - name: Upload one-click overlay installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_Core_Bridge_v0.8.0_Overlay_Installer_for_VectorCraft_v0.19
+          path: overlay-output/*.exe
+          if-no-files-found: error
+          retention-days: 30
