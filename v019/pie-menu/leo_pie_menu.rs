@@ -1,4 +1,4 @@
-//! Leo Design Pie Menu v0.2.0 — native VectorCraft canvas radial commands.
+//! Leo Design Pie Menu v0.4.0 — native VectorCraft canvas radial commands.
 //! Multiple configurable menus, keyboard and modifier+RMB bindings, a searchable
 //! native command picker, and JSON import/export. No OS-global mouse hook.
 use egui::{Color32, Key, Modifiers, PointerButton, Pos2, Rect, Stroke, Ui, Vec2};
@@ -343,11 +343,45 @@ pub fn paint(ui: &Ui, app: &VectorcraftApp) {
     // requests another frame; forcing redraw every frame wastes CPU/GPU.
 }
 
+
+fn preset_definitions() -> [(&'static str, [&'static str; 8]); 3] {
+    [
+        ("视图与网格", ["view.grid", "view.snapToGrid", "view.smartGuides", "view.guides",
+            "view.rulers", "view.transparencyGrid", "view.zoomIn", "view.zoomOut"]),
+        ("编组与排列", ["object.group", "object.ungroup", "object.arrange.bringToFront",
+            "object.arrange.bringForward", "object.arrange.sendBackward", "object.arrange.sendToBack",
+            "select.none", "tool:selection"]),
+        ("常用编辑工具", ["edit.undo", "edit.redo", "edit.cut", "edit.copy",
+            "edit.paste", "edit.pasteInPlace", "tool:directSelection", "tool:selection"]),
+    ]
+}
+
 fn builtin_commands()->Vec<(String,String)>{
     let mut v:Vec<_>=crate::palette::items().into_iter().map(|(label,id,_)|(label,id)).collect();
     for (id,label) in crate::state::all_panels() {
         v.push((format!("面板 › {label}"),format!("panel:{id}")));
     }
+    // Use the official Simplified Chinese catalog independently of app language.
+    let lang = crate::i18n::Lang::from_code("zh-hans").unwrap_or(crate::i18n::current());
+    for (label, id) in &mut v {
+        let english = label.clone();
+        let translated = label.split(" › ").map(|part| crate::i18n::tr(lang, part))
+            .collect::<Vec<_>>().join(" › ");
+        let chinese = match id.as_str() {
+            "view.grid" => "显示网格",
+            "view.snapToGrid" => "吸附到网格",
+            "view.smartGuides" => "智能参考线",
+            "view.guides" => "显示／隐藏参考线",
+            "view.rulers" => "显示标尺",
+            "object.group" => "编组",
+            "object.ungroup" => "取消编组",
+            _ => translated.as_str(),
+        };
+        *label = if chinese == english { english } else { format!("{chinese} / {english}") };
+    }
+    // Deduplicate by command ID before sorting by the visible name.
+    let mut seen = std::collections::HashSet::new();
+    v.retain(|(_, id)| seen.insert(id.clone()));
     v.sort_by(|a,b|a.0.cmp(&b.0));
     v.dedup_by(|a,b|a.1==b.1);
     v
@@ -482,6 +516,28 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                 menus.remove(index);index=0;changed=true;
             }
         });
+        ui.menu_button("＋ 从常用预设新建", |ui| {
+            ui.label("新建独立菜单，保留现有快捷键和槽位");
+            for (title, ids) in preset_definitions() {
+                if ui.add_enabled(menus.len() < 24, egui::Button::new(title)).clicked() {
+                    let mut preset = PieConfig::default();
+                    preset.name = title.into();
+                    preset.mouse.clear();
+                    for (slot, id) in preset.slots.iter_mut().zip(ids) {
+                        if let Some((label, command)) = commands.iter().find(|(_, command)| command == id) {
+                            slot.name = label.split(" / ").next().unwrap_or(label).rsplit(" › ").next().unwrap_or(label).into();
+                            slot.command = command.clone();
+                        }
+                    }
+                    menus.push(preset);
+                    index = menus.len() - 1;
+                    sector = 0;
+                    changed = true;
+                    status = "预设已新建，请设置触发快捷键；原菜单已保留".into();
+                    ui.close();
+                }
+            }
+        });
         let menu=&mut menus[index];
         ui.horizontal(|ui|{
             ui.label("菜单名称");
@@ -591,15 +647,16 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                 }
             });
             cols[1].vertical(|ui|{
-                ui.label("搜索并添加 VectorCraft 功能");
+                ui.label("中文功能列表 · 点击添加到当前方向");
+                ui.label(egui::RichText::new("支持中文、英文和命令 ID；例如：网格 / grid").small().weak());
                 ui.text_edit_singleline(&mut query);
                 let needle=query.trim().to_lowercase();
                 egui::ScrollArea::vertical().max_height(340.0).show(ui,|ui|{
                     for (label,id) in commands.iter().filter(|(name,id)|{
-                        needle.is_empty() || name.to_lowercase().contains(&needle) || id.to_lowercase().contains(&needle)
-                    }).take(80) {
+                        needle.split_whitespace().all(|word| name.to_lowercase().contains(word) || id.to_lowercase().contains(word))
+                    }) {
                         if ui.button(format!("＋ {label}")).on_hover_text(id).clicked(){
-                            menu.slots[sector]=PieSlot{name:label.rsplit(" › ").next().unwrap_or(label).to_owned(),command:id.clone()};
+                            menu.slots[sector]=PieSlot{name:label.split(" / ").next().unwrap_or(label).rsplit(" › ").next().unwrap_or(label).to_owned(),command:id.clone()};
                             changed=true;
                         }
                     }
@@ -652,6 +709,23 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn chinese_picker_keeps_english_and_grid_searchable() {
+        let commands = builtin_commands();
+        let (label, _) = commands.iter().find(|(_, id)| id == "view.grid").unwrap();
+        assert!(label.contains("显示网格"));
+        assert!(label.to_lowercase().contains("grid"));
+        let mut seen = std::collections::HashSet::new();
+        assert!(commands.iter().all(|(_, id)| seen.insert(id)));
+    }
+    #[test] fn presets_only_reference_available_native_commands() {
+        let commands = builtin_commands();
+        for (title, ids) in preset_definitions() {
+            for id in ids {
+                assert!(commands.iter().any(|(_, command)| command == id),
+                    "missing preset command {title}: {id}");
+            }
+        }
+    }
     #[test] fn shift_d_and_common_shortcuts_are_accepted() {
         assert!(valid_binding("Shift+D",false));
         assert!(valid_binding("Shift + D",false));
