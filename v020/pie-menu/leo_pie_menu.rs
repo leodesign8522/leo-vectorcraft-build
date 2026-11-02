@@ -1140,7 +1140,7 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     egui::Window::new("Leo Design 饼菜单编辑器")
         .id(egui::Id::new("leo-pie-config-window"))
         .open(&mut open).default_pos([60.0,70.0]).default_size([710.0,540.0])
-        .resizable(true).show(ctx,|ui|{
+        .resizable(true).vscroll(true).show(ctx,|ui|{
         ui.horizontal_wrapped(|ui|{
             ui.label("饼菜单");
             egui::ComboBox::from_id_salt("leo-pie-current").selected_text(&menus[index].name).show_ui(ui,|ui|{
