@@ -121,6 +121,14 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test native Leo Design Pie Menu gestures and configuration
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_pie_menu::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Leo Pie Menu gesture and config regressions failed" }
       - name: Compile Windows x64 native EXE
         shell: pwsh
         working-directory: vectorcraft
@@ -140,14 +148,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Live corner drag regression failed" }
           cargo test --locked -p vectorcraft-engine leo_move_anchor_endpoint_keeps_live_corner -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Live corner explicit move regression failed" }
-      - name: Test native Leo Design Pie Menu gestures and configuration
-        shell: pwsh
-        working-directory: vectorcraft
-        env:
-          CARGO_INCREMENTAL: "0"
-        run: |
-          cargo test --locked -p vectorcraft-ui-egui leo_pie_menu::tests -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Leo Pie Menu gesture and config regressions failed" }
       - name: Test editable AI import and SVG clipboard fonts
         shell: pwsh
         working-directory: vectorcraft
