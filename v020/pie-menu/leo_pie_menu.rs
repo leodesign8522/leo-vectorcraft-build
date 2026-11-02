@@ -1,4 +1,4 @@
-//! Leo Design Pie Menu v0.5.1 — native VectorCraft canvas radial commands.
+//! Leo Design Pie Menu v0.6.0 — native VectorCraft canvas radial commands.
 //! Multiple configurable menus, keyboard and modifier+RMB bindings, a searchable
 //! native command picker, and JSON import/export. No OS-global mouse hook.
 use crate::VectorcraftApp;
@@ -429,9 +429,103 @@ fn run_slot(app: &mut VectorcraftApp, selected: usize, sector: usize) {
     }
 }
 
+
+fn slot_for_shortcut(app: &VectorcraftApp, key: Key, mods: Modifiers) -> Option<PieSlot> {
+    let text = crate::shortcut_editor::format(&egui::KeyboardShortcut::new(mods, key));
+    let chord = crate::keymap::vc_chord(&text)?;
+    let map = crate::keymap::keymap_with(&app.ui.shortcut_overrides);
+    let command = crate::keymap::lookup(&map, &chord)?;
+    let entry = crate::keymap::entry_key(&command);
+    let name = builtin_commands().into_iter().find(|(_, id)| *id == entry)
+        .map(|(name, _)| name.split(" / ").next().unwrap_or(&name)
+            .rsplit(" › ").next().unwrap_or(&name).to_string())
+        .unwrap_or_else(|| command.id.clone());
+    Some(PieSlot { name, command: command.id, params: command.params, submenu: None })
+}
+
+fn capture_command_frame(app: &mut VectorcraftApp, ctx: &egui::Context) {
+    let target: Vec<usize> = app.ui.leo_pie_recording.split(':').skip(1)
+        .filter_map(|s| s.parse().ok()).collect();
+    let press = ctx.input(|i| i.events.iter().find_map(|event| match event {
+        egui::Event::Key { key, pressed: true, repeat: false, modifiers, .. }
+            if !crate::shortcuts::is_modifier(*key) => Some((*key, *modifiers)),
+        _ => None,
+    }).or_else(|| i.events.iter().find_map(|event| match event {
+        egui::Event::Copy => Some((Key::C, i.modifiers)),
+        egui::Event::Cut => Some((Key::X, i.modifiers)),
+        egui::Event::Paste(_) => Some((Key::V, i.modifiers)),
+        _ => None,
+    })));
+    if let Some((key, mods)) = press {
+        app.ui.leo_pie_recording.clear();
+        if key == Key::Escape {
+            app.ui.leo_pie_message = "已取消添加快捷键".into();
+        } else if let Some(slot) = slot_for_shortcut(app, key, mods) {
+            let text = keyboard_text(key, mods);
+            if let [menu, sector] = target.as_slice()
+                && let Some(dest) = app.ui.leo_pies.get_mut(*menu).and_then(|m| m.slots.get_mut(*sector))
+            {
+                app.ui.leo_pie_message = format!("已添加：{}（{}）；录入时不会执行功能", slot.name, text);
+                *dest = slot;
+                app.prefs_changed = true;
+            }
+        } else {
+            app.ui.leo_pie_message = format!("{} 没有绑定可添加的功能，请先在“键盘快捷键”里设置，或按名称搜索。",
+                keyboard_text(key, mods));
+        }
+    }
+    ctx.input_mut(|i| i.events.retain(|e|
+        !matches!(e, egui::Event::Key { .. } | egui::Event::Text(_)
+            | egui::Event::Copy | egui::Event::Cut | egui::Event::Paste(_))));
+}
+
+/// Pause over a submenu while holding a gesture to continue through levels.
+fn release_select(app: &VectorcraftApp, open: &OpenPie) -> bool {
+    let root = open.history.first().map_or(open.menu, |(menu, _)| *menu);
+    app.ui.leo_pies.get(root).is_some_and(|m| m.keyboard_release_select)
+}
+
+fn held_submenu(app: &mut VectorcraftApp, ctx: &egui::Context, open: &OpenPie, at: Pos2) -> bool {
+    let token = egui::Id::new("leo-pie-submenu-hover");
+    let held = ctx.input(|i| if open.mouse {
+        i.pointer.button_down(PointerButton::Secondary)
+    } else {
+        open.key.is_some_and(|key| i.key_down(key))
+            && release_select(app, open)
+    });
+    let target = open.last_sector.filter(|sector| held && app.ui.leo_pies
+        .get(open.menu).and_then(|m| m.slots.get(*sector)).is_some_and(|s| s.submenu.is_some()));
+    let Some(sector) = target else {
+        ctx.data_mut(|d| d.remove::<(usize, usize, f64)>(token));
+        return false;
+    };
+    let now = ctx.input(|i| i.time);
+    let previous = ctx.data(|d| d.get_temp::<(usize, usize, f64)>(token));
+    let start = previous.filter(|(menu, slot, _)| *menu == open.menu && *slot == sector)
+        .map_or(now, |(_, _, time)| time);
+    ctx.data_mut(|d| d.insert_temp(token, (open.menu, sector, start)));
+    ctx.request_repaint_after(std::time::Duration::from_millis(30));
+    if now - start < 0.30 { return false; }
+    ctx.data_mut(|d| d.remove::<(usize, usize, f64)>(token));
+    select_slot(app, open.clone(), sector, at);
+    if let Some(child) = app.ui.leo_pie_open.as_mut() {
+        child.mouse = open.mouse;
+        child.key = open.key;
+    }
+    true
+}
+
 /// Keyboard events are intercepted *before* VectorCraft's regular keymap.
 /// Never trigger over a focused editor, dialog, IME or command palette.
 pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
+    // Capture before text/tool dispatch: Delete must never delete artwork while recording.
+    if app.ui.leo_pie_editor && app.ui.leo_pie_recording.starts_with("command:") {
+        capture_command_frame(app, ctx);
+        return true;
+    }
+    if app.ui.leo_pie_editor && !app.ui.leo_pie_recording.is_empty() {
+        return true;
+    }
     // An open Pie Menu editor is a NON-MODAL configuration panel: the user
     // must be able to try gestures on the document without closing it.
     // The focus guard below still prevents shortcut activation while the
@@ -456,11 +550,7 @@ pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
         // Optional Blender-style keyboard chord: hold the key, move the
         // cursor toward a sector, release the same key to execute.
         if let Some(key) = open.key {
-            let release_enabled = app
-                .ui
-                .leo_pies
-                .get(open.menu)
-                .is_some_and(|m| m.keyboard_release_select);
+            let release_enabled = release_select(app, &open);
             if release_enabled && ctx.input(|i| i.key_released(key)) {
                 let at = ctx.input(|i| i.pointer.hover_pos());
                 let threshold = app.ui.leo_pies[open.menu].flick_threshold;
@@ -479,6 +569,7 @@ pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
         // alter the active document under the menu.
         return true;
     }
+    ctx.data_mut(|d| d.remove::<(usize, usize, f64)>(egui::Id::new("leo-pie-submenu-hover")));
     let found = ctx.input(|i| {
         i.events.iter().find_map(|e| {
             if let egui::Event::Key {
@@ -561,6 +652,13 @@ pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> 
         if let Some(p) = at {
             active.last_sector = active.sector(p, threshold);
         }
+        if at.is_some_and(|p| held_submenu(app, ui.ctx(), &active, p)) {
+            return true;
+        }
+        if !active.mouse && pointer.button_pressed(PointerButton::Secondary) {
+            back(app, active);
+            return true;
+        }
         if active.mouse && pointer.button_released(PointerButton::Secondary) {
             let slot = active.last_sector;
             if let Some(slot) = slot {
@@ -599,6 +697,7 @@ pub fn mouse_frame(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response) -> 
         app.ui.leo_pie_open = Some(active);
         return true;
     }
+    ui.ctx().data_mut(|d| d.remove::<(usize, usize, f64)>(egui::Id::new("leo-pie-submenu-hover")));
     if !resp.hovered() || !pointer.button_pressed(PointerButton::Secondary) {
         return false;
     }
@@ -817,6 +916,7 @@ fn command_matches(label: &str, id: &str, query: &str) -> bool {
         "view.snapToGrid" => "对齐网格 网格吸附 吸附到网格 普通网格",
         "perspective.grid.snap" => "透视网格吸附 透视对齐网格",
         "object.ungroup" => "取消编组 解除编组 拆组",
+        "edit.clear" | "edit.delete" => "删除 delete del backspace",
         _ => "",
     };
     let haystack = search_term(&format!("{label} {id} {aliases}"));
@@ -853,6 +953,7 @@ fn builtin_commands() -> Vec<(String, String)> {
             "view.smartGuides" => "智能参考线",
             "view.guides" => "显示／隐藏参考线",
             "view.rulers" => "显示标尺",
+            "edit.clear" | "edit.delete" => "删除（Delete）",
             "object.group" => "编组",
             "object.ungroup" => "取消编组",
             _ => translated.as_str(),
@@ -1135,6 +1236,7 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let mut changed = false;
     let mut test_slot = None;
     let mut file_action = 0;
+    let mut edit_child = None;
     let commands = builtin_commands();
     let variants = menu_variants();
     egui::Window::new("Leo Design 饼菜单编辑器")
@@ -1304,7 +1406,11 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                     }
                     changed=true;
                 }
-                ui.label("下级菜单：进入后单击选择；点中心或 Backspace 返回，Esc 关闭。");
+                if let Some(target) = menu.slots[sector].submenu {
+                    if ui.button("进入编辑此子菜单 →").clicked() { edit_child = Some(target); }
+                }
+                ui.label("按住手势，移向子菜单停留 0.3 秒进入，再移向功能松开执行。");
+                ui.label("也可松开进入后单击选择；点中心、右键或 Backspace 返回，Esc 关闭。");
                 ui.label("命令 ID（高级）");
                 if ui.text_edit_singleline(&mut menu.slots[sector].command).changed() {
                     menu.slots[sector].params = serde_json::Value::Null;
@@ -1323,7 +1429,19 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                 }
             });
             cols[1].vertical(|ui|{
-                ui.label("中文功能列表 · 点击添加到当前方向");
+                ui.label("添加功能到当前方向");
+                if ui.button(if recording.starts_with("command:") {"正在等待按键… Esc 取消"} else {"＋ 按快捷键添加功能"}).clicked() {
+                    recording = format!("command:{index}:{sector}");
+                    app.ui.leo_pie_open = None;
+                    if let Some(focus) = ctx.memory(|m| m.focused()) {
+                        ctx.memory_mut(|m| m.surrender_focus(focus));
+                    }
+                    status = "请按功能的快捷键，例如 Delete、Shift+O；这里只添加，不执行功能。".into();
+                }
+                if recording.starts_with("command:") {
+                    ui.colored_label(Color32::from_rgb(153,212,252), "请按快捷键；Esc 取消");
+                }
+                ui.label("或按名称搜索功能");
                 ui.label(egui::RichText::new("支持中文、英文和命令 ID；例如：网格 / grid").small().weak());
                 ui.text_edit_singleline(&mut query);
                 let matches: Vec<_> = commands.iter()
@@ -1388,6 +1506,8 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
         app.ui.leo_pies = menus;
         app.prefs_changed = true;
     }
+    if let Some(child) = edit_child { index = child; sector = 0; recording.clear(); }
+    if !open { recording.clear(); }
     app.ui.leo_pie_selected = index;
     app.ui.leo_pie_slot = sector;
     app.ui.leo_pie_query = query;
@@ -1419,6 +1539,114 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn child_release_mode_follows_root_menu() {
+        let mut app = test_app();
+        app.ui.leo_pies[0].keyboard_release_select = true;
+        app.ui.leo_pies[1].keyboard_release_select = false;
+        let open = OpenPie {
+            menu:1, origin:Pos2::ZERO, mouse:false, key:Some(Key::Space),
+            last_sector:None, history:vec![(0,Pos2::ZERO)],
+        };
+        assert!(release_select(&app, &open));
+    }
+
+    #[test]
+    fn shortcut_capture_resolves_delete_tools_panels_and_overrides() {
+        let mut app = test_app();
+        let slot = slot_for_shortcut(&app, Key::Delete, Modifiers::NONE).unwrap();
+        assert_eq!(slot.command, "edit.clear");
+        assert!(slot.submenu.is_none());
+        let panel = slot_for_shortcut(&app, Key::F6, Modifiers::NONE).unwrap();
+        assert_eq!(panel.command, "window.panel");
+        assert_eq!(panel.params["panel"], "color");
+        let tool = slot_for_shortcut(&app, Key::V, Modifiers::NONE).unwrap();
+        assert_eq!(tool.command, "tool:selection");
+        crate::keymap::set_override(&mut app.ui.shortcut_overrides, "edit.clear", "Shift+O");
+        let custom = slot_for_shortcut(&app, Key::O, Modifiers::SHIFT).unwrap();
+        assert_eq!(custom.command, "edit.clear");
+        crate::keymap::set_override(&mut app.ui.shortcut_overrides, "edit.clear", "");
+        assert!(slot_for_shortcut(&app, Key::Delete, Modifiers::NONE).is_none());
+    }
+
+    #[test]
+    fn recording_delete_adds_to_child_without_deleting_selection() {
+        let mut app = test_app();
+        let object = app.run("shape.rectangle", json!({"x":0,"y":0,"width":10,"height":10})).unwrap()["id"].clone();
+        app.run("select.set", json!({"ids":[object]})).unwrap();
+        app.ui.leo_pie_editor = true;
+        app.ui.leo_pie_recording = "command:1:3".into();
+        let old = app.ui.leo_pies[0].clone();
+        let ctx = egui::Context::default();
+        let _ = ctx.run_ui(egui::RawInput {
+            events: vec![egui::Event::Key {
+                key: Key::Delete, physical_key: None, pressed: true,
+                repeat: false, modifiers: Modifiers::NONE,
+            }],
+            ..Default::default()
+        }, |ui| { assert!(keyboard_frame(&mut app, ui.ctx())); });
+        assert_eq!(app.session.active().unwrap().selection.objects.len(), 1);
+        assert_eq!(app.ui.leo_pies[1].slots[3].command, "edit.clear");
+        assert_eq!(app.ui.leo_pies[0], old);
+        assert!(app.ui.leo_pie_recording.is_empty());
+        run_slot(&mut app, 1, 3);
+        assert!(app.session.active().unwrap().selection.objects.is_empty());
+    }
+
+    #[test]
+    fn recording_cancel_and_unassigned_keys_preserve_slot() {
+        let mut app = test_app();
+        let original = app.ui.leo_pies.clone();
+        app.ui.leo_pie_editor = true;
+        let ctx = egui::Context::default();
+        for key in [Key::Escape, Key::F12] {
+            app.ui.leo_pie_recording = "command:0:0".into();
+            let mods = if key == Key::F12 { Modifiers { alt: true, ctrl: true, shift: true, ..Default::default() } } else { Modifiers::NONE };
+            let _ = ctx.run_ui(egui::RawInput {
+                events: vec![egui::Event::Key {
+                    key, physical_key: None, pressed: true, repeat: false, modifiers: mods,
+                }], ..Default::default()
+            }, |ui| { assert!(keyboard_frame(&mut app, ui.ctx())); });
+            assert_eq!(app.ui.leo_pies, original);
+            assert!(app.ui.leo_pie_recording.is_empty());
+        }
+    }
+
+    #[test]
+    fn held_mouse_submenu_continues_gesture_and_release_executes_leaf() {
+        let mut app = test_app();
+        app.ui.leo_pies[0].slots[0] = PieSlot { name: "子菜单".into(), submenu: Some(1), ..Default::default() };
+        app.ui.leo_pies[1].slots[0] = PieSlot { name: "网格".into(), command: "view.snapToGrid".into(), ..Default::default() };
+        let ctx = egui::Context::default();
+        let origin = Pos2::new(300.0, 300.0);
+        app.ui.leo_pie_open = Some(OpenPie {
+            menu:0, origin, mouse:true, key:None, last_sector:None, history:vec![],
+        });
+        let button = |pos, pressed| egui::Event::PointerButton {
+            pos, button:PointerButton::Secondary, pressed, modifiers:Modifiers::NONE,
+        };
+        let frame = |app: &mut VectorcraftApp, time, events| {
+            let _ = ctx.run_ui(egui::RawInput { time:Some(time), events, ..Default::default() }, |ui| {
+                let rect = Rect::from_min_size(Pos2::ZERO, Vec2::new(900.0,900.0));
+                let response = ui.allocate_rect(rect, egui::Sense::hover());
+                assert!(mouse_frame(app, ui, &response));
+            });
+        };
+        let at = origin + Vec2::new(100.0,0.0);
+        let before = app.ui.view.snap_to_grid;
+        frame(&mut app, 1.0, vec![egui::Event::PointerMoved(at), button(at,true)]);
+        frame(&mut app, 1.35, vec![]);
+        let child = app.ui.leo_pie_open.clone().unwrap();
+        assert_eq!(child.menu, 1);
+        assert!(child.mouse);
+        assert_eq!(app.ui.view.snap_to_grid, before);
+        let leaf = child.origin + Vec2::new(100.0,0.0);
+        frame(&mut app, 1.4, vec![egui::Event::PointerMoved(leaf), button(leaf,false)]);
+        assert!(app.ui.leo_pie_open.is_none());
+        assert_ne!(app.ui.view.snap_to_grid, before);
+    }
+
     #[test]
     fn submenu_navigation_back_and_leaf_execution() {
         let mut app = test_app();
