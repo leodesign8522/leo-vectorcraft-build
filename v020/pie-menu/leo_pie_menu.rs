@@ -1507,6 +1507,7 @@ mod tests {
                 },
             );
             output.platform_output.commands.clear();
+            output.textures_delta.clear();
         };
         let at = origin + Vec2::new(100.0, 0.0);
         let button = |pos, button, pressed| egui::Event::PointerButton {

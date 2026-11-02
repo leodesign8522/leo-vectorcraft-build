@@ -148,7 +148,7 @@ jobs:
         run: |
           cargo test --locked -p vectorcraft-ui-egui leo_pie_menu::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Leo Pie Menu gesture and config regressions failed" }
-      - name: Test SVG clipboard font aliases and editable text import
+      - name: Test editable AI import and SVG clipboard fonts
         shell: pwsh
         working-directory: vectorcraft
         run: |
