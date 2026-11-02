@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 root=Path(sys.argv[1])
 p=root/'crates/svg/src/import/text.rs'
-s=p.read_text()
+s=p.read_text(encoding="utf-8")
 a='''            if !fam.is_empty() {
                 if let Some((family, style)) = FontDb::global().by_postscript_name(&fam) {'''
 b='''            let fam = leo_clipboard_font_alias(&fam).to_string();
