@@ -356,6 +356,26 @@ fn preset_definitions() -> [(&'static str, [&'static str; 8]); 3] {
     ]
 }
 
+/// Match familiar Chinese verbs as well as the official catalog terminology.
+fn search_term(s: &str) -> String {
+    s.to_lowercase().replace("制作", "创建").replace("建立", "创建")
+        .replace("剪裁蒙版", "剪切蒙版").replace("裁剪蒙版", "剪切蒙版")
+        .replace("遮罩", "蒙版").replace("解除", "释放")
+        .chars().filter(|c| !c.is_whitespace() && !matches!(*c, '›' | '/' | '·' | '…')).collect()
+}
+fn command_matches(label: &str, id: &str, query: &str) -> bool {
+    let aliases = match id {
+        "object.clippingMask.make" => "制作剪切蒙版 创建剪切蒙版 建立剪切蒙版 剪裁蒙版 clipping mask make",
+        "object.clippingMask.release" => "释放剪切蒙版 解除剪切蒙版 取消剪切蒙版 clipping mask release",
+        "object.clippingMask.editContents" => "编辑蒙版内容 编辑内容",
+        "object.clippingMask.editMask" => "编辑剪切路径 编辑蒙版",
+        "object.ungroup" => "取消编组 解除编组 拆组",
+        _ => "",
+    };
+    let haystack = search_term(&format!("{label} {id} {aliases}"));
+    query.split_whitespace().all(|word| haystack.contains(&search_term(word)))
+}
+
 fn builtin_commands()->Vec<(String,String)>{
     let mut v:Vec<_>=crate::palette::items().into_iter().map(|(label,id,_)|(label,id)).collect();
     for (id,label) in crate::state::all_panels() {
@@ -368,6 +388,8 @@ fn builtin_commands()->Vec<(String,String)>{
         let translated = label.split(" › ").map(|part| crate::i18n::tr(lang, part))
             .collect::<Vec<_>>().join(" › ");
         let chinese = match id.as_str() {
+            "object.clippingMask.make" => "创建剪切蒙版",
+            "object.clippingMask.release" => "释放剪切蒙版",
             "view.grid" => "显示网格",
             "view.snapToGrid" => "吸附到网格",
             "view.smartGuides" => "智能参考线",
@@ -650,11 +672,15 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                 ui.label("中文功能列表 · 点击添加到当前方向");
                 ui.label(egui::RichText::new("支持中文、英文和命令 ID；例如：网格 / grid").small().weak());
                 ui.text_edit_singleline(&mut query);
-                let needle=query.trim().to_lowercase();
+                let matches: Vec<_> = commands.iter()
+                    .filter(|(name,id)| command_matches(name,id,&query)).collect();
+                ui.label(egui::RichText::new(format!("找到 {} 个功能；点击 ＋ 替换当前选中方向", matches.len())).small().weak());
+                if matches.is_empty() {
+                    ui.label("没有匹配的功能。试试更短的关键词，例如：剪切蒙版、网格。");
+                    if ui.button("清空搜索，显示全部功能").clicked() { query.clear(); }
+                }
                 egui::ScrollArea::vertical().max_height(340.0).show(ui,|ui|{
-                    for (label,id) in commands.iter().filter(|(name,id)|{
-                        needle.split_whitespace().all(|word| name.to_lowercase().contains(word) || id.to_lowercase().contains(word))
-                    }) {
+                    for (label,id) in matches {
                         if ui.button(format!("＋ {label}")).on_hover_text(id).clicked(){
                             menu.slots[sector]=PieSlot{name:label.split(" / ").next().unwrap_or(label).rsplit(" › ").next().unwrap_or(label).to_owned(),command:id.clone()};
                             changed=true;
@@ -709,6 +735,16 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn clipping_mask_search_accepts_common_chinese_names() {
+        let commands = builtin_commands();
+        let (label, id) = commands.iter().find(|(_,id)| id == "object.clippingMask.make").unwrap();
+        for query in ["制作剪切蒙版", "创建剪切蒙版", "建立剪切蒙版", "剪切蒙版", "裁剪蒙版", "clipping mask", "object.clippingMask.make"] {
+            assert!(command_matches(label, id, query), "unmatched query: {query}");
+        }
+        assert!(!command_matches(label, id, "不存在的功能"));
+        assert!(command_matches("对象 › 剪切蒙版 › 创建", id, "制作剪切蒙版"));
+        assert!(!command_matches("显示网格", "view.grid", "制作剪切蒙版"));
+    }
     #[test] fn chinese_picker_keeps_english_and_grid_searchable() {
         let commands = builtin_commands();
         let (label, _) = commands.iter().find(|(_, id)| id == "view.grid").unwrap();
