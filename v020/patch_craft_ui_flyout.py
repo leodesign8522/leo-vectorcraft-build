@@ -11,6 +11,7 @@ from pathlib import Path
 import os
 import sys
 import tomllib
+import subprocess
 
 base = Path(os.environ.get("CARGO_HOME") or (Path.home()/".cargo"))/"git"/"checkouts"
 if len(sys.argv) == 2:
@@ -23,7 +24,15 @@ else:
 if len(candidates) != 1:
     raise SystemExit(f"FAIL expected exactly one pinned craft-libs iconic.rs, found {len(candidates)}: {candidates}")
 file = candidates[0]
-text = file.read_text(encoding="utf-8")
+current = file.read_text(encoding="utf-8")
+# Cargo caches retain modified git checkouts between runs. Compute the exact
+# patch from the pinned committed file, then accept only pristine or identical
+# already-patched bytes; unknown edits still fail closed.
+text = subprocess.run([
+    "git", "-C", str(file.parents[5]), "show",
+    "HEAD:crates/ui/src/docking/render/iconic.rs",
+], check=True, capture_output=True, text=True, encoding="utf-8").stdout
+original = text
 def edit(old,new,name):
     global text
     n=text.count(old)
@@ -116,5 +125,7 @@ edit(
         self.iconic.rect = Some(response.rect);''',
     "give iconic flyouts invisible 16pt inside-edge resize hotzones"
 )
+if current not in (original, text):
+    raise SystemExit("FAIL pinned craft-ui has unknown edits; refusing to overwrite")
 file.write_text(text,encoding="utf-8",newline="\n")
 print("SUCCESS: Leo Design resizable pinned craft-ui icon flyouts",file)
