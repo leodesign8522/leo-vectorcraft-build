@@ -589,6 +589,56 @@ fn capture_window(app: &mut VectorcraftApp, ctx: &egui::Context) {
     });
 }
 
+
+const MAX_CONFIG_BYTES: usize = 2_000_000;
+fn decode_config_file(bytes: &[u8]) -> Result<Vec<PieConfig>, String> {
+    if bytes.len() > MAX_CONFIG_BYTES { return Err("配置文件超过 2MB".into()); }
+    let text = std::str::from_utf8(bytes).map_err(|e| format!("配置文件不是 UTF-8：{e}"))?;
+    let menus: Vec<PieConfig> = serde_json::from_str(text.trim_start_matches('\u{feff}'))
+        .map_err(|e| format!("配置文件格式错误：{e}"))?;
+    validate(&menus)?;
+    Ok(menus)
+}
+fn export_config_file(app: &mut VectorcraftApp, menus: &[PieConfig]) -> Result<Option<String>, String> {
+    validate(menus)?;
+    let bytes = serde_json::to_vec_pretty(menus).map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_CONFIG_BYTES { return Err("配置文件超过 2MB，无法导出".into()); }
+    let pick = crate::FilePick {
+        filters: vec![crate::FilePick::filter("Leo Design 饼菜单配置", &["json"])],
+        ..crate::FilePick::named("Leo_Design_Pie_Menu.json")
+    };
+    let Some(path) = crate::picks::save(app, &pick) else { return Ok(None); };
+    let write = app.services.write.as_mut().ok_or("无文件写入服务")?;
+    write(&path, &bytes)?;
+    Ok(Some(format!("已导出 {} 个饼菜单：{path}", menus.len())))
+}
+fn import_config_file(app: &mut VectorcraftApp) -> Result<Option<String>, String> {
+    let pick = crate::FilePick {
+        filters: vec![crate::FilePick::filter("Leo Design 饼菜单配置", &["json"])],
+        ..Default::default()
+    };
+    let Some(path) = crate::picks::open(app, &pick) else { return Ok(None); };
+    let read = app.services.read.as_ref().ok_or("无文件读取服务")?;
+    let bytes = read(&path)?;
+    // Do not replace any preferences until the complete file validates.
+    let menus = decode_config_file(&bytes)?;
+    let count = menus.len();
+    app.ui.leo_pies = menus;
+    app.ui.leo_pie_selected = 0;
+    app.ui.leo_pie_slot = 0;
+    app.ui.leo_pie_open = None;
+    app.ui.leo_pie_recording.clear();
+    app.prefs_changed = true;
+    Ok(Some(format!("已导入 {count} 个饼菜单，快捷键和方向已恢复")))
+}
+fn file_result(app: &mut VectorcraftApp, result: Result<Option<String>, String>) {
+    match result {
+        Ok(Some(message)) => app.ui.leo_pie_message = message,
+        Ok(None) => {}, // Cancelled or asynchronous dialog still open.
+        Err(error) => app.ui.leo_pie_message = format!("配置操作失败：{error}"),
+    }
+}
+
 pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     capture_window(app, ctx);
     if !app.ui.leo_pie_editor{return;}
@@ -602,8 +652,9 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let mut open=true;
     let mut changed=false;
     let mut test_slot=None;
+    let mut file_action=0;
     let commands=builtin_commands();
-    egui::Window::new("Leo Design · 饼菜单编辑器")
+    egui::Window::new("Leo Design 饼菜单编辑器")
         .id(egui::Id::new("leo-pie-config-window"))
         .open(&mut open).default_pos([60.0,70.0]).default_size([710.0,540.0])
         .resizable(true).show(ctx,|ui|{
@@ -777,6 +828,12 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             });
         });
         ui.separator();
+        ui.horizontal_wrapped(|ui|{
+            if ui.button("导出配置文件…").on_hover_text("保存全部饼菜单、方向、功能、参数和触发快捷键到 JSON 文件").clicked() { file_action=1; }
+            if ui.button("导入配置文件…").on_hover_text("选择 JSON 配置文件；验证通过后替换全部饼菜单设置").clicked() { file_action=2; }
+        });
+        ui.label(egui::RichText::new("备份全部饼菜单及快捷键；导入会替换当前饼菜单配置。").small().weak());
+        ui.collapsing("高级：复制／粘贴 JSON 配置", |ui| {
         ui.horizontal(|ui|{
             if ui.button("复制 JSON 配置").clicked(){
                 if let Ok(raw)=serde_json::to_string_pretty(&menus){ctx.copy_text(raw);status="已将配置复制到剪贴板".into();}
@@ -796,6 +853,7 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
             }
             }
         }
+        });
         if let Err(e)=validate(&menus){ui.colored_label(Color32::from_rgb(255,130,100),format!("配置冲突：{e}"));}
         if !status.is_empty(){ui.label(status.as_str());}
     });
@@ -812,6 +870,20 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     app.ui.leo_pie_import=import;
     app.ui.leo_pie_message=status;
     app.ui.leo_pie_editor=open;
+    // Native async file pickers replay this callback after a path arrives.
+    // Dispatch after committing live edits to avoid replacing imported state.
+    if file_action == 1 {
+        let snapshot = app.ui.leo_pies.clone();
+        crate::picks::button(app, move |app| {
+            let result = export_config_file(app, &snapshot);
+            file_result(app, result);
+        });
+    } else if file_action == 2 {
+        crate::picks::button(app, |app| {
+            let result = import_config_file(app);
+            file_result(app, result);
+        });
+    }
     // A command test is performed only after the live edits above have been
     // committed to UiState; the editor stays open during the action.
     if let Some(slot)=test_slot {
@@ -822,6 +894,22 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn config_files_roundtrip_and_reject_invalid_without_installing() {
+        let menus = defaults();
+        let raw = serde_json::to_vec_pretty(&menus).unwrap();
+        assert_eq!(decode_config_file(&raw).unwrap(), menus);
+        let bom = [b"\xef\xbb\xbf".as_slice(), raw.as_slice()].concat();
+        assert_eq!(decode_config_file(&bom).unwrap(), menus);
+        assert!(decode_config_file(b"not json").is_err());
+        assert!(decode_config_file(b"[]").is_err());
+        assert!(decode_config_file(&vec![b' '; MAX_CONFIG_BYTES+1]).is_err());
+        let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), crate::Services::default());
+        let original = app.ui.leo_pies.clone();
+        app.services.pick_open = Some(Box::new(|_| Some("bad.json".into())));
+        app.services.read = Some(Box::new(|_| Ok(b"[]".to_vec())));
+        assert!(import_config_file(&mut app).is_err());
+        assert_eq!(app.ui.leo_pies, original);
+    }
     #[test] fn menu_capture_parameters_and_old_slots_roundtrip() {
         let old: PieSlot = serde_json::from_str(r#"{"name":"旧功能","command":"object.group"}"#).unwrap();
         assert!(old.params.is_null());
