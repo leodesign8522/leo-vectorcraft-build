@@ -175,12 +175,33 @@ fn validate(configs: &[PieConfig]) -> Result<(), String> {
 fn run_slot(app: &mut VectorcraftApp, selected: usize, sector: usize) {
     let Some(slot) = app.ui.leo_pies.get(selected).and_then(|m| m.slots.get(sector)).cloned() else { return; };
     if slot.command.is_empty() { return; }
+    app.ui.status.clear();
+    if slot.command == "object.align" && slot.params.get("horizontal").is_none() && slot.params.get("vertical").is_none() {
+        crate::menus::invoke(app, "window.panel", json!({"panel":"align"}));
+        app.ui.leo_pie_message = "已打开对齐面板；可搜索左对齐、右对齐等具体功能直接添加".into();
+        return;
+    }
+    if !slot.command.starts_with("tool:") && !slot.command.starts_with("panel:")
+        && !crate::menus::enabled(app, &slot.command) {
+        app.ui.leo_pie_message = format!("「{}」当前不可用，请检查是否打开文档、选中所需对象或处于正确工具状态", slot.name);
+        app.status(app.ui.leo_pie_message.clone());
+        return;
+    }
     if let Some(tool) = slot.command.strip_prefix("tool:") {
         crate::menus::invoke(app, "tool.select", json!({"tool":tool}));
     } else if let Some(panel) = slot.command.strip_prefix("panel:") {
         crate::menus::invoke(app, "window.panel", json!({"panel":panel}));
     } else {
-        crate::menus::invoke(app, &slot.command, if slot.params.is_null() { json!({}) } else { slot.params });
+        crate::menus::invoke(app, &slot.command, if slot.params.is_null() { json!({}) } else { slot.params.clone() });
+    }
+    if !app.ui.status.is_empty() {
+        app.ui.leo_pie_message = app.ui.status.clone();
+    } else if let Some(on) = crate::menus::checked(app, &slot.command, &slot.params) {
+        let scope = if slot.command == "perspective.grid.snap" { "（仅用于透视网格）" } else { "" };
+        app.ui.leo_pie_message = format!("{}：{}{}", slot.name, if on { "已开启" } else { "已关闭" }, scope);
+        app.status(app.ui.leo_pie_message.clone());
+    } else {
+        app.ui.leo_pie_message = format!("已调用：{}", slot.name);
     }
 }
 
@@ -371,6 +392,8 @@ fn command_matches(label: &str, id: &str, query: &str) -> bool {
         "object.clippingMask.release" => "释放剪切蒙版 解除剪切蒙版 取消剪切蒙版 clipping mask release",
         "object.clippingMask.editContents" => "编辑蒙版内容 编辑内容",
         "object.clippingMask.editMask" => "编辑剪切路径 编辑蒙版",
+        "view.snapToGrid" => "对齐网格 网格吸附 吸附到网格 普通网格",
+        "perspective.grid.snap" => "透视网格吸附 透视对齐网格",
         "object.ungroup" => "取消编组 解除编组 拆组",
         _ => "",
     };
@@ -393,7 +416,10 @@ fn builtin_commands()->Vec<(String,String)>{
             "object.clippingMask.make" => "创建剪切蒙版",
             "object.clippingMask.release" => "释放剪切蒙版",
             "view.grid" => "显示网格",
-            "view.snapToGrid" => "吸附到网格",
+            "view.snapToGrid" => "普通网格吸附（开关）",
+            "perspective.grid.snap" => "透视网格吸附（开关）",
+            "perspective.grid.show" => "显示透视网格",
+            "perspective.grid.rulers" => "显示透视网格标尺",
             "view.smartGuides" => "智能参考线",
             "view.guides" => "显示／隐藏参考线",
             "view.rulers" => "显示标尺",
@@ -410,6 +436,35 @@ fn builtin_commands()->Vec<(String,String)>{
     v.dedup_by(|a,b|a.1==b.1);
     v
 }
+/// Preserve native menu parameters (alignment direction, document color mode,
+/// effects etc.), rather than silently binding all variants to an empty object.
+fn menu_variants() -> Vec<(String, String, serde_json::Value)> {
+    fn collect(items: &[crate::menus::Item], path: &str, out: &mut Vec<(String,String,serde_json::Value)>) {
+        let lang = crate::i18n::Lang::from_code("zh-hans").unwrap_or(crate::i18n::current());
+        for item in items {
+            match item {
+                crate::menus::Item::Sub(label, children) => {
+                    collect(children, &format!("{path} › {}", crate::i18n::tr(lang,label)), out);
+                }
+                crate::menus::Item::Cmd(label, id, params) if params.as_object().is_some_and(|p| !p.is_empty()) => {
+                    let (command, params) = crate::menus::click_target(label,id,params);
+                    let translated = crate::i18n::tr(lang,label);
+                    out.push((format!("{path} › {translated} / {label}"),command,params));
+                }
+                _ => {},
+            }
+        }
+    }
+    let mut out = Vec::new();
+    let lang = crate::i18n::Lang::from_code("zh-hans").unwrap_or(crate::i18n::current());
+    for (title, items) in crate::menus::menu_tree() {
+        collect(&items, crate::i18n::tr(lang,title), &mut out);
+    }
+    let mut seen = std::collections::HashSet::new();
+    out.retain(|(_,id,p)| seen.insert((id.clone(),p.to_string())));
+    out
+}
+
 /// Geometry of the eight slots in the same order as the *runtime* pie:
 /// Right, Down-Right, Down, Down-Left, Left, Up-Left, Up, Up-Right.
 /// egui's Y grows downward; this is the exact angle convention of OpenPie.
@@ -572,6 +627,7 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let mut test_slot=None;
     let mut file_action=0;
     let commands=builtin_commands();
+    let variants=menu_variants();
     egui::Window::new("Leo Design 饼菜单编辑器")
         .id(egui::Id::new("leo-pie-config-window"))
         .open(&mut open).default_pos([60.0,70.0]).default_size([710.0,540.0])
@@ -720,6 +776,13 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                     menu.slots[sector].params = serde_json::Value::Null;
                     changed = true;
                 }
+                if menu.slots[sector].command == "perspective.grid.snap" {
+                    ui.label("这是透视网格吸附，不影响普通网格。");
+                    if ui.button("改为普通网格吸附").clicked() {
+                        menu.slots[sector] = PieSlot { name:"普通网格吸附".into(), command:"view.snapToGrid".into(), ..Default::default() };
+                        changed = true;
+                    }
+                }
                 if ui.button("清空此方向").clicked() {
                     menu.slots[sector]=PieSlot::default();changed=true;
                 }
@@ -729,13 +792,21 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                 ui.label(egui::RichText::new("支持中文、英文和命令 ID；例如：网格 / grid").small().weak());
                 ui.text_edit_singleline(&mut query);
                 let matches: Vec<_> = commands.iter()
-                    .filter(|(name,id)| command_matches(name,id,&query)).collect();
-                ui.label(egui::RichText::new(format!("找到 {} 个功能；点击 ＋ 替换当前选中方向", matches.len())).small().weak());
-                if matches.is_empty() {
+                    .filter(|(name,id)| !variants.iter().any(|(_,variant,_)| variant == id) && command_matches(name,id,&query)).collect();
+                let parameter_matches: Vec<_> = variants.iter()
+                    .filter(|(name,id,_)| command_matches(name,id,&query)).collect();
+                ui.label(egui::RichText::new(format!("找到 {} 个功能；点击 ＋ 替换当前选中方向", matches.len()+parameter_matches.len())).small().weak());
+                if matches.is_empty() && parameter_matches.is_empty() {
                     ui.label("没有匹配的功能。试试更短的关键词，例如：剪切蒙版、网格。");
                     if ui.button("清空搜索，显示全部功能").clicked() { query.clear(); }
                 }
                 egui::ScrollArea::vertical().max_height(340.0).show(ui,|ui|{
+                    for (label,id,params) in parameter_matches {
+                        if ui.button(format!("＋ {label}")).on_hover_text(format!("{id} {params}")).clicked() {
+                            menu.slots[sector] = PieSlot { name:label.split(" / ").next().unwrap_or(label).rsplit(" › ").next().unwrap_or(label).into(), command:id.clone(), params:params.clone() };
+                            changed = true;
+                        }
+                    }
                     for (label,id) in matches {
                         if ui.button(format!("＋ {label}")).on_hover_text(id).clicked(){
                             menu.slots[sector]=PieSlot{name:label.split(" / ").next().unwrap_or(label).rsplit(" › ").next().unwrap_or(label).to_owned(),command:id.clone(), ..PieSlot::default()};
@@ -812,6 +883,60 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn test_app() -> VectorcraftApp {
+        let mut app=VectorcraftApp::new(vectorcraft_engine::Session::new(),crate::Services::default());
+        app.run("file.new",json!({"width":200,"height":200})).unwrap();
+        app
+    }
+    fn execute_test_slot(app: &mut VectorcraftApp, id: &str, params: serde_json::Value) {
+        app.ui.leo_pies[0].slots[0]=PieSlot{name:id.into(),command:id.into(),params};
+        run_slot(app,0,0);
+    }
+    #[test] fn grid_toggles_are_independent_and_report_state() {
+        let mut app=test_app();
+        let original=app.ui.view.snap_to_grid;
+        execute_test_slot(&mut app,"view.snapToGrid",json!({}));
+        assert_ne!(app.ui.view.snap_to_grid,original);
+        assert!(!app.ui.leo_pie_message.is_empty());
+        let normal=app.ui.view.snap_to_grid;
+        let perspective=crate::menus::checked(&app,"perspective.grid.snap",&json!({}));
+        execute_test_slot(&mut app,"perspective.grid.snap",json!({}));
+        assert_ne!(crate::menus::checked(&app,"perspective.grid.snap",&json!({})),perspective);
+        assert_eq!(app.ui.view.snap_to_grid,normal);
+        let shown=app.ui.view.grid;
+        execute_test_slot(&mut app,"view.grid",json!({}));
+        assert_ne!(app.ui.view.grid,shown);
+        execute_test_slot(&mut app,"view.snapToGrid",json!({}));
+        assert_eq!(app.ui.view.snap_to_grid,original);
+    }
+    #[test] fn menu_alignment_preserves_direction_and_moves_objects() {
+        let mut app=test_app();
+        let a=app.run("shape.rectangle",json!({"x":10,"y":10,"width":10,"height":10})).unwrap()["id"].clone();
+        let b=app.run("shape.rectangle",json!({"x":70,"y":40,"width":20,"height":10})).unwrap()["id"].clone();
+        app.run("select.set",json!({"ids":[a,b]})).unwrap();
+        for direction in ["left","right"] {
+            let (_,id,params)=menu_variants().into_iter().find(|(_,id,p)| id=="object.align" && p["horizontal"]==direction).unwrap();
+            execute_test_slot(&mut app,&id,params);
+            let st=app.session.active().unwrap();
+            let bounds=|id:&serde_json::Value| st.doc.bounds_of(&[vectorcraft_doc::NodeId(id.as_u64().unwrap())],false).unwrap();
+            let (aa,bb)=(bounds(&a),bounds(&b));
+            if direction=="left" { assert!((aa.x0-bb.x0).abs()<1e-6); }
+            else { assert!((aa.x1-bb.x1).abs()<1e-6); }
+        }
+    }
+    #[test] fn grouping_and_missing_selection_feedback() {
+        let mut app=test_app();
+        let a=app.run("shape.rectangle",json!({"x":0,"y":0,"width":10,"height":10})).unwrap()["id"].clone();
+        let b=app.run("shape.rectangle",json!({"x":20,"y":0,"width":10,"height":10})).unwrap()["id"].clone();
+        app.run("select.set",json!({"ids":[a,b]})).unwrap();
+        execute_test_slot(&mut app,"object.group",json!({}));
+        assert_eq!(app.session.active().unwrap().selection.objects.len(),1);
+        execute_test_slot(&mut app,"object.ungroup",json!({}));
+        assert_eq!(app.session.active().unwrap().selection.objects.len(),2);
+        execute_test_slot(&mut app,"select.none",json!({}));
+        execute_test_slot(&mut app,"object.group",json!({}));
+        assert!(app.ui.leo_pie_message.contains("当前不可用"));
+    }
     #[test] fn config_files_roundtrip_and_reject_invalid_without_installing() {
         let menus = defaults();
         let raw = serde_json::to_vec_pretty(&menus).unwrap();
