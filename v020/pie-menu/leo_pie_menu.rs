@@ -457,6 +457,7 @@ fn capture_command_frame(app: &mut VectorcraftApp, ctx: &egui::Context) {
         _ => None,
     })));
     if let Some((key, mods)) = press {
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new("leo-pie-recorded-key"), key));
         app.ui.leo_pie_recording.clear();
         if key == Key::Escape {
             app.ui.leo_pie_message = "已取消添加快捷键".into();
@@ -518,6 +519,18 @@ fn held_submenu(app: &mut VectorcraftApp, ctx: &egui::Context, open: &OpenPie, a
 /// Keyboard events are intercepted *before* VectorCraft's regular keymap.
 /// Never trigger over a focused editor, dialog, IME or command palette.
 pub fn keyboard_frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> bool {
+    // A recorded key remains owned until release, including OS auto-repeat.
+    // This guard also survives closing the editor while that key is held.
+    let held_id = egui::Id::new("leo-pie-recorded-key");
+    if let Some(key) = ctx.data(|d| d.get_temp::<Key>(held_id)) {
+        if !ctx.input(|i| i.key_down(key)) {
+            ctx.data_mut(|d| d.remove::<Key>(held_id));
+        }
+        ctx.input_mut(|i| i.events.retain(|e|
+            !matches!(e, egui::Event::Key { .. } | egui::Event::Text(_)
+                | egui::Event::Copy | egui::Event::Cut | egui::Event::Paste(_))));
+        return true;
+    }
     // Capture before text/tool dispatch: Delete must never delete artwork while recording.
     if app.ui.leo_pie_editor && app.ui.leo_pie_recording.starts_with("command:") {
         capture_command_frame(app, ctx);
@@ -1540,6 +1553,45 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 mod tests {
     use super::*;
 
+    // The pinned egui fork requires every headless frame to drain render outputs.
+    fn test_frame(ctx: &egui::Context, input: egui::RawInput, render: impl FnMut(&mut Ui)) {
+        let mut output = ctx.run_ui(input, render);
+        output.platform_output.commands.clear();
+        output.textures_delta.clear();
+    }
+
+
+
+    #[test]
+    fn recorded_delete_is_owned_through_repeat_release_and_editor_close() {
+        let mut app = test_app();
+        let object = app.run("shape.rectangle", json!({"x":0,"y":0,"width":10,"height":10})).unwrap()["id"].clone();
+        app.run("select.set", json!({"ids":[object]})).unwrap();
+        app.ui.leo_pie_editor = true;
+        app.ui.leo_pie_recording = "command:0:0".into();
+        let ctx = egui::Context::default();
+        let frame = |app: &mut VectorcraftApp, pressed, repeat| {
+            test_frame(&ctx,egui::RawInput {
+                events: vec![egui::Event::Key {
+                    key:Key::Delete, physical_key:None, pressed, repeat,
+                    modifiers:Modifiers::NONE,
+                }], ..Default::default()
+            }, |ui| {
+                assert!(keyboard_frame(app, ui.ctx()));
+                assert!(!ui.input(|i| i.events.iter().any(|e|
+                    matches!(e, egui::Event::Key { .. }))));
+            });
+        };
+        frame(&mut app, true, false);
+        app.ui.leo_pie_editor = false;
+        frame(&mut app, true, true);
+        frame(&mut app, false, false);
+        assert_eq!(app.session.active().unwrap().selection.objects.len(), 1);
+        test_frame(&ctx,egui::RawInput::default(), |ui| {
+            assert!(!keyboard_frame(&mut app, ui.ctx()));
+        });
+    }
+
     #[test]
     fn child_release_mode_follows_root_menu() {
         let mut app = test_app();
@@ -1579,7 +1631,7 @@ mod tests {
         app.ui.leo_pie_recording = "command:1:3".into();
         let old = app.ui.leo_pies[0].clone();
         let ctx = egui::Context::default();
-        let _ = ctx.run_ui(egui::RawInput {
+        test_frame(&ctx,egui::RawInput {
             events: vec![egui::Event::Key {
                 key: Key::Delete, physical_key: None, pressed: true,
                 repeat: false, modifiers: Modifiers::NONE,
@@ -1603,13 +1655,18 @@ mod tests {
         for key in [Key::Escape, Key::F12] {
             app.ui.leo_pie_recording = "command:0:0".into();
             let mods = if key == Key::F12 { Modifiers { alt: true, ctrl: true, shift: true, ..Default::default() } } else { Modifiers::NONE };
-            let _ = ctx.run_ui(egui::RawInput {
+            test_frame(&ctx,egui::RawInput {
                 events: vec![egui::Event::Key {
                     key, physical_key: None, pressed: true, repeat: false, modifiers: mods,
                 }], ..Default::default()
             }, |ui| { assert!(keyboard_frame(&mut app, ui.ctx())); });
             assert_eq!(app.ui.leo_pies, original);
             assert!(app.ui.leo_pie_recording.is_empty());
+            test_frame(&ctx,egui::RawInput {
+                events: vec![egui::Event::Key {
+                    key, physical_key:None, pressed:false, repeat:false, modifiers:mods,
+                }], ..Default::default()
+            }, |ui| { assert!(keyboard_frame(&mut app, ui.ctx())); });
         }
     }
 
@@ -1627,7 +1684,7 @@ mod tests {
             pos, button:PointerButton::Secondary, pressed, modifiers:Modifiers::NONE,
         };
         let frame = |app: &mut VectorcraftApp, time, events| {
-            let _ = ctx.run_ui(egui::RawInput { time:Some(time), events, ..Default::default() }, |ui| {
+            test_frame(&ctx,egui::RawInput { time:Some(time), events, ..Default::default() }, |ui| {
                 let rect = Rect::from_min_size(Pos2::ZERO, Vec2::new(900.0,900.0));
                 let response = ui.allocate_rect(rect, egui::Sense::hover());
                 assert!(mouse_frame(app, ui, &response));
