@@ -26,13 +26,14 @@ pub fn open(app: &mut VectorcraftApp, p: &Value) -> Result<Value, String> {
     let bytes = app.services.read.as_ref().ok_or("无文件读取服务")?(&path)?;
     // An explicit editable-first action: never ask the PDF page to reconstruct text frames.
     // The engine still reports unsupported data and protects the source from ordinary Save.
-    let result = crate::io::open_document(
+    let mut result = crate::io::open_document(
         app,
         &path,
         &bytes,
         Some(path.clone()),
         &json!({"editingData": "always", "layers": true, "textAs": "text"}),
     )?;
+    result["postScriptAi"] = json!(vectorcraft_pdf::is_postscript(&bytes));
     crate::io::note_recent(app, &path);
     let mut texts = 0usize;
     let mut areas = 0usize;
@@ -66,6 +67,8 @@ fn report(r: &Value, texts: usize, areas: usize, groups: usize, overflow: usize)
         "已读取 AI 原始编辑数据。"
     } else if r["restored"].as_bool() == Some(true) {
         "已恢复文件中的 VectorCraft 原生文档。"
+    } else if r["postScriptAi"].as_bool() == Some(true) {
+        "已按旧版 PostScript AI 读取；图层及文字保留情况请核对下方警告和实际文档。"
     } else {
         "未能读取原始编辑数据，已使用页面内容；原始图层、区域文字框和字形可能无法完整保留。"
     };

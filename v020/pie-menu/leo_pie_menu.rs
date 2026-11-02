@@ -306,7 +306,10 @@ fn select_slot(app: &mut VectorcraftApp, mut open: OpenPie, sector: usize, at: P
         }
         open.history.push((open.menu, open.origin));
         open.menu = target;
-        open.origin = at;
+        open.origin = app
+            .canvas_rect
+            .map(|clip| visual_center(clip, at, app.ui.leo_pies[target].menu_radius))
+            .unwrap_or(at);
         // Entered on release: child stays open for a deliberate click, with no extra shortcut.
         open.mouse = false;
         open.key = None;
@@ -320,7 +323,16 @@ fn select_slot(app: &mut VectorcraftApp, mut open: OpenPie, sector: usize, at: P
 fn back(app: &mut VectorcraftApp, mut open: OpenPie) {
     if let Some((menu, origin)) = open.history.pop() {
         open.menu = menu;
-        open.origin = origin;
+        open.origin = app
+            .canvas_rect
+            .map(|clip| {
+                visual_center(
+                    clip,
+                    origin,
+                    app.ui.leo_pies.get(menu).map_or(106.0, |m| m.menu_radius),
+                )
+            })
+            .unwrap_or(origin);
         open.mouse = false;
         open.key = None;
         open.last_sector = None;
@@ -1458,6 +1470,78 @@ mod tests {
         menus[0].slots[0].submenu = Some(5);
         assert!(validate(&menus).is_err());
     }
+    #[test]
+    fn submenu_survives_mouse_release_then_click_executes_leaf() {
+        let mut app = test_app();
+        app.ui.leo_pies[0].slots[0] = PieSlot {
+            name: "子菜单".into(),
+            submenu: Some(1),
+            ..Default::default()
+        };
+        app.ui.leo_pies[1].slots[0] = PieSlot {
+            name: "网格".into(),
+            command: "view.snapToGrid".into(),
+            ..Default::default()
+        };
+        let ctx = egui::Context::default();
+        let origin = Pos2::new(300.0, 300.0);
+        app.ui.leo_pie_open = Some(OpenPie {
+            menu: 0,
+            origin,
+            mouse: true,
+            key: None,
+            last_sector: None,
+            history: vec![],
+        });
+        let frame = |app: &mut VectorcraftApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    let rect = Rect::from_min_size(Pos2::ZERO, Vec2::new(900.0, 900.0));
+                    let response = ui.allocate_rect(rect, egui::Sense::hover());
+                    assert!(mouse_frame(app, ui, &response));
+                    paint(ui, app);
+                },
+            );
+            output.platform_output.commands.clear();
+        };
+        let at = origin + Vec2::new(100.0, 0.0);
+        let button = |pos, button, pressed| egui::Event::PointerButton {
+            pos,
+            button,
+            pressed,
+            modifiers: Modifiers::default(),
+        };
+        let before = app.ui.view.snap_to_grid;
+        frame(
+            &mut app,
+            vec![
+                egui::Event::PointerMoved(at),
+                button(at, PointerButton::Secondary, true),
+            ],
+        );
+        frame(&mut app, vec![button(at, PointerButton::Secondary, false)]);
+        assert_eq!(app.ui.leo_pie_open.as_ref().unwrap().menu, 1);
+        frame(&mut app, vec![]);
+        assert_eq!(
+            app.ui.view.snap_to_grid, before,
+            "release must only open the child"
+        );
+        let leaf = at + Vec2::new(100.0, 0.0);
+        frame(
+            &mut app,
+            vec![
+                egui::Event::PointerMoved(leaf),
+                button(leaf, PointerButton::Primary, true),
+            ],
+        );
+        assert!(app.ui.leo_pie_open.is_none());
+        assert_ne!(app.ui.view.snap_to_grid, before);
+    }
+
     fn test_app() -> VectorcraftApp {
         let mut app = VectorcraftApp::new(
             vectorcraft_engine::Session::new(),
