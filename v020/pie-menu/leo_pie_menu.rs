@@ -1,4 +1,4 @@
-//! Leo Design Pie Menu v0.4.0 — native VectorCraft canvas radial commands.
+//! Leo Design Pie Menu v0.5.0 — native VectorCraft canvas radial commands.
 //! Multiple configurable menus, keyboard and modifier+RMB bindings, a searchable
 //! native command picker, and JSON import/export. No OS-global mouse hook.
 use egui::{Color32, Key, Modifiers, PointerButton, Pos2, Rect, Stroke, Ui, Vec2};
@@ -11,10 +11,12 @@ use crate::VectorcraftApp;
 pub struct PieSlot {
     pub name: String,
     pub command: String,
+    /// Parameters captured from a native menu item, defaulting for old configs.
+    pub params: serde_json::Value,
 }
 impl Default for PieSlot {
     fn default() -> Self {
-        Self { name: String::new(), command: String::new() }
+        Self { name: String::new(), command: String::new(), params: serde_json::Value::Null }
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -55,7 +57,7 @@ pub fn defaults() -> Vec<PieConfig> {
         ("取消选择", "select.none"), ("对齐", "object.align"),
         ("直接选择", "tool:directSelection"), ("选择", "tool:selection"),
     ].iter().enumerate() {
-        a.slots[i] = PieSlot { name: (*name).into(), command: (*cmd).into() };
+        a.slots[i] = PieSlot { name: (*name).into(), command: (*cmd).into(), ..PieSlot::default() };
     }
     let b = PieConfig {
         name: "快捷路径工具".into(),
@@ -178,7 +180,7 @@ fn run_slot(app: &mut VectorcraftApp, selected: usize, sector: usize) {
     } else if let Some(panel) = slot.command.strip_prefix("panel:") {
         crate::menus::invoke(app, "window.panel", json!({"panel":panel}));
     } else {
-        crate::menus::invoke(app, &slot.command, json!({}));
+        crate::menus::invoke(app, &slot.command, if slot.params.is_null() { json!({}) } else { slot.params });
     }
 }
 
@@ -506,7 +508,89 @@ fn editor_radial_slots(
     response.on_hover_text("点击运行当前选中的槽位命令；不会关闭编辑器");
 }
 
+
+#[derive(Clone)]
+struct MenuCapture {
+    slot: PieSlot,
+    menu: usize,
+    direction: usize,
+}
+fn capture_key() -> egui::Id { egui::Id::new("leo-pie-add-from-menu") }
+
+/// Used by the shared menu renderer; never invokes the document command.
+pub fn menu_item_context(
+    app: &VectorcraftApp, ui: &mut Ui, response: &egui::Response,
+    label: &str, command: &str, params: &serde_json::Value,
+) {
+    response.context_menu(|ui| {
+        if ui.button("＋ 添加到饼菜单…").clicked() {
+            let name = match command {
+                "object.clippingMask.make" => "创建剪切蒙版".to_owned(),
+                "object.clippingMask.release" => "释放剪切蒙版".to_owned(),
+                _ => label.to_owned(),
+            };
+            let capture = MenuCapture {
+                slot: PieSlot { name, command: command.into(), params: params.clone() },
+                menu: app.ui.leo_pie_selected,
+                direction: app.ui.leo_pie_slot.min(7),
+            };
+            ui.ctx().data_mut(|data| data.insert_temp(capture_key(), capture));
+            ui.ctx().request_repaint();
+            ui.close();
+        }
+    });
+}
+
+fn capture_window(app: &mut VectorcraftApp, ctx: &egui::Context) {
+    let Some(mut capture) = ctx.data(|data| data.get_temp::<MenuCapture>(capture_key())) else { return; };
+    let mut open = true;
+    let mut added = false;
+    egui::Window::new("添加到饼菜单")
+        .id(egui::Id::new("leo-pie-capture-window"))
+        .open(&mut open).default_width(360.0).show(ctx, |ui| {
+            ui.label(format!("功能：{}", capture.slot.name));
+            if app.ui.leo_pies.is_empty() {
+                ui.label("请先在饼菜单编辑器中新建一个菜单。");
+                return;
+            }
+            capture.menu = capture.menu.min(app.ui.leo_pies.len().saturating_sub(1));
+            let selected = app.ui.leo_pies.get(capture.menu).map(|p| p.name.as_str()).unwrap_or("");
+            egui::ComboBox::from_id_salt("leo-pie-capture-menu")
+                .selected_text(selected).show_ui(ui, |ui| {
+                    for (index, menu) in app.ui.leo_pies.iter().enumerate() {
+                        ui.selectable_value(&mut capture.menu, index, &menu.name);
+                    }
+                });
+            ui.label("选择放置方向");
+            ui.horizontal_wrapped(|ui| {
+                for (index, name) in ["→ 右", "↘ 右下", "↓ 下", "↙ 左下", "← 左", "↖ 左上", "↑ 上", "↗ 右上"].iter().enumerate() {
+                    ui.selectable_value(&mut capture.direction, index, *name);
+                }
+            });
+            let old = app.ui.leo_pies.get(capture.menu).and_then(|p| p.slots.get(capture.direction));
+            if let Some(old) = old.filter(|slot| !slot.command.is_empty()) {
+                ui.label(format!("此方向原功能：{}，添加后将替换。", old.name));
+            }
+            if ui.button("确认添加").clicked() {
+                if let Some(slot) = app.ui.leo_pies.get_mut(capture.menu).and_then(|p| p.slots.get_mut(capture.direction)) {
+                    *slot = capture.slot.clone();
+                    app.ui.leo_pie_selected = capture.menu;
+                    app.ui.leo_pie_slot = capture.direction;
+                    app.ui.leo_pie_editor = true;
+                    app.prefs_changed = true;
+                    app.ui.leo_pie_message = format!("已添加：{}", capture.slot.name);
+                    added = true;
+                }
+            }
+        });
+    ctx.data_mut(|data| {
+        if !open || added { data.remove::<MenuCapture>(capture_key()); }
+        else { data.insert_temp(capture_key(), capture); }
+    });
+}
+
 pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
+    capture_window(app, ctx);
     if !app.ui.leo_pie_editor{return;}
     let mut menus=app.ui.leo_pies.clone();
     let mut index=app.ui.leo_pie_selected.min(menus.len().saturating_sub(1));
@@ -663,7 +747,10 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                 ui.label("显示名称");
                 changed|=ui.text_edit_singleline(&mut menu.slots[sector].name).changed();
                 ui.label("命令 ID（高级）");
-                changed|=ui.text_edit_singleline(&mut menu.slots[sector].command).changed();
+                if ui.text_edit_singleline(&mut menu.slots[sector].command).changed() {
+                    menu.slots[sector].params = serde_json::Value::Null;
+                    changed = true;
+                }
                 if ui.button("清空此方向").clicked() {
                     menu.slots[sector]=PieSlot::default();changed=true;
                 }
@@ -682,7 +769,7 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
                 egui::ScrollArea::vertical().max_height(340.0).show(ui,|ui|{
                     for (label,id) in matches {
                         if ui.button(format!("＋ {label}")).on_hover_text(id).clicked(){
-                            menu.slots[sector]=PieSlot{name:label.split(" / ").next().unwrap_or(label).rsplit(" › ").next().unwrap_or(label).to_owned(),command:id.clone()};
+                            menu.slots[sector]=PieSlot{name:label.split(" / ").next().unwrap_or(label).rsplit(" › ").next().unwrap_or(label).to_owned(),command:id.clone(), ..PieSlot::default()};
                             changed=true;
                         }
                     }
@@ -735,6 +822,14 @@ pub fn editor(app: &mut VectorcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn menu_capture_parameters_and_old_slots_roundtrip() {
+        let old: PieSlot = serde_json::from_str(r#"{"name":"旧功能","command":"object.group"}"#).unwrap();
+        assert!(old.params.is_null());
+        let captured = PieSlot { name:"左对齐".into(), command:"object.align".into(), params:json!({"horizontal":"left"}) };
+        let raw = serde_json::to_string(&captured).unwrap();
+        assert_eq!(serde_json::from_str::<PieSlot>(&raw).unwrap(), captured);
+        assert_eq!(captured.params["horizontal"], "left");
+    }
     #[test] fn clipping_mask_search_accepts_common_chinese_names() {
         let commands = builtin_commands();
         let (label, id) = commands.iter().find(|(_,id)| id == "object.clippingMask.make").unwrap();
