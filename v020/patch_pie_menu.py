@@ -147,7 +147,3 @@ change("crates/ui-egui/src/menus/run.rs",
 
 print("SUCCESS Leo Design Pie Menu v0.3.0 integrated, including self-configurable shortcuts and searchable command binding")
 
-change("crates/ui-egui/src/menus/bar.rs",
-    '    if r.clicked() {\n        *clicked = row.target()',
-    '    // Leo Design: right-click registers the actual menu target and params.\n    if let Some((command, params)) = row.target() {\n        crate::leo_pie_menu::menu_item_context(app, ui, &r, row.label.as_ref(), &command, &params);\n    }\n    if r.clicked() {\n        *clicked = row.target()',
-    "native menu right-click adds command and parameters to a pie slot")
