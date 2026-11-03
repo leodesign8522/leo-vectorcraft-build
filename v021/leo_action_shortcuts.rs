@@ -259,7 +259,7 @@ mod leo_action_shortcut_tests {
         assert!(!recording(&a));
         assert!(a.ui.dialog.is_some());
         assert!(ctx.input(|i| i.events.is_empty()));
-        let _ = ctx.end_pass();
+        ctx.end_pass().textures_delta.clear();
     }
     #[test]
     fn dialog_capture_precedes_fields_and_confirmation_and_cancel_discards_changes() {
@@ -269,14 +269,14 @@ mod leo_action_shortcut_tests {
         let ctx = egui::Context::default();
         ctx.begin_pass(egui::RawInput { events: vec![event(Key::Enter, Modifiers::NONE, false)], ..Default::default() });
         crate::dialogs::show(&mut a, &ctx);
-        let _ = ctx.end_pass();
+        ctx.end_pass().textures_delta.clear();
         assert!(a.ui.dialog.is_some(), "recorded Enter must not confirm the dialog");
         assert!(a.ui.action_sets[0].actions[0].leo_shortcut.is_empty());
         a.ui.dialog.as_mut().unwrap().fields.insert("__leo_recording".into(), json!(true));
         let mods = Modifiers { ctrl:true, command:true, alt:true, shift:true, ..Modifiers::NONE };
         ctx.begin_pass(egui::RawInput { events: vec![event(Key::F12, mods, false)], ..Default::default() });
         crate::dialogs::show(&mut a, &ctx);
-        let _ = ctx.end_pass();
+        ctx.end_pass().textures_delta.clear();
         assert!(!a.ui.dialog.as_ref().unwrap().str("leo_shortcut").is_empty());
         crate::dialogs::cancel(&mut a);
         assert!(a.ui.action_sets[0].actions[0].leo_shortcut.is_empty());
@@ -301,16 +301,16 @@ mod leo_action_shortcut_tests {
         assert!(!keyboard_frame(&mut a, &ctx));
         a.run("edit.undo", json!({})).unwrap();
         assert!(a.session.active().unwrap().selection.is_empty());
-        let _ = ctx.end_pass();
+        ctx.end_pass().textures_delta.clear();
         ctx.begin_pass(egui::RawInput { events: vec![event(Key::F12, mods, true)], ..Default::default() });
         assert!(!keyboard_frame(&mut a, &ctx));
-        let _ = ctx.end_pass();
+        ctx.end_pass().textures_delta.clear();
         a.ui.recording = Some((0, "record".into(), 0));
         ctx.begin_pass(egui::RawInput { events: vec![event(Key::F12, mods, false)], ..Default::default() });
         assert!(!keyboard_frame(&mut a, &ctx));
         a.ui.recording = None;
         crate::dialogs::action_set_options::open_action(&mut a, 0, 1);
         assert!(!keyboard_frame(&mut a, &ctx));
-        let _ = ctx.end_pass();
+        ctx.end_pass().textures_delta.clear();
     }
 }

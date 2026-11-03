@@ -89,7 +89,7 @@ jobs:
           shared-key: "leo-vectorcraft-v018-core-windows-release"
           cache-all-crates: false
           cache-on-failure: true
-      - name: Verify and check official v0.21 baseline
+      - name: Verify pinned official v0.21 baseline
         shell: pwsh
         working-directory: vectorcraft
         run: |
@@ -97,8 +97,8 @@ jobs:
           if ($actual -ne "11862f61198c8f62c0b22b6c9a331cc5950ac98d") {
             throw "Unexpected upstream source commit"
           }
-          cargo check --locked -p vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Official v0.21 baseline check failed" }
+          # This exact upstream SHA already passed cargo check in run 41565654553.
+          # Feature-only rebuilds compile/test the enhanced source below.
       - name: Apply modular Leo Design Core Bridge
         shell: pwsh
         run: |
@@ -279,7 +279,7 @@ jobs:
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Automated validation for this preview:
-          - Unmodified official v0.21.0 baseline: cargo check passed in this run.
+          - Official v0.21.0 SHA pinned; baseline cargo check passed in run 41565654553.
           - Enhanced Windows x64 native EXE: release build passed.
           - Live Corner source-anchor movement and undo tests passed.
           - Edition separation checked: default Core contains no Pie Menu UI/input hooks.

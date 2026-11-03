@@ -22,7 +22,7 @@ change('panels/actions.rs', 'pub struct Action {\n', '''pub struct Action {
     pub leo_shortcut: String,
 ''')
 
-# Only the two native Actions files construct this type. Match its first field,
+# Match the native Actions constructors by their first field,
 # never the struct declaration, enum patterns, or a string such as "Action {n}".
 for rel in ['panels/actions.rs', 'panels/actions/files.rs']:
     p = base / rel
@@ -97,10 +97,25 @@ if (base / 'leo_pie_menu.rs').exists():
         // Pie settings use Ctrl/Alt/Shift spelling, case insensitive.
         let text = p.keyboard.split('+').map(|part| match part.trim().to_ascii_uppercase().as_str() {
             "CTRL" => "Ctrl".to_string(), "ALT" => "Alt".to_string(), "SHIFT" => "Shift".to_string(),
-            _ => part.trim().to_string(),
+            _ => egui::Key::ALL.iter().find(|key| key.name().eq_ignore_ascii_case(part.trim()))
+                .map_or_else(|| part.trim().to_string(), |key| key.name().to_string()),
         }).collect::<Vec<_>>().join("+");
         crate::keymap::vc_chord(&text).is_some_and(|other| same(c, &other))
     }).map(|p| p.name.clone())
 }''')
 (base / 'leo_action_shortcuts.rs').write_text(source, encoding='utf-8')
 print('PASS persistent action shortcuts, UI recorder, native conflict protection and file compatibility')
+
+if (base / 'leo_pie_menu.rs').exists():
+    with (base / 'leo_action_shortcuts.rs').open('a', encoding='utf-8') as f:
+        f.write('''
+#[cfg(test)]
+mod leo_action_pie_conflict_tests {
+    #[test]
+    fn leo_action_shortcut_tests_recognize_uppercase_pie_special_key_names() {
+        let mut app = crate::VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
+        app.ui.leo_pies[0].keyboard = "SHIFT+SPACE".into();
+        assert!(super::available(&app, "Shift+Space").unwrap_err().contains("饼菜单"));
+    }
+}
+''')
