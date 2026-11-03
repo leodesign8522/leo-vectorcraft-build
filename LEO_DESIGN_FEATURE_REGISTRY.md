@@ -3,6 +3,7 @@
 ## 当前版本：Core Bridge v0.10.0 / VectorCraft v0.21.0（2026-11-03）
 
 - 官方固定基线：`v0.21.0 / 11862f61198c8f62c0b22b6c9a331cc5950ac98d`。
+- 安装路径约定（2026-11-03）：后续 Core Bridge 与独立饼菜单安装器默认使用 `C:\Program Files\ArtCraft\VectorCraft`（Inno Setup `{autopf}\ArtCraft\VectorCraft`）；仍可手动选择实际安装目录。已有下载包不会因源码修改而改变。
 - 当前分支：`leo-v021-migration`；源码独立保存在 `v021/`，v020 历史源码保留。
 - 默认 Core 不编译饼菜单模块、菜单入口或键鼠拦截；只保留旧菜单 JSON 数据。
 - 可选包：Leo Design Pie Menu v0.7.0，仅配套 Core Bridge v0.10.0 / 官方 v0.21.0，单独安装和卸载。
