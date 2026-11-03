@@ -58,3 +58,6 @@ Uninstall-Pie
 if ((Get-FileHash $target).Hash -ne $laterHash) { throw 'Uninstall rolled back a later Core version' }
 Assert-Prefs
 Write-Host 'PASS: wrong-version rejection, optional install/remove, later-update retention, preferences preservation'
+# Every failed assertion above throws. The intentionally rejected native install
+# can leave LASTEXITCODE nonzero; report success only after all assertions pass.
+exit 0
