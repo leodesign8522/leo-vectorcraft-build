@@ -260,6 +260,32 @@ mod leo_action_shortcut_tests {
         let _ = ctx.end_pass();
     }
     #[test]
+    fn dialog_capture_precedes_fields_and_confirmation_and_cancel_discards_changes() {
+        let mut a = app();
+        crate::dialogs::action_set_options::open_action(&mut a, 0, 0);
+        a.ui.dialog.as_mut().unwrap().fields.insert("__leo_recording".into(), json!(true));
+        let ctx = egui::Context::default();
+        let _ = ctx.run(egui::RawInput { events: vec![event(Key::Enter, Modifiers::NONE, false)], ..Default::default() }, |ctx| {
+            crate::dialogs::show(&mut a, ctx);
+        });
+        assert!(a.ui.dialog.is_some(), "recorded Enter must not confirm the dialog");
+        assert!(a.ui.action_sets[0].actions[0].leo_shortcut.is_empty());
+        a.ui.dialog.as_mut().unwrap().fields.insert("__leo_recording".into(), json!(true));
+        let mods = Modifiers { ctrl:true, command:true, alt:true, shift:true, ..Modifiers::NONE };
+        let _ = ctx.run(egui::RawInput { events: vec![event(Key::F12, mods, false)], ..Default::default() }, |ctx| {
+            crate::dialogs::show(&mut a, ctx);
+        });
+        assert!(!a.ui.dialog.as_ref().unwrap().str("leo_shortcut").is_empty());
+        crate::dialogs::cancel(&mut a);
+        assert!(a.ui.action_sets[0].actions[0].leo_shortcut.is_empty());
+        a.run(SET_SHORTCUT, json!({"set":0,"action":0,"shortcut":FREE})).unwrap();
+        crate::dialogs::action_set_options::open_action(&mut a, 0, 0);
+        a.ui.dialog.as_mut().unwrap().fields.insert("name".into(), json!("改名后"));
+        crate::dialogs::confirm(&mut a).unwrap();
+        assert_eq!(a.ui.action_sets[0].actions[0].name, "改名后");
+        assert_eq!(a.ui.action_sets[0].actions[0].leo_shortcut, FREE);
+    }
+    #[test]
     fn key_runs_exact_action_once_and_recording_or_dialog_blocks_it() {
         let mut a = app();
         a.run("file.new", json!({"width":100,"height":100})).unwrap();

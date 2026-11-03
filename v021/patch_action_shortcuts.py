@@ -79,6 +79,10 @@ change('menus/ui_commands.rs', '        crate::panels::actions::RENAME_ACTION,',
 
 change('shortcuts.rs', '    if app.ui.dialog.is_some() || app.ui.palette_open {',
        '    if crate::leo_action_shortcuts::capture_frame(app, ctx) { return; }\n    if app.ui.dialog.is_some() || app.ui.palette_open {')
+change('dialogs.rs', 'pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {',
+       '''pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
+    // Capture before name fields and the common Enter-to-confirm handler see the press.
+    crate::leo_action_shortcuts::capture_frame(app, ctx);''')
 change('shortcuts.rs', '    // A plain Delete or Backspace after a click on a Layers or Appearance row',
        '''    if crate::leo_action_shortcuts::keyboard_frame(app, ctx) { return; }
     // A plain Delete or Backspace after a click on a Layers or Appearance row''')
