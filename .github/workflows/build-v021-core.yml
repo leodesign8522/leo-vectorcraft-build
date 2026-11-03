@@ -1,4 +1,4 @@
-name: Leo Design Core Bridge v0.10.0 - separate optional Pie Menu
+name: Leo Design Core Bridge v0.10.1 - separate optional Pie Menu
 
 on:
   workflow_dispatch:
@@ -51,10 +51,10 @@ jobs:
         include:
           - flavor: core
             label: 默认版（不含饼菜单）
-            artifact: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.0_No_Pie_Windows_x64
+            artifact: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.1_No_Pie_Windows_x64
           - flavor: pie
             label: 饼菜单可选包编译输入（含 Core Bridge）
-            artifact: Leo_Design_Pie_Menu_v0.7.0_Build_Input
+            artifact: Leo_Design_Pie_Menu_v0.7.1_Build_Input
     runs-on: windows-latest
     timeout-minutes: 180
     env:
@@ -139,6 +139,8 @@ jobs:
             python v021/patch_optional_pie_prefs.py vectorcraft
             if ($LASTEXITCODE -ne 0) { throw "Dormant optional preferences compatibility failed" }
           }
+          python v021/patch_action_shortcuts.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Action shortcut integration failed" }
           python scripts/patch_color_panel_lock.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo CMYK display-mode lock patch failed" }
           git -C vectorcraft diff --check
@@ -184,6 +186,14 @@ jobs:
         run: |
           cargo test --locked -p vectorcraft-ui-egui leo_pie_menu::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Leo Pie Menu gesture and config regressions failed" }
+      - name: Test persistent action shortcuts and native Actions compatibility
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_action_shortcut_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Action shortcut regressions failed" }
+          cargo test --locked -p vectorcraft-ui-egui panels::actions::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native Actions regressions failed" }
       - name: Compile Windows x64 native EXE
         shell: pwsh
         working-directory: vectorcraft
@@ -242,9 +252,12 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design Core Bridge v0.10.0 / VectorCraft v0.21.0
+          Leo Design Core Bridge v0.10.1 / VectorCraft v0.21.0
           本包：${{ matrix.label }}
 
+          新增：动作选项中为每个动作录入快捷键，直接执行并随动作保存。
+          选中具体动作 → 面板右上角菜单 → 动作选项 → 点击录入快捷键 → 确定。
+          已占用快捷键会提示冲突；编辑文字、对话框和录制动作时不触发。
           默认 Core Bridge 已移除饼菜单界面、快捷键和鼠标拦截。
           保留：智能选择、锚点移动整组、彩色辅助线、文字增强、AI 导入、
           截图粘贴、JPEG/PNG/ICO 导出、停靠面板尺寸、快捷设置与配置导入导出。
@@ -308,7 +321,7 @@ jobs:
       - name: Fetch enhanced VectorCraft v0.21 EXE
         uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.0_No_Pie_Windows_x64
+          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.1_No_Pie_Windows_x64
           path: overlay-source
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -333,7 +346,7 @@ jobs:
       - name: Upload one-click overlay installer
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Core_Bridge_v0.10.0_No_Pie_Overlay_Installer_for_VectorCraft_v0.21
+          name: Leo_Design_Core_Bridge_v0.10.1_No_Pie_Overlay_Installer_for_VectorCraft_v0.21
           path: overlay-output/*.exe
           if-no-files-found: error
           retention-days: 30
@@ -348,11 +361,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.0_No_Pie_Windows_x64
+          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.1_No_Pie_Windows_x64
           path: core-source
       - uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_Pie_Menu_v0.7.0_Build_Input
+          name: Leo_Design_Pie_Menu_v0.7.1_Build_Input
           path: pie-source
       - name: Compile optional installer
         shell: pwsh
@@ -376,7 +389,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Optional install/remove regression failed" }
       - uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Pie_Menu_v0.7.0_Optional_Installer_for_Core_Bridge_v0.10.0
+          name: Leo_Design_Pie_Menu_v0.7.1_Optional_Installer_for_Core_Bridge_v0.10.1
           path: pie-installer-output/*.exe
           if-no-files-found: error
           retention-days: 30

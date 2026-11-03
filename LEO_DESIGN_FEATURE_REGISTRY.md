@@ -1,17 +1,27 @@
 # Leo Design × VectorCraft — 功能总账（长期维护）
 
-## 当前版本：Core Bridge v0.10.0 / VectorCraft v0.21.0（2026-11-03）
+## 当前版本：Core Bridge v0.10.1 / VectorCraft v0.21.0（2026-11-03）
 
 - 官方固定基线：`v0.21.0 / 11862f61198c8f62c0b22b6c9a331cc5950ac98d`。
 - 安装路径约定（2026-11-03）：后续 Core Bridge 与独立饼菜单安装器默认使用 `C:\Program Files\ArtCraft\VectorCraft`（Inno Setup `{autopf}\ArtCraft\VectorCraft`）；仍可手动选择实际安装目录。已有下载包不会因源码修改而改变。
 - 当前分支：`leo-v021-migration`；源码独立保存在 `v021/`，v020 历史源码保留。
 - 默认 Core 不编译饼菜单模块、菜单入口或键鼠拦截；只保留旧菜单 JSON 数据。
-- 可选包：Leo Design Pie Menu v0.7.0，仅配套 Core Bridge v0.10.0 / 官方 v0.21.0，单独安装和卸载。
+- 可选包：Leo Design Pie Menu v0.7.1，仅配套 Core Bridge v0.10.1 / 官方 v0.21.0，单独安装和卸载。
 - 其他增强功能继续迁移：智能选择、整组锚点移动、彩色辅助线、文字/字体、AI 导入、截图粘贴、图像/ICO 导出、面板及工作区配置。
 - 截图粘贴适配 v0.21 官方后台解码流程，保留 CF_BITMAP 回退；面板尺寸字段避开新增的原生瞬时弹出面板状态。
 - 两种款式的完整补丁应用及源代码隔离检查通过；固定 craft-ui 补丁也通过干净源码检查。
 - 自动测试、Windows 编译、可选包安装/卸载结果以本次 Actions 为准；实际 GUI 仍需验收。
 - 旧 ICC 工作空间持久化及完整自由工作区的历史缺口没有被宣称解决。
+
+
+## LC-021 动作快捷键（Core v0.10.1 / 可选 Pie v0.7.1）
+
+- 在“动作选项”中录入、清除每个动作的快捷键；列表显示已分配按键。
+- 快捷键存于动作本身：随首选项和 .vcactions 导入导出，改名/调整顺序仍绑定原动作；旧文件缺少字段时默认为无快捷键。
+- 拒绝原生命令、其他动作、系统保留键冲突；可选饼菜单版也检查菜单键。后续原生快捷键重新分配后，优先保留原生命令；重复导入/复制不抢占按键。
+- 文字/输入框/IME、对话框、弹出菜单、忙碌工具、录制动作和演示模式均不执行；长按重复不反复运行，动作仍通过 command.batch 撤销。
+- 默认不含饼菜单的 Core 与独立可选包均集成；安装默认目录为 C:\Program Files\ArtCraft\VectorCraft。
+- 源码 v021/leo_action_shortcuts.rs + patch_action_shortcuts.py；Windows 编译与测试以本次 Actions 为准，实际 GUI 待验收。
 
 
 ## v0.20 拆分开发记录（交付目标已转到 v0.21）

@@ -1,12 +1,9 @@
-name: Package verified v0.21 optional Pie Menu
+name: Repackage archived v0.7.0 optional Pie Menu
 
 # Reuse the already-successful Core/Pie Windows builds from 5ed8d0b.
 # Only installer test exit-status handling changed; no program code changed.
 on:
   workflow_dispatch:
-  push:
-    branches: [leo-v021-migration]
-    paths: [".github/workflows/package-v021-pie.yml"]
 
 permissions:
   contents: read
@@ -19,6 +16,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: c72e312e1f194142a930f11fe8e396a49b8a6b2b
       - uses: actions/download-artifact@v4
         with:
           name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.0_No_Pie_Windows_x64

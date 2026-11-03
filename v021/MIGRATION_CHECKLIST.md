@@ -1,11 +1,11 @@
-# Leo Design Core Bridge v0.10.0 / VectorCraft v0.21.0
+# Leo Design Core Bridge v0.10.1 / VectorCraft v0.21.0
 
 日期：2026-11-03。官方基线：`11862f61198c8f62c0b22b6c9a331cc5950ac98d`。
 
 ## 分开交付
 
 1. Core Bridge 默认版：无饼菜单模块、菜单项、键盘/鼠标拦截。
-2. Leo Design Pie Menu v0.7.0：单独可选安装器，需要上述配套 Core；卸载恢复配套 Core，其他增强保留。
+2. Leo Design Pie Menu v0.7.1：单独可选安装器，需要上述配套 Core；卸载恢复配套 Core，其他增强保留。
 
 当前插件接口没有画布输入或面板扩展接口；可选安装器切换同版本增强 EXE，不是通用 WASM/DLL。
 默认 Core 仅保存旧菜单 JSON 设置，不执行它。设置不会被安装器删除；以后重装可选包可继续读取。
