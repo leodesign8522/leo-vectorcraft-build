@@ -1,18 +1,27 @@
 # Leo Design × VectorCraft — 功能总账（长期维护）
 
-## 当前开发版本：Core Bridge v0.10.2 / VectorCraft v0.21.0（2026-11-03）
+## 当前开发版本：Core Bridge v0.10.3 / VectorCraft v0.21.0（2026-11-03）
 
 - 官方固定基线：`v0.21.0 / 11862f61198c8f62c0b22b6c9a331cc5950ac98d`。
 - 安装路径约定（2026-11-03）：后续 Core Bridge 与独立饼菜单安装器默认使用 `C:\Program Files\ArtCraft\VectorCraft`（Inno Setup `{autopf}\ArtCraft\VectorCraft`）；仍可手动选择实际安装目录。已有下载包不会因源码修改而改变。
 - 当前分支：`leo-v021-migration`；源码独立保存在 `v021/`，v020 历史源码保留。
 - 默认 Core 不编译饼菜单模块、菜单入口或键鼠拦截；只保留旧菜单 JSON 数据。
-- 当前开发可选包：Leo Design Pie Menu v0.7.2，仅配套 Core Bridge v0.10.2 / 官方 v0.21.0，单独安装和卸载。
+- 当前开发可选包：Leo Design Pie Menu v0.7.3，仅配套 Core Bridge v0.10.3 / 官方 v0.21.0，单独安装和卸载。
 - 其他增强功能继续迁移：智能选择、整组锚点移动、彩色辅助线、文字/字体、AI 导入、截图粘贴、图像/ICO 导出、面板及工作区配置。
 - 截图粘贴适配 v0.21 官方后台解码流程，保留 CF_BITMAP 回退；面板尺寸字段避开新增的原生瞬时弹出面板状态。
 - 两种款式的完整补丁应用及源代码隔离检查通过；固定 craft-ui 补丁也通过干净源码检查。
 - 自动测试、Windows 编译、可选包安装/卸载结果以本次 Actions 为准；实际 GUI 仍需验收。
 - 旧 ICC 工作空间持久化及完整自由工作区的历史缺口没有被宣称解决。
 
+
+## LC-023 截图粘贴兼容补丁（Core v0.10.3 / 可选 Pie v0.7.3）
+
+- 用户实测：PixPin 复制为 JPG / PNG 文件后，VectorCraft 粘贴仍无反应。尚未获取用户机器的剪贴板格式及事件，不能认定确切根因。
+- 修复已确认的代码缺口：保留 V 按下时的 Ctrl/Shift 状态，防止 Ctrl 先松开导致无事件粘贴被丢弃；Paste/PasteImage 仍阻止重复粘贴。
+- Windows 同时读取 PNG、image/png、DIBV5、DIB，后台依次验证，不能因某个格式非空就跳过有效备用格式。可用时回退系统图像读取；回退前后检查剪贴板序列号，避免粘入后来复制的图片。
+- 全部候选失败时保留失败的图像数据，交给现有导入解码器报错，避免无声使用旧内部剪贴板。纯 CF_BITMAP 读取不可用、系统剪贴板被占用及宿主不触发事件仍可能需要进一步诊断。
+- 新增按键顺序与重复抑制测试；位图测试覆盖 PNG 备用候选、DIB、系统回退及错误数据不被无声吞掉。
+- 补丁应用和 Python 语法检查通过；Rust 测试、Windows 编译以本轮 Actions 结果为准，PixPin 实机粘贴尚未验收。
 
 ## LC-022 文档信息中的已选数量（Core v0.10.2 / 可选 Pie v0.7.2）
 
