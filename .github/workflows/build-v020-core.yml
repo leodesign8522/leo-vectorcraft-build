@@ -1,4 +1,4 @@
-name: Leo Design Core Bridge - VectorCraft v0.20 (Windows x64)
+name: Leo Design Core Bridge v0.9.8 - separate optional Pie Menu
 
 on:
   workflow_dispatch:
@@ -17,11 +17,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  installer-contract:
+    name: Verify optional installer install/remove contract
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile installer against isolated Windows executable fixtures
+        shell: pwsh
+        run: |
+          $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          $base = $env:COMSPEC
+          $pie = (Get-Command powershell.exe).Source
+          $outDir = (New-Item -ItemType Directory -Force -Path "installer-contract-output").FullName
+          & $compiler "/DBaseExe=$base" "/DPieExe=$pie" "/O$outDir" "v020/pie-menu/Leo_Design_Pie_Menu.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer contract compile failed" }
+          $installer = (Get-ChildItem $outDir -Filter *.exe | Select-Object -First 1).FullName
+          & ./v020/pie-menu/test_optional_installer.ps1 -Installer $installer -BaseExe $base -PieExe $pie
+          if ($LASTEXITCODE -ne 0) { throw "Installer contract regression failed" }
   build:
-    name: VectorCraft v0.20 + Leo Design Core Bridge
+    needs: installer-contract
+    name: Core Bridge ${{ matrix.flavor }} (VectorCraft v0.20)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: core
+            label: 默认版（不含饼菜单）
+            artifact: Leo_Design_VectorCraft_v020_Core_Bridge_v0.9.8_No_Pie_Windows_x64
+          - flavor: pie
+            label: 饼菜单可选包编译输入（含 Core Bridge）
+            artifact: Leo_Design_Pie_Menu_v0.6.1_Build_Input
     runs-on: windows-latest
     timeout-minutes: 180
     env:
+      CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_TEST_OPT_LEVEL: "0"
       CARGO_PROFILE_TEST_CODEGEN_UNITS: "256"
     steps:
@@ -95,8 +129,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Leo multi-colour Smart Guides patch failed" }
           python v020/patch_quick_settings.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo Units and Colour dock panels patch failed" }
-          python v020/patch_pie_menu.py vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Leo Design Pie Menu source integration failed" }
+          if ("${{ matrix.flavor }}" -eq "pie") {
+            python v020/patch_pie_menu.py vectorcraft
+            if ($LASTEXITCODE -ne 0) { throw "Optional Pie Menu integration failed" }
+          } else {
+            python v020/patch_optional_pie_prefs.py vectorcraft
+            if ($LASTEXITCODE -ne 0) { throw "Dormant optional preferences compatibility failed" }
+          }
           python scripts/patch_color_panel_lock.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo CMYK display-mode lock patch failed" }
           git -C vectorcraft diff --check
@@ -115,6 +154,18 @@ jobs:
           # Force invalidation so the patched flyout renderer is in the EXE.
           cargo clean --release -p craft-ui
           if ($LASTEXITCODE -ne 0) { throw "Unable to invalidate cached craft-ui" }
+      - name: Verify Core and optional Pie separation
+        shell: pwsh
+        run: |
+          python v020/check_pie_separation.py vectorcraft "${{ matrix.flavor }}"
+          if ($LASTEXITCODE -ne 0) { throw "Unexpected pie input or UI hooks" }
+      - name: Test dormant optional preferences in Core only
+        if: matrix.flavor == 'core'
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_optional_prefs_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Core must retain settings without loading Pie Menu" }
       - name: Format migrated Rust source
         shell: pwsh
         working-directory: vectorcraft
@@ -122,6 +173,7 @@ jobs:
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
       - name: Test native Leo Design Pie Menu gestures and configuration
+        if: matrix.flavor == 'pie'
         shell: pwsh
         working-directory: vectorcraft
         env:
@@ -187,36 +239,37 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design Core Bridge v0.9.7
-          适用官方版本：VectorCraft v0.20.0
-          状态：迁移预览版，Windows 实际操作与安装体验仍需验收。
+          Leo Design Core Bridge v0.9.8 / VectorCraft v0.20.0
+          本包：${{ matrix.label }}
 
-          便携版：解压到空文件夹，双击 vectorcraft.exe。
-          覆盖安装器：关闭 VectorCraft 后，选择官方 v0.20.0 安装目录。
-          两种方式任选其一。覆盖安装器只替换程序 EXE，不删除用户设置。
-          便携版的独立设置目录不等于自动迁移原安装版的配置。
-
-          保留：智能选择、锚点移动整组、彩色辅助线、文字增强、截图粘贴、
-          JPEG/PNG/ICO 导出、停靠面板尺寸、快捷设置及八方向饼菜单。
-          A 工具框选路径段采用官方 v0.20 原生实现。
+          默认 Core Bridge 已移除饼菜单界面、快捷键和鼠标拦截。
+          保留：智能选择、锚点移动整组、彩色辅助线、文字增强、AI 导入、
+          截图粘贴、JPEG/PNG/ICO 导出、停靠面板尺寸、快捷设置与配置导入导出。
           历史缺口：ICC 工作空间设置记忆、完整自由工作区仍未确认恢复。
 
-          饼菜单 v0.6：选方向 → 点“按快捷键添加功能” → 按 Delete、Shift+O 等。
-          录入读取当前键位，不会执行功能；Esc 取消。没有绑定的键会提示。
-          子菜单：按住手势，停留 0.3 秒进入，再移向功能松开执行。
-          也可松开进入后单击；中心、右键或 Backspace 返回，Esc 关闭。
-          编辑器选中子菜单方向后可点“进入编辑此子菜单”。
+          默认便携版：解压到空文件夹，双击 vectorcraft.exe。
+          默认覆盖安装器：关闭 VectorCraft，选择原 v0.20.0 安装目录。
+          设置不会被安装器删除；便携版与安装版的配置目录可能不同。
 
-          功能逐项说明见 LEO_DESIGN_FEATURE_REGISTRY.md。
-          本构建的自动验证范围见 BUILD_VALIDATION.txt。
-          编译与自动测试通过，不代表所有 Windows GUI 场景已验收。
+          饼菜单另有单独的可选安装器，想用时再安装。
+          可选安装器需要先装同版本 Core Bridge；卸载仅恢复配套 Core。
+          如果主程序后来升级，卸载不会回退新程序。
+          “饼菜单可选包编译输入”是安装器打包用的完整 EXE，不是普通插件。
+          官方插件接口不能接管画布输入，详见 OPTIONAL_INSTALL.md。
+
+          默认 Core 只保留已有饼菜单的原始配置数据，供重装恢复，不运行菜单。
+          其他功能的边界见 LEO_DESIGN_FEATURE_REGISTRY.md 与 BUILD_VALIDATION.txt。
+          编译与自动测试通过不等于 Windows GUI 和复杂用户文件均已验收。
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Automated validation for this preview:
           - Unmodified official v0.20.0 baseline: cargo check passed in this run.
           - Enhanced Windows x64 native EXE: release build passed.
           - Live Corner source-anchor movement and undo tests passed.
-          - Pie Menu gestures, JSON, Chinese picker and preset command tests passed.
+          - Edition separation checked: default Core contains no Pie Menu UI/input hooks.
+          - Core edition: dormant optional JSON preferences roundtrip passed.
+          - Optional Pie edition: Pie Menu gesture and config regressions passed.
+          Only the matching edition tests above run for this artifact.
           - Migrated PDF CID/CJK font resolver regressions passed.
           - ICO container, sizes, rendering and transparency tests passed.
           - Official marquee selection tests passed.
@@ -229,13 +282,14 @@ jobs:
           '@ | Set-Content "dist/BUILD_VALIDATION.txt" -Encoding utf8
           Copy-Item LEO_DESIGN_FEATURE_REGISTRY.md dist/
           Copy-Item v020/MIGRATION_CHECKLIST.md dist/
+          Copy-Item v020/pie-menu/OPTIONAL_INSTALL.md dist/
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           & "dist/vectorcraft.exe" --version
           if ($LASTEXITCODE -ne 0) { throw "EXE version smoke test failed" }
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v020_Core_Bridge_v0.9.7_Windows_x64
+          name: ${{ matrix.artifact }}
           path: dist/
           if-no-files-found: error
           retention-days: 30
@@ -251,7 +305,7 @@ jobs:
       - name: Fetch enhanced VectorCraft v0.20 EXE
         uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v020_Core_Bridge_v0.9.7_Windows_x64
+          name: Leo_Design_VectorCraft_v020_Core_Bridge_v0.9.8_No_Pie_Windows_x64
           path: overlay-source
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -276,7 +330,50 @@ jobs:
       - name: Upload one-click overlay installer
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Core_Bridge_v0.9.7_Overlay_Installer_for_VectorCraft_v0.20
+          name: Leo_Design_Core_Bridge_v0.9.8_No_Pie_Overlay_Installer_for_VectorCraft_v0.20
           path: overlay-output/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+
+  optional-pie-installer:
+    name: Build optional Pie Menu installer with Core-only restore
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_v020_Core_Bridge_v0.9.8_No_Pie_Windows_x64
+          path: core-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: Leo_Design_Pie_Menu_v0.6.1_Build_Input
+          path: pie-source
+      - name: Compile optional installer
+        shell: pwsh
+        run: |
+          $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          $base = (Resolve-Path "core-source/vectorcraft.exe").Path
+          $pie = (Resolve-Path "pie-source/vectorcraft.exe").Path
+          if ((Get-FileHash $base).Hash -eq (Get-FileHash $pie).Hash) { throw "Optional flavor must differ from Core" }
+          $outDir = (New-Item -ItemType Directory -Force -Path "pie-installer-output").FullName
+          & $compiler "/DBaseExe=$base" "/DPieExe=$pie" "/O$outDir" "v020/pie-menu/Leo_Design_Pie_Menu.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Optional Pie installer compilation failed" }
+      - name: Test optional installation and removal on isolated runner files
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem pie-installer-output -Filter *.exe | Select-Object -First 1).FullName
+          & ./v020/pie-menu/test_optional_installer.ps1 -Installer $installer -BaseExe (Resolve-Path core-source/vectorcraft.exe).Path -PieExe (Resolve-Path pie-source/vectorcraft.exe).Path
+          if ($LASTEXITCODE -ne 0) { throw "Optional install/remove regression failed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_Pie_Menu_v0.6.1_Optional_Installer_for_Core_Bridge_v0.9.8
+          path: pie-installer-output/*.exe
           if-no-files-found: error
           retention-days: 30

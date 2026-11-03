@@ -2,12 +2,12 @@
   #define SourceExe "dist\vectorcraft.exe"
 #endif
 
-#define BridgeVersion "0.9.7"
+#define BridgeVersion "0.9.8"
 #define UpstreamVersion "0.20.0"
 
 [Setup]
 AppId=LeoDesignCoreBridgeOverlayForVectorCraftV020
-AppName=Leo Design Core Bridge v{#BridgeVersion} (VectorCraft v{#UpstreamVersion})
+AppName=Leo Design Core Bridge (No Pie Menu) v{#BridgeVersion} (VectorCraft v{#UpstreamVersion})
 AppVersion={#BridgeVersion}
 AppPublisher=Leo Design
 AppPublisherURL=https://github.com/leodesign8522/leo-vectorcraft-build
@@ -20,7 +20,7 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
-OutputBaseFilename=Leo_Design_Core_Bridge_v{#BridgeVersion}_Overlay_for_VectorCraft_v{#UpstreamVersion}
+OutputBaseFilename=Leo_Design_Core_Bridge_v{#BridgeVersion}_No_Pie_Overlay_for_VectorCraft_v{#UpstreamVersion}
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes
@@ -89,4 +89,5 @@ begin
   if not CheckTarget(False) then
     Result := '找不到兼容的 VectorCraft v0.20 主程序。请检查安装路径和程序版本。';
 end;
+
 
