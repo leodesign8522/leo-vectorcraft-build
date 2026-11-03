@@ -1,7 +1,9 @@
 //! Persistent shortcuts belong to actions, never to their mutable list indexes.
 use crate::{VectorcraftApp, state::Dialog};
 use craft_keymap::{Chord, Trigger};
-use egui::{Key, Modifiers};
+use egui::Key;
+#[cfg(test)]
+use egui::Modifiers;
 use serde_json::{Value, json};
 
 fn chord(text: &str) -> Option<Chord> {
@@ -265,16 +267,16 @@ mod leo_action_shortcut_tests {
         crate::dialogs::action_set_options::open_action(&mut a, 0, 0);
         a.ui.dialog.as_mut().unwrap().fields.insert("__leo_recording".into(), json!(true));
         let ctx = egui::Context::default();
-        let _ = ctx.run(egui::RawInput { events: vec![event(Key::Enter, Modifiers::NONE, false)], ..Default::default() }, |ctx| {
-            crate::dialogs::show(&mut a, ctx);
-        });
+        ctx.begin_pass(egui::RawInput { events: vec![event(Key::Enter, Modifiers::NONE, false)], ..Default::default() });
+        crate::dialogs::show(&mut a, &ctx);
+        let _ = ctx.end_pass();
         assert!(a.ui.dialog.is_some(), "recorded Enter must not confirm the dialog");
         assert!(a.ui.action_sets[0].actions[0].leo_shortcut.is_empty());
         a.ui.dialog.as_mut().unwrap().fields.insert("__leo_recording".into(), json!(true));
         let mods = Modifiers { ctrl:true, command:true, alt:true, shift:true, ..Modifiers::NONE };
-        let _ = ctx.run(egui::RawInput { events: vec![event(Key::F12, mods, false)], ..Default::default() }, |ctx| {
-            crate::dialogs::show(&mut a, ctx);
-        });
+        ctx.begin_pass(egui::RawInput { events: vec![event(Key::F12, mods, false)], ..Default::default() });
+        crate::dialogs::show(&mut a, &ctx);
+        let _ = ctx.end_pass();
         assert!(!a.ui.dialog.as_ref().unwrap().str("leo_shortcut").is_empty());
         crate::dialogs::cancel(&mut a);
         assert!(a.ui.action_sets[0].actions[0].leo_shortcut.is_empty());

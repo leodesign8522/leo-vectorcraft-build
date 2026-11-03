@@ -31,6 +31,9 @@ for rel in ['panels/actions.rs', 'panels/actions/files.rs']:
     if n == 0: raise SystemExit(f'No action constructors: {rel}')
     p.write_text(s, encoding='utf-8')
 
+change('panels/pathfinder.rs', 'crate::panels::actions::Action { name:',
+       'crate::panels::actions::Action { leo_shortcut: String::new(), name:')
+
 change('panels/actions.rs', '        copy.name = format!("{} copy", copy.name);',
        '        copy.leo_shortcut.clear();\n        copy.name = format!("{} copy", copy.name);')
 change('panels/actions.rs', '        let copy = ActionSet::new(format!("{} copy", src.name), src.actions.clone());',
