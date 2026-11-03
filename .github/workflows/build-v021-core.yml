@@ -164,6 +164,12 @@ jobs:
         run: |
           python v021/check_pie_separation.py vectorcraft "${{ matrix.flavor }}"
           if ($LASTEXITCODE -ne 0) { throw "Unexpected pie input or UI hooks" }
+      - name: Format migrated Rust source
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
       - name: Test dormant optional preferences in Core only
         if: matrix.flavor == 'core'
         shell: pwsh
@@ -171,12 +177,6 @@ jobs:
         run: |
           cargo test --locked -p vectorcraft-ui-egui leo_optional_prefs_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Core must retain settings without loading Pie Menu" }
-      - name: Format migrated Rust source
-        shell: pwsh
-        working-directory: vectorcraft
-        run: |
-          cargo fmt --all
-          if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
       - name: Test native Leo Design Pie Menu gestures and configuration
         if: matrix.flavor == 'pie'
         shell: pwsh
@@ -204,6 +204,8 @@ jobs:
           cargo build --release --locked -p vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Core Bridge Windows compilation failed" }
       - name: Test live corner endpoint movement, regeneration and undo
+        # Shared backend source is identical in both editions; validate it once.
+        if: matrix.flavor == 'core'
         shell: pwsh
         working-directory: vectorcraft
         env:
@@ -224,6 +226,8 @@ jobs:
           cargo test --locked -p vectorcraft-svg leo_svg_clipboard_fonts -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "SVG clipboard font alias regression failed" }
       - name: Test PDF CJK resolver migration
+        # Shared backend source is identical in both editions; validate it once.
+        if: matrix.flavor == 'core'
         shell: pwsh
         working-directory: vectorcraft
         run: |
@@ -281,12 +285,12 @@ jobs:
           Automated validation for this preview:
           - Official v0.21.0 SHA pinned; baseline cargo check passed in run 41565654553.
           - Enhanced Windows x64 native EXE: release build passed.
-          - Live Corner source-anchor movement and undo tests passed.
+          - Shared Live Corner backend: validated by the Core job in this run.
           - Edition separation checked: default Core contains no Pie Menu UI/input hooks.
           - Core edition: dormant optional JSON preferences roundtrip passed.
           - Optional Pie edition: Pie Menu gesture and config regressions passed.
           Only the matching edition tests above run for this artifact.
-          - Migrated PDF CID/CJK font resolver regressions passed.
+          - Shared PDF CID/CJK backend: validated by the Core job in this run.
           - ICO container, sizes, rendering and transparency tests passed.
           - Official marquee selection tests passed.
           - Screenshot paste shortcut tests passed.

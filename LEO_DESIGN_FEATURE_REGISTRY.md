@@ -24,6 +24,18 @@
 - 源码 v021/leo_action_shortcuts.rs + patch_action_shortcuts.py；Windows 编译与测试以本次 Actions 为准，实际 GUI 待验收。
 
 
+### LC-021 交付验证（2026-11-03）
+
+- 程序源码提交：`0bbc81a591524eeeee6716e1b6eed709641bda1f`；[Windows 构建 #41585779112](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41585779112) 的两个原生 EXE 与两个安装器均成功。
+- 动作专项：默认 Core 6 项 / 可选 Pie 7 项通过；覆盖配置往返、原生命令与动作冲突、改名/顺序、复制/导入、录入取消、对话框确认保护、一次按键执行、长按抑制、撤销及录制/对话框屏蔽。两种版本各 36 项原生 Actions 回归通过；可选 Pie 原有 26 项回归通过。
+- 原有圆角、AI 导入、SVG/PDF 字体、ICO、选边、截图粘贴、图像导出、工作区指定回归通过。默认 Core 2 项休眠配置保留测试通过。
+- 可选安装器用本次真实 EXE 验证：拒绝非配套版本、安装/卸载精确恢复 Core、保护后续更新、用户配置字节不变，全部通过。
+- [Core v0.10.1 安装器](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41585779112/artifacts/13210135927)；[可选 Pie v0.7.1 安装器](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41585779112/artifacts/13209547452)。需先安装配套 Core，再按需安装 Pie。
+- 使用：选中具体动作行 → 面板右上角菜单 → 动作选项 → 点击录入快捷键 → 确定。设置保存在动作数据中，.vcactions 可携带；冲突的导入绑定会清除，避免抢占现有按键。
+- 自动测试包括无窗口界面事件测试；不等同于用户机器的 Windows GUI 验收。
+- 后续 CI 先格式化再编译测试，避免默认 Core 重编译；相同底层的圆角和 PDF 回归只在 Core 执行，两种版本仍各自运行 UI/动作测试。当前交付 EXE 未因此改变，也未重新触发原生构建。
+
+
 ## v0.20 拆分开发记录（交付目标已转到 v0.21）
 
 - 官方基线仍为 VectorCraft v0.20.0。
