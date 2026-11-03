@@ -1,0 +1,61 @@
+name: Package verified v0.21 optional Pie Menu
+
+# Reuse the already-successful Core/Pie Windows builds from 5ed8d0b.
+# Only installer test exit-status handling changed; no program code changed.
+on:
+  workflow_dispatch:
+  push:
+    branches: [leo-v021-migration]
+    paths: [".github/workflows/package-v021-pie.yml"]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  optional-pie-installer:
+    name: Build optional Pie Menu installer with Core-only restore
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.0_No_Pie_Windows_x64
+          path: core-source
+          run-id: 41565654553
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: Leo_Design_Pie_Menu_v0.7.0_Build_Input
+          path: pie-source
+          run-id: 41565654553
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+      - name: Compile optional installer
+        shell: pwsh
+        run: |
+          $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          $base = (Resolve-Path "core-source/vectorcraft.exe").Path
+          $pie = (Resolve-Path "pie-source/vectorcraft.exe").Path
+          if ((Get-FileHash $base).Hash -eq (Get-FileHash $pie).Hash) { throw "Optional flavor must differ from Core" }
+          $outDir = (New-Item -ItemType Directory -Force -Path "pie-installer-output").FullName
+          & $compiler "/DBaseExe=$base" "/DPieExe=$pie" "/O$outDir" "v021/pie-menu/Leo_Design_Pie_Menu.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Optional Pie installer compilation failed" }
+      - name: Test optional installation and removal on isolated runner files
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem pie-installer-output -Filter *.exe | Select-Object -First 1).FullName
+          & ./v021/pie-menu/test_optional_installer.ps1 -Installer $installer -BaseExe (Resolve-Path core-source/vectorcraft.exe).Path -PieExe (Resolve-Path pie-source/vectorcraft.exe).Path
+          if ($LASTEXITCODE -ne 0) { throw "Optional install/remove regression failed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Leo_Design_Pie_Menu_v0.7.0_Optional_Installer_for_Core_Bridge_v0.10.0
+          path: pie-installer-output/*.exe
+          if-no-files-found: error
+          retention-days: 30
