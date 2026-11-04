@@ -15,10 +15,28 @@ change("crates/tools/src/guides/snap.rs", "impl PointSnap {\n", """impl PointSna
     /// Direct editing includes shown ruler guides with Smart Guides, independently of Snap to Point.
     /// Other drawing tools keep their native snapping preferences.
     pub fn for_anchor_drag(cx: &ToolContext) -> Self {
-        Self::new(cx, || Targets::for_anchor_drag(cx.doc, cx.selection).with_rulers(cx))
+        Self::new(cx, || Targets::for_anchor_drag(cx.doc, cx.selection).with_visible_rulers(cx))
     }
 
 """)
+change("crates/tools/src/context.rs", "    pub guides: bool,",
+       "    pub guides: bool,\n    /// Ruler visibility for snapping, independently of whether guides can be selected.\n    pub ruler_guides_shown: bool,")
+change("crates/tools/src/lib.rs", "            guides: true,",
+       "            guides: true,\n            ruler_guides_shown: true,")
+change("crates/engine/src/tooling.rs", "            guides: view.guides && !self.menu.guides_locked,",
+       "            guides: view.guides && !self.menu.guides_locked,\n            ruler_guides_shown: view.guides,")
+change("crates/tools/src/guides/targets.rs",
+       "    pub(super) fn with_rulers(mut self, cx: &ToolContext) -> Self {\n        if cx.guides {",
+       """    pub(super) fn with_rulers(self, cx: &ToolContext) -> Self {
+        self.rulers_when_shown(cx, cx.guides)
+    }
+
+    pub(super) fn with_visible_rulers(self, cx: &ToolContext) -> Self {
+        self.rulers_when_shown(cx, cx.ruler_guides_shown)
+    }
+
+    fn rulers_when_shown(mut self, cx: &ToolContext, shown: bool) -> Self {
+        if shown {""")
 # The group-anchor and partial-segment paths use the same target gathering as anchor dragging.
 p = root / "crates/tools/src/direct.rs"
 s = p.read_text(encoding="utf-8")
@@ -54,7 +72,8 @@ fn leo_shift_ruler_snap_horizontal_vertical_both_signs_and_without_snap_to_point
         d.guides.push(vectorcraft_doc::Guide::new(vertical, pos));
         let selected = anchors_of(source, &[(0, 1)]);
         let p = paint();
-        let c = ToolContext { smart_guides: true, snap_to_point: false, constrain_angle: 30.0, ..cx(&d, &selected, &p) };
+        // Locked guides cannot be selected, but remain visible snap targets.
+        let c = ToolContext { guides: false, ruler_guides_shown: true, smart_guides: true, snap_to_point: false, constrain_angle: 30.0, ..cx(&d, &selected, &p) };
         let shift = Mods { shift: true, ..Mods::default() };
         let mut t = DirectSelectionTool::new(false);
         t.pointer(&c, &PointerEvent::new(PointerKind::Down, 380.0, 340.0).with_mods(shift));
@@ -80,7 +99,7 @@ fn leo_shift_ruler_snap_respects_hidden_guides_and_disabled_snapping() {
     let selected = anchors_of(source, &[(0, 1)]);
     let p = paint();
     for (visible, smart) in [(false, true), (true, false)] {
-        let c = ToolContext { guides: visible, smart_guides: smart, snap_to_point: false, ..cx(&d, &selected, &p) };
+        let c = ToolContext { guides: visible, ruler_guides_shown: visible, smart_guides: smart, snap_to_point: false, ..cx(&d, &selected, &p) };
         let shift = Mods { shift: true, ..Mods::default() };
         let mut t = DirectSelectionTool::new(false);
         t.pointer(&c, &PointerEvent::new(PointerKind::Down, 380.0, 340.0).with_mods(shift));
