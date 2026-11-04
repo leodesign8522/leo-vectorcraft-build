@@ -37,6 +37,10 @@ old_method = """    pub(crate) fn textless_paste(&mut self, events: &[egui::Even
                     self.leo_paste_held = Some(*modifiers);
                 }
                 egui::Event::Key { key, pressed: false, modifiers, .. } if PASTE_KEYS.contains(key) => {
+                    // Screenshot tools often put *only* a Windows CF_DIB/CF_BITMAP
+                    // onto the clipboard. With some input backends egui delivers
+                    // both a V press and release but no Paste or PasteImage event.
+                    // The old code silently dropped that legitimate Ctrl+V.
                     if let Some(i) = self.pressed.iter().position(|k| k == key) {
                         self.pressed.swap_remove(i);
                     }
@@ -52,6 +56,7 @@ old_method = """    pub(crate) fn textless_paste(&mut self, events: &[egui::Even
         }
         fire
     }"""
+
 new_method = """    pub(crate) fn textless_paste(&mut self, events: &[egui::Event]) -> Option<Modifiers> {
         let pending_at_frame_start = self.leo_released_modifiers.is_some();
         let mut modifier_released_this_frame = false;
