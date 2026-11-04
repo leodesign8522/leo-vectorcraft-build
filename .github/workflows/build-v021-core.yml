@@ -1,4 +1,4 @@
-name: Leo Design Core Bridge v0.10.5 - separate optional Pie Menu
+name: Leo Design Core Bridge v0.10.6 - separate optional Pie Menu
 
 on:
   workflow_dispatch:
@@ -50,10 +50,10 @@ jobs:
       matrix:
         include:
           - flavor: core
-            label: 默认版（不含饼菜单）
-            artifact: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.5_No_Pie_Windows_x64
+            label: Ĭ�ϰ棨�������˵���
+            artifact: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.6_No_Pie_Windows_x64
           - flavor: pie
-            label: 饼菜单可选包编译输入（含 Core Bridge）
+            label: ���˵���ѡ���������루�� Core Bridge��
             artifact: Leo_Design_Pie_Menu_v0.7.4_Build_Input
     runs-on: windows-latest
     timeout-minutes: 180
@@ -145,6 +145,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Leo horizontal and vertical line extension patch failed" }
           python v021/patch_anchor_visuals.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "LC-026 page-axis snapping and extension guide visuals patch failed" }
+          python v021/patch_anchor_ruler_snap.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "LC-028 Shift anchor and segment ruler snapping failed" }
+          python v021/patch_selected_segments_copy.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "LC-027 selected-segment clipboard extraction failed" }
           python v021/patch_anchor_drag_tests.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo Shift-click selection test migration failed" }
           python v021/patch_quick_settings.py vectorcraft
@@ -249,6 +253,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Line extension direction and intersection regressions failed" }
           cargo test --locked -p vectorcraft-tools leo_anchor_extension_visual_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Extension preview and snap visual-state regressions failed" }
+      - name: Test selected segments clipboard and Shift ruler snapping
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-engine leo_segment_copy -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Selected-segment extraction, Copy/Cut, paste and undo regressions failed" }
+          cargo test --locked -p vectorcraft-tools leo_shift_ruler_snap -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Horizontal/vertical Shift ruler snapping regressions failed" }
       - name: Compile Windows x64 native EXE
         shell: pwsh
         working-directory: vectorcraft
@@ -311,35 +323,38 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          Leo Design Core Bridge v0.10.5 / VectorCraft v0.21.0
-          本包：${{ matrix.label }}
+          Leo Design Core Bridge v0.10.6 / VectorCraft v0.21.0
+          ������${{ matrix.label }}
 
-          新增：截图粘贴修复：补齐 Ctrl+V 释放事件回退；原生读取 CF_BITMAP 并在 PNG / DIB 解码失败时继续尝试备用格式。PixPin 仍需用户机器实测。
-          注意：PixPin 的真实系统剪贴板仍需用户机器验证；自动测试不等同于实机验收。
-          新增：A 工具 Shift 拖点固定支持水平、垂直、45°方向吸附，不受 General > Constrain Angle 旋转值影响；三种方向均可吸附真实边交点。\n          新增：原线段延长线青色虚线预览；吸附成功后改为琥珀色虚线，并显示命中点与“延长线吸附”标记。
-          新增：文档信息 → 对象，常驻显示已选物体 / 已选编组，未选中为 0。
-          按当前选择项计数：编组作为一个物体，同时计入编组；不展开内部成员。
-          新增：动作选项中为每个动作录入快捷键，直接执行并随动作保存。
-          选中具体动作 → 面板右上角菜单 → 动作选项 → 点击录入快捷键 → 确定。
-          已占用快捷键会提示冲突；编辑文字、对话框和录制动作时不触发。
-          默认 Core Bridge 已移除饼菜单界面、快捷键和鼠标拦截。
-          保留：智能选择、锚点移动整组、彩色辅助线、文字增强、AI 导入、
-          截图粘贴、JPEG/PNG/ICO 导出、停靠面板尺寸、快捷设置与配置导入导出。
-          历史缺口：ICC 工作空间设置记忆、完整自由工作区仍未确认恢复。
+          ������A ����ѡ�е���/�����߶κ� Ctrl+C / Ctrl+X��ֻ������ѡ�߶Σ������߶α������ӣ������߶α���������·�������������ֱ�����ʽ��
+          ���������ܲο��߿���ʱ��Shift ˮƽ/��ֱ�ϵ���϶�����ѡ����߶Σ���ֱ�������ɼ��ο��ߣ�������⿪�����������㡱��
+          ��������ͼճ���޸������� Ctrl+V �ͷ��¼����ˣ�ԭ����ȡ CF_BITMAP ���� PNG / DIB ����ʧ��ʱ�������Ա��ø�ʽ��PixPin �����û�����ʵ�⡣
+          ע�⣺PixPin ����ʵϵͳ�����������û�������֤���Զ����Բ���ͬ��ʵ�����ա�
+          ������A ���� Shift �ϵ�̶�֧��ˮƽ����ֱ��45�㷽������������ General > Constrain Angle ��תֵӰ�죻���ַ������������ʵ�߽��㡣
+          ������ԭ�߶��ӳ�����ɫ����Ԥ���������ɹ����Ϊ����ɫ���ߣ�����ʾ���е��롰�ӳ�����������ǡ�
+          �������ĵ���Ϣ �� ���󣬳�פ��ʾ��ѡ���� / ��ѡ���飬δѡ��Ϊ 0��
+          ����ǰѡ���������������Ϊһ�����壬ͬʱ������飻��չ���ڲ���Ա��
+          ����������ѡ����Ϊÿ������¼���ݼ���ֱ��ִ�в��涯�����档
+          ѡ�о��嶯�� �� ������Ͻǲ˵� �� ����ѡ�� �� ���¼���ݼ� �� ȷ����
+          ��ռ�ÿ�ݼ�����ʾ��ͻ���༭���֡��Ի����¼�ƶ���ʱ��������
+          Ĭ�� Core Bridge ���Ƴ����˵����桢��ݼ���������ء�
+          ����������ѡ��ê���ƶ����顢��ɫ�����ߡ�������ǿ��AI ���롢
+          ��ͼճ����JPEG/PNG/ICO ������ͣ�����ߴ硢������������õ��뵼����
+          ��ʷȱ�ڣ�ICC �����ռ����ü��䡢�������ɹ�������δȷ�ϻָ���
 
-          默认便携版：解压到空文件夹，双击 vectorcraft.exe。
-          默认覆盖安装器：关闭 VectorCraft，选择原 v0.21.0 安装目录。
-          设置不会被安装器删除；便携版与安装版的配置目录可能不同。
+          Ĭ�ϱ�Я�棺��ѹ�����ļ��У�˫�� vectorcraft.exe��
+          Ĭ�ϸ��ǰ�װ�����ر� VectorCraft��ѡ��ԭ v0.21.0 ��װĿ¼��
+          ���ò��ᱻ��װ��ɾ������Я���밲װ�������Ŀ¼���ܲ�ͬ��
 
-          饼菜单另有单独的可选安装器，想用时再安装。
-          可选安装器需要先装同版本 Core Bridge；卸载仅恢复配套 Core。
-          如果主程序后来升级，卸载不会回退新程序。
-          “饼菜单可选包编译输入”是安装器打包用的完整 EXE，不是普通插件。
-          官方插件接口不能接管画布输入，详见 OPTIONAL_INSTALL.md。
+          ���˵����е����Ŀ�ѡ��װ��������ʱ�ٰ�װ��
+          ��ѡ��װ����Ҫ��װͬ�汾 Core Bridge��ж�ؽ��ָ����� Core��
+          ������������������ж�ز�������³���
+          �����˵���ѡ���������롱�ǰ�װ������õ����� EXE��������ͨ�����
+          �ٷ�����ӿڲ��ܽӹܻ������룬��� OPTIONAL_INSTALL.md��
 
-          默认 Core 只保留已有饼菜单的原始配置数据，供重装恢复，不运行菜单。
-          其他功能的边界见 LEO_DESIGN_FEATURE_REGISTRY.md 与 BUILD_VALIDATION.txt。
-          编译与自动测试通过不等于 Windows GUI 和复杂用户文件均已验收。
+          Ĭ�� Core ֻ�������б��˵���ԭʼ�������ݣ�����װ�ָ��������в˵���
+          �������ܵı߽�� LEO_DESIGN_FEATURE_REGISTRY.md �� BUILD_VALIDATION.txt��
+          �������Զ�����ͨ�������� Windows GUI �͸����û��ļ��������ա�
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Automated validation for this preview:
@@ -355,6 +370,8 @@ jobs:
           - Official marquee selection tests passed.
           - Screenshot paste shortcut and native CF_BITMAP fallback tests passed.
           - Shift horizontal/vertical/45-degree page-axis snapping, arbitrary-angle intersections, and cyan/amber extension guide-state tests passed.
+          - Selected segment geometry, internal/SVG clipboard, multi-object Cut and undo tests passed.
+          - Shift ruler snapping in both directions with Snap to Point disabled, and hidden-guide behavior tests passed.
           - JPEG/PNG export option tests passed.
           - Workspace JSON import validation tests passed.
           Windows GUI gestures, installer execution and real user configuration
@@ -386,7 +403,7 @@ jobs:
       - name: Fetch enhanced VectorCraft v0.21 EXE
         uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.5_No_Pie_Windows_x64
+          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.6_No_Pie_Windows_x64
           path: overlay-source
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -411,7 +428,7 @@ jobs:
       - name: Upload one-click overlay installer
         uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Core_Bridge_v0.10.5_No_Pie_Overlay_Installer_for_VectorCraft_v0.21
+          name: Leo_Design_Core_Bridge_v0.10.6_No_Pie_Overlay_Installer_for_VectorCraft_v0.21
           path: overlay-output/*.exe
           if-no-files-found: error
           retention-days: 30
@@ -426,7 +443,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.5_No_Pie_Windows_x64
+          name: Leo_Design_VectorCraft_v021_Core_Bridge_v0.10.6_No_Pie_Windows_x64
           path: core-source
       - uses: actions/download-artifact@v4
         with:
@@ -454,7 +471,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Optional install/remove regression failed" }
       - uses: actions/upload-artifact@v4
         with:
-          name: Leo_Design_Pie_Menu_v0.7.4_Optional_Installer_for_Core_Bridge_v0.10.5
+          name: Leo_Design_Pie_Menu_v0.7.4_Optional_Installer_for_Core_Bridge_v0.10.6
           path: pie-installer-output/*.exe
           if-no-files-found: error
           retention-days: 30
+
