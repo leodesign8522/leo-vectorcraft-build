@@ -13,12 +13,16 @@ direct = (tools / 'direct.rs').read_text(encoding='utf-8')
 targets = (tools / 'guides/targets.rs').read_text(encoding='utf-8')
 if flavor == 'core':
     assert not module.exists(), 'Custom snap module leaked into Core'
-    for token in ('leo_point_lock', 'leo_snap_from', 'EXTENSION_PREVIEW_COLOR', 'extension_preview('):
+    assert not (tools / 'guides/leo_rotation.rs').exists(), 'Rotation snapping leaked into Core'
+    for rel in ['select.rs', 'xform/transform.rs', 'xform/free.rs']:
+        assert 'snap_rotation(' not in (tools / rel).read_text(encoding='utf-8'), f'Rotation snapping hook leaked into Core: {rel}'
+    for token in ('leo_point_lock', 'leo_snap_from', 'EXTENSION_PREVIEW_COLOR', 'extension_preview(', 'leo_rotation_lock', 'leo_rotation_hit', 'leo_for_rotation'):
         assert token not in targets, f'Custom snapping leaked into Core: {token}'
     assert 'MoveGroupAnchor' not in direct, 'Group-anchor snap adapter leaked into Core'
     assert 'smart_guide_horizontal_color' not in prefs, 'Custom guide colour preferences leaked into Core'
 else:
     assert module.is_file(), 'Independent snapping resolver missing'
+    assert (tools / 'guides/leo_rotation.rs').is_file(), 'Rotation snapping resolver missing'
     assert 'self.leo_snap_from(p, from, tol)' in targets
     assert 'MoveGroupAnchor' in direct
     assert 'smart_guide_horizontal_color' in prefs

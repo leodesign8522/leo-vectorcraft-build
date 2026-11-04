@@ -1,4 +1,4 @@
-//! Leo Design Snapping v0.1.1: point resolver, owned by the snapping edition.
+//! Leo Design Snapping v0.1.2: point resolver, owned by the snapping edition.
 //! Document collection and object resize/move adapters currently use upstream code.
 use super::*;
 
