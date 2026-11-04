@@ -1,0 +1,24 @@
+name: Leo Design Snapping v0.1.0 Preview
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v021-migration
+    paths:
+      - ".github/workflows/build-v021-snapping.yml"
+      - ".github/workflows/build-v021-edition.yml"
+      - "v021/**"
+      - "scripts/**"
+      - "snapping/**"
+
+permissions:
+  contents: read
+jobs:
+  edition:
+    uses: ./.github/workflows/build-v021-edition.yml
+    with:
+      flavor: snapping
+      label: Leo Design Snapping v0.1.0 Preview
+      artifact: Leo_Design_Snapping_v0.1.0_Windows_x64
+      installer: snapping/Leo_Design_Snapping.iss
+      output: Leo_Design_Snapping_v0.1.0_Installer
