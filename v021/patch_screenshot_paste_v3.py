@@ -58,51 +58,53 @@ old_method = """    pub(crate) fn textless_paste(&mut self, events: &[egui::Even
     }"""
 
 new_method = """    pub(crate) fn textless_paste(&mut self, events: &[egui::Event]) -> Option<Modifiers> {
+        self.textless_paste_with_modifiers(events, Modifiers::NONE)
+    }
+
+    pub(crate) fn textless_paste_with_modifiers(&mut self, events: &[egui::Event], current_modifiers: Modifiers) -> Option<Modifiers> {
         let pending_at_frame_start = self.leo_released_modifiers.is_some();
         let mut modifier_released_this_frame = false;
         let mut v_released = false;
+        let previous = self.leo_last_modifiers;
+        let was_command = previous.command || previous.ctrl;
+        let is_command = current_modifiers.command || current_modifiers.ctrl;
+        if was_command && !is_command {
+            self.leo_released_modifiers = Some(previous);
+            modifier_released_this_frame = true;
+        }
+        self.leo_last_modifiers = current_modifiers;
         let mut fire = None;
         for e in events {
             match e {
                 egui::Event::Paste(_) | egui::Event::PasteImage(_) => self.pasted = true,
                 // A release that comes while the window is away is never seen.
                 egui::Event::WindowFocused(false) => *self = Self::default(),
-                egui::Event::ModifiersChanged(modifiers) => {
-                    let was_command = self.leo_last_modifiers.command || self.leo_last_modifiers.ctrl;
-                    let is_command = modifiers.command || modifiers.ctrl;
-                    if was_command && !is_command {
-                        self.leo_released_modifiers = Some(self.leo_last_modifiers);
-                        modifier_released_this_frame = true;
-                    }
-                    self.leo_last_modifiers = *modifiers;
-                }
                 egui::Event::Key { key, pressed: true, modifiers, .. } if PASTE_KEYS.contains(key) && !self.pressed.contains(key) => {
                     self.pressed.push(*key);
                     self.leo_paste_held = Some(*modifiers);
-                    self.leo_last_modifiers = *modifiers;
                 }
                 egui::Event::Key { key, pressed: false, modifiers, .. } if PASTE_KEYS.contains(key) => {
                     v_released = true;
                     if let Some(i) = self.pressed.iter().position(|k| k == key) {
                         self.pressed.swap_remove(i);
                     }
-                    // Some Windows backends swallow Ctrl+V's key-down when the clipboard
-                    // contains an image. Preserve the modifier transition from the previous
-                    // frame so releasing Ctrl before V cannot turn the paste into a no-op.
+                    // Prefer the key-down snapshot, then the Ctrl/Cmd state captured
+                    // on the preceding frame, then the current input state.
                     let keydown = self.leo_paste_held.take();
                     let released = self.leo_released_modifiers.take();
-                    let previous = self.leo_last_modifiers;
-                    let previous_if_released = ((previous.command || previous.ctrl)
-                        && !(modifiers.command || modifiers.ctrl)).then_some(previous);
-                    let held = keydown.or(released).or(previous_if_released).unwrap_or(*modifiers);
+                    let held = keydown.or(released).unwrap_or_else(|| {
+                        if current_modifiers.command || current_modifiers.ctrl {
+                            current_modifiers
+                        } else {
+                            *modifiers
+                        }
+                    });
                     let handled = std::mem::take(&mut self.pasted);
                     let shortcut = (*key == Key::Paste) || (*key == Key::V && (held.command || held.ctrl));
                     if shortcut && !handled {
                         fire = Some(held);
                     }
-                    self.leo_last_modifiers = *modifiers;
                 }
-                egui::Event::Key { modifiers, .. } => self.leo_last_modifiers = *modifiers,
                 _ => {}
             }
         }
@@ -114,6 +116,10 @@ new_method = """    pub(crate) fn textless_paste(&mut self, events: &[egui::Even
         fire
     }"""
 change(keys, old_method, new_method, "recover Ctrl+V when V key-down is swallowed or Ctrl is released first")
+change("crates/ui-egui/src/shortcuts.rs",
+       "let textless_paste = ctx.input(|i| app.paste_chord.textless_paste(&i.events));",
+       "let textless_paste = ctx.input(|i| app.paste_chord.textless_paste_with_modifiers(&i.events, i.modifiers));",
+       "pass the current frame modifier snapshot to the screenshot-paste fallback")
 
 clip = "apps/vectorcraft/src/clipboard.rs"
 old_reader = """    fn read_bitmap_candidates() -> Option<ClipboardRead> {
@@ -269,16 +275,15 @@ mod leo_pixpin_modifier_fallback_tests {
     fn release_only_v_after_ctrl_release_still_triggers_paste() {
         let ctrl = Modifiers { ctrl: true, command: true, ..Default::default() };
         let mut chord = PasteChord::default();
-        assert_eq!(chord.textless_paste(&[egui::Event::ModifiersChanged(ctrl)]), None);
-        assert_eq!(chord.textless_paste(&[egui::Event::ModifiersChanged(Modifiers::NONE), v_release(Modifiers::NONE)]), Some(ctrl));
+        assert_eq!(chord.textless_paste_with_modifiers(&[], ctrl), None);
+        assert_eq!(chord.textless_paste_with_modifiers(&[v_release(Modifiers::NONE)], Modifiers::NONE), Some(ctrl));
     }
 
     #[test]
-    fn release_only_v_uses_last_ctrl_snapshot_if_modifier_event_was_swallowed() {
+    fn release_only_v_uses_current_ctrl_snapshot_when_keyup_modifiers_are_empty() {
         let ctrl = Modifiers { ctrl: true, command: true, ..Default::default() };
         let mut chord = PasteChord::default();
-        chord.textless_paste(&[egui::Event::ModifiersChanged(ctrl)]);
-        assert_eq!(chord.textless_paste(&[v_release(Modifiers::NONE)]), Some(ctrl));
+        assert_eq!(chord.textless_paste_with_modifiers(&[v_release(Modifiers::NONE)], ctrl), Some(ctrl));
     }
 }
 """)
