@@ -23,20 +23,9 @@ impl Targets {
                 None => (q, self.line(f.at, q).into_iter().collect()),
             };
         }
-        // A point has a larger release radius than acquisition radius. The lock belongs
-        // to this target snapshot/gesture, never a global process or document singleton.
-        if let Some((q, kind)) = self.leo_point_lock.get() {
-            if q.distance(p) <= tol * 1.5 {
-                return (q, self.label(q, kind.label()).into_iter().collect());
-            }
-            self.leo_point_lock.set(None);
-        }
-        if let Some((q, kind)) = self.nearest_point(p, tol) {
-            self.leo_point_lock.set(Some((q, kind)));
-            return (q, self.label(q, kind.label()).into_iter().collect());
-        }
         // An explicit source extension is resolved before unrelated path projections.
         if let Some((at, end, dir, projected)) = self.extension(p, tol) {
+            self.leo_point_lock.set(None);
             let (hit, target, kind) = self.slide(at, dir, projected, tol, true)
                 .filter(|(hit, _, _)| hit.distance(projected) <= tol)
                 .unwrap_or((projected, projected, "extension"));
@@ -51,6 +40,18 @@ impl Targets {
             if kind == "intersect" { ov.extend(self.label(hit, "intersect")); }
             else if kind == "align" { ov.extend(self.lined_up(hit, target)); }
             return (hit, ov);
+        }
+        // A point has a larger release radius than acquisition radius. The lock belongs
+        // to this target snapshot/gesture, never a global process or document singleton.
+        if let Some((q, kind)) = self.leo_point_lock.get() {
+            if q.distance(p) <= tol * 1.5 {
+                return (q, self.label(q, kind.label()).into_iter().collect());
+            }
+            self.leo_point_lock.set(None);
+        }
+        if let Some((q, kind)) = self.nearest_point(p, tol) {
+            self.leo_point_lock.set(Some((q, kind)));
+            return (q, self.label(q, kind.label()).into_iter().collect());
         }
         if let Some(q) = self.crossing(p, tol) {
             return (q, self.label(q, "intersect").into_iter().collect());
@@ -141,6 +142,25 @@ mod tests {
         t.points.push((Point::ZERO, Kind::Anchor));
         t.snap_point(Point::new(1.0, 0.0), 8.0);
         t.snap_point(Point::new(1.0, 0.0), f64::NAN);
+        assert!(t.leo_point_lock.get().is_none());
+    }
+    #[test]
+    fn leo_snapping_extension_is_not_pulled_off_line_by_a_nearby_anchor() {
+        let mut t = Targets::default();
+        t.points.push((Point::new(10.0, 1.0), Kind::Anchor));
+        t.extensions.push((Point::ZERO, Point::new(5.0, 0.0), Vec2::new(1.0, 0.0)));
+        let (q, _) = t.snap_point(Point::new(10.0, 0.2), 2.0);
+        assert_eq!(q, Point::new(10.0, 0.0));
+        assert!(t.leo_point_lock.get().is_none());
+    }
+    #[test]
+    fn leo_snapping_shift_clears_an_unconstrained_point_lock() {
+        let mut t = Targets::default();
+        t.points.push((Point::new(10.0, 0.0), Kind::Anchor));
+        assert_eq!(t.snap_point(Point::new(10.0, 1.0), 8.0).0, Point::new(10.0, 0.0));
+        let from = Leave::diagonal(Point::ZERO, true);
+        let (q, _) = t.snap_from(Point::new(10.0, 1.0), Some(&from), 8.0);
+        assert_eq!(q, Point::new(10.0, 10.0));
         assert!(t.leo_point_lock.get().is_none());
     }
 }
