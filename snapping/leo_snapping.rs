@@ -24,7 +24,15 @@ impl Targets {
             };
         }
         // Keep the source direction while extending or shortening, including past its fixed end.
-        if let Some((at, end, dir, projected)) = self.extension(p, tol) {
+        if let Some((at, end, dir, projected)) = self.extension(p, tol).filter(|(at, _, dir, projected)| {
+            // A nearly horizontal/vertical source may still be straightened. Prefer its
+            // fixed end's axis only when that axis is strictly nearer than the source line.
+            // Exact horizontal/vertical sources already have the same axis; keep amber there.
+            let off_axis = dir.x.abs().min(dir.y.abs());
+            let near_axis = off_axis > 1e-9 && off_axis < 1.0_f64.to_radians().sin();
+            let axis_distance = (p.x - at.x).abs().min((p.y - at.y).abs());
+            !near_axis || axis_distance + 1e-9 >= projected.distance(p)
+        }) {
             self.leo_point_lock.set(None);
             let (hit, target, kind) = self.slide(at, dir, projected, tol, false)
                 .filter(|(hit, _, _)| hit.distance(projected) <= tol)
@@ -104,6 +112,34 @@ impl Targets {
 #[cfg(test)]
 mod leo_snapping_bidirectional_extension_tests {
     use super::*;
+
+    #[test]
+    fn nearly_axis_aligned_sources_still_straighten_without_losing_extension() {
+        for dir in [Vec2::new(1.0, 0.005), Vec2::new(0.005, 1.0)] {
+            let dir = dir / dir.hypot();
+            let at = Point::new(100.0, 200.0);
+            let end = at + dir * 200.0;
+            let mut t = Targets::default();
+            t.extensions.push((at, end, dir));
+            t.xs.push((at.x, at, Kind::Anchor));
+            t.ys.push((at.y, at, Kind::Anchor));
+            let pointer = if dir.x > dir.y { Point::new(end.x, at.y) } else { Point::new(at.x, end.y) };
+            let (q, overlays) = t.snap_point(pointer, 4.0);
+            assert_eq!(q, pointer);
+            assert!(overlays.iter().any(|ov| matches!(ov,
+                Overlay::Label { text, .. } if text == "align"
+            )), "{overlays:?}");
+            // Both shorter and longer positions on the original slant still use amber.
+            for distance in [100.0, 300.0] {
+                let on = at + dir * distance;
+                let (q, overlays) = t.snap_point(on, 4.0);
+                assert!(q.distance(on) < 1e-9);
+                assert!(overlays.iter().any(|ov| matches!(ov,
+                    Overlay::Label { text, .. } if text == "延长线吸附"
+                )), "{overlays:?}");
+            }
+        }
+    }
 
     #[test]
     fn source_direction_keeps_amber_feedback_in_both_directions() {
