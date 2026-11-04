@@ -51,15 +51,17 @@ change(transform,
        'self.snap = Some(if self.kind == TransformKind::Rotate { PointSnap::for_rotation(cx) } else { PointSnap::new(cx, || Targets::collect(cx.doc, &cx.selection.objects, None)) });')
 change(transform, '''                let (p, guides) = self.snap.as_ref().map_or((p, vec![]), |s| s.snap(cx, p));
                 self.hover = guides;
-                let (m, text) = self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds);''', '''                let (m, text) = if self.kind == TransformKind::Rotate {
+                let (m, text) = self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds);''', '''                let (m, text, measure_at) = if self.kind == TransformKind::Rotate {
                     let (m, deg, guides) = self.snap.as_ref().unwrap().snap_rotation(cx, d.origin, d.pick, p, d.pick, ev.mods.shift);
                     self.hover = guides;
-                    (m, format!("{:.1}°", -deg))
+                    (m, format!("{:.1}°", -deg), m * d.pick)
                 } else {
                     let (p, guides) = self.snap.as_ref().map_or((p, vec![]), |s| s.snap(cx, p));
                     self.hover = guides;
-                    self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds)
+                    let (m, text) = self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds);
+                    (m, text, p)
                 };''')
+change(transform, '                self.measure = Some((p, text));', '                self.measure = Some((measure_at, text));')
 change(transform, '''        if let (Some(d), TransformKind::Reflect | TransformKind::Rotate) = (self.drag, self.kind)
             && d.began''', '''        if let (Some(d), TransformKind::Reflect | TransformKind::Rotate) = (self.drag, self.kind)
             && !(self.kind == TransformKind::Rotate && !self.hover.is_empty())

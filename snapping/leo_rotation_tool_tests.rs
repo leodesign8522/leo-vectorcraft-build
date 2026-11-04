@@ -56,6 +56,15 @@ mod leo_snapping_rotation_tool_tests {
         tool.pointer(&c, &PointerEvent::new(PointerKind::Down, grab.x, grab.y));
         let drag = tool.pointer(&c, &PointerEvent::new(PointerKind::Drag, 382.0, 398.0));
         let m = matrix(&drag);
+        assert!(
+            tool.measure
+                .as_ref()
+                .unwrap()
+                .0
+                .distance(Point::new(380.0, 400.0))
+                < 1e-7,
+            "readout follows the actual snapped point"
+        );
         assert!((m * origin).distance(origin) < 1e-8);
         assert!(
             (m * grab).distance(Point::new(380.0, 400.0)) < 1e-7,
