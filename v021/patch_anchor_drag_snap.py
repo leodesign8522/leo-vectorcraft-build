@@ -39,7 +39,7 @@ change(direct,
        '        if ev.mods.shift {\n'
        '            // Keep an already-selected anchor selected while the pointer is dragged.\n'
        '            // A Shift-click toggles it off only when released without moving.\n'
-       '            if already && !cx.selection.anchors.is_empty() {\n'
+       '            if cx.selection.anchors.get(&id).is_some_and(|anchors| anchors.contains(&(si, ai))) {\n'
        '                self.shift_deselect = Some((id, si, ai));\n'
        '                return vec![];\n'
        '            }\n'
