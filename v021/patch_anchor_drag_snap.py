@@ -122,7 +122,10 @@ change(targets, "                best = Some((moved, hit, on));",
 change(targets,
        "        best.map(|(_, hit, from)| (hit, from))",
        "        // Also intersect the constrained line with actual target paths.\n"
-       "        let line = Line::new(at, at + dir);\n"
+       "        let unit = dir * (1.0 / dir.hypot());\n"
+        "        let extent = (q - at).hypot() + reach;\n"
+        "        // kurbo::Line is finite: span both sides far enough to include q and its snap radius.\n"
+        "        let line = Line::new(at - unit * extent, at + unit * extent);\n"
        "        for (bounds, segment) in self.segments.iter().filter(|(bounds, _)| bounds.inflate(reach, reach).contains(q)) {\n"
        "            for intersection in segment.intersect_line(line) {\n"
        "                let hit = line.eval(intersection.line_t);\n"
