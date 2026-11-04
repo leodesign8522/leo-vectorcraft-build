@@ -1,22 +1,37 @@
 # Leo Design × VectorCraft — 功能总账（长期维护）
 
-## 当前开发版本：Core Bridge v0.10.3 / VectorCraft v0.21.0（2026-11-03）
+## 当前开发版本：Core Bridge v0.10.4 / VectorCraft v0.21.0（2026-11-04）
 
 - 官方固定基线：`v0.21.0 / 11862f61198c8f62c0b22b6c9a331cc5950ac98d`。
 - 安装路径约定（2026-11-03）：后续 Core Bridge 与独立饼菜单安装器默认使用 `C:\Program Files\ArtCraft\VectorCraft`（Inno Setup `{autopf}\ArtCraft\VectorCraft`）；仍可手动选择实际安装目录。已有下载包不会因源码修改而改变。
 - 当前分支：`leo-v021-migration`；源码独立保存在 `v021/`，v020 历史源码保留。
 - 默认 Core 不编译饼菜单模块、菜单入口或键鼠拦截；只保留旧菜单 JSON 数据。
-- 当前开发可选包：Leo Design Pie Menu v0.7.3，仅配套 Core Bridge v0.10.3 / 官方 v0.21.0，单独安装和卸载。
+- 当前开发可选包：Leo Design Pie Menu v0.7.3，仅配套 Core Bridge v0.10.4 / 官方 v0.21.0，单独安装和卸载。
 - 其他增强功能继续迁移：智能选择、整组锚点移动、彩色辅助线、文字/字体、AI 导入、截图粘贴、图像/ICO 导出、面板及工作区配置。
-- 截图粘贴适配 v0.21 官方后台解码流程，保留 CF_BITMAP 回退；面板尺寸字段避开新增的原生瞬时弹出面板状态。
+- 截图粘贴由 v0.10.4 增加原生 CF_BITMAP / GetDIBits 快照读取与 Ctrl+V 释放事件兜底；仍需 PixPin 实机验收。面板尺寸字段避开新增的原生瞬时弹出面板状态。
 - 两种款式的完整补丁应用及源代码隔离检查通过；固定 craft-ui 补丁也通过干净源码检查。
 - 自动测试、Windows 编译、可选包安装/卸载结果以本次 Actions 为准；实际 GUI 仍需验收。
 - 旧 ICC 工作空间持久化及完整自由工作区的历史缺口没有被宣称解决。
 
 
+## LC-024 Shift 锚点拖动与真实边交点吸附（Core v0.10.4 / 可选 Pie v0.7.3）
+
+- 修复 A 工具中 Shift 按下已选锚点时，旧逻辑先执行 toggle、把拖动目标取消选择的问题。已选锚点在按下时保持选中；只有未发生拖动的 Shift-click 才在松开时取消选择。
+- Shift 拖动继续按 General › Constrain Angle 的 45°步进约束，并显示锁定方向辅助线；方向线上可吸附到附近真实路径边交点，而不只限于水平/垂直辅助线。
+- 原线段延长线识别提前于普通锚点和边吸附，避免附近无关目标把点拉离原方向；交点计算直接与目标路径线段求交。
+- 水平、垂直及任意斜角延长方向均参与识别；只接受原固定端点朝向拖动端点的前向射线，并限制吸附位移在容差范围内。
+- 新增工具状态机回归：已选点 Shift-drag、Shift 45°方向与斜边交点、任意斜角原线段延长线交点、水平/垂直延长方向。
+
+## LC-025 PixPin / Windows 图片剪贴板读取与 Ctrl+V 兜底（Core v0.10.4 / 可选 Pie v0.7.3）
+
+- v0.10.3 用户实测仍未生效，因此不把旧版自动测试当作 PixPin 实机成功。该版修正旧回退路径：不再依赖 arboard 重新打开 CF_BITMAP，而是在 Windows 剪贴板锁内调用 clipboard-win 的 GetDIBits / get_bitmap，将 GDI 位图快照为 BMP，再与 PNG、DIB 候选依次解码。
+- PNG、DIBV5、DIB 候选解码失败后继续尝试原生 CF_BITMAP；全部失败时保留错误数据交给导入层报错，不静默粘贴旧内部剪贴板。
+- Ctrl+V 兼容 V key-down 被 egui 吞掉、只收到 key-up 的情况；额外记住前一帧 Ctrl/Cmd 状态，兼容 Ctrl 先松开再松开 V。Paste / PasteImage 事件仍抑制重复粘贴。
+- 新增 modifier-transition 与 native CF_BITMAP fallback 单元测试。自动测试通过仍不等于 PixPin 在用户电脑上实机验收；交付后必须以 PixPin 截图 Ctrl+V 实测为准。
+
 ## LC-023 截图粘贴兼容补丁（Core v0.10.3 / 可选 Pie v0.7.3）
 
-- 用户实测：PixPin 复制为 JPG / PNG 文件后，VectorCraft 粘贴仍无反应。尚未获取用户机器的剪贴板格式及事件，不能认定确切根因。
+- 用户实测：Core v0.10.3 安装后 PixPin 截图 Ctrl+V 仍无反应。LC-025 已重新实现 CF_BITMAP 读取和 key-up 兜底；不能把 v0.10.3 的构建测试等同于实机成功。
 - 修复已确认的代码缺口：保留 V 按下时的 Ctrl/Shift 状态，防止 Ctrl 先松开导致无事件粘贴被丢弃；Paste/PasteImage 仍阻止重复粘贴。
 - Windows 同时读取 PNG、image/png、DIBV5、DIB，后台依次验证，不能因某个格式非空就跳过有效备用格式。可用时回退系统图像读取；回退前后检查剪贴板序列号，避免粘入后来复制的图片。
 - 全部候选失败时保留失败的图像数据，交给现有导入解码器报错，避免无声使用旧内部剪贴板。纯 CF_BITMAP 读取不可用、系统剪贴板被占用及宿主不触发事件仍可能需要进一步诊断。
