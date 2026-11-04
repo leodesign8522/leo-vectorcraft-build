@@ -75,6 +75,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate Python patch syntax before Rust setup
+        shell: pwsh
+        run: |
+          python -m compileall -q v021 scripts
+          if ($LASTEXITCODE -ne 0) { throw "Python patch syntax validation failed" }
       - name: Install stable Rust toolchain
         shell: pwsh
         run: |
