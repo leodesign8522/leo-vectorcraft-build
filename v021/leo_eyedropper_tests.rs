@@ -199,7 +199,8 @@ fn leo_eyedropper_scaled_range_only_changes_highlighted_characters() {
     }
     let dst = s.doc().unwrap().selection.objects[0];
     s.tool_text("MAMA NA KAZI", view).unwrap();
-    if let NodeKind::Text(t) = &mut s.doc_mut().unwrap().doc.node_mut(dst).unwrap().kind {
+    let doc = std::sync::Arc::make_mut(&mut s.doc_mut().unwrap().doc);
+    if let NodeKind::Text(t) = &mut doc.node_mut(dst).unwrap().kind {
         t.xf *= vectorcraft_geom::Affine::scale_non_uniform(0.5, 2.0);
     }
     let before = leo_eyedropper_text(&s, dst);
