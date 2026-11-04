@@ -37,19 +37,14 @@ old_method = """    pub(crate) fn textless_paste(&mut self, events: &[egui::Even
                     self.leo_paste_held = Some(*modifiers);
                 }
                 egui::Event::Key { key, pressed: false, modifiers, .. } if PASTE_KEYS.contains(key) => {
-                    match self.pressed.iter().position(|k| k == key) {
-                        Some(i) => {
-                            self.pressed.swap_remove(i);
-                        }
-                        // Unless a Paste event came (the guard takes it either way).
-                        None => {}
+                    if let Some(i) = self.pressed.iter().position(|k| k == key) {
+                        self.pressed.swap_remove(i);
                     }
+                    let handled = std::mem::take(&mut self.pasted);
                     let held = self.leo_paste_held.take().unwrap_or(*modifiers);
                     let shortcut = (*key == Key::Paste) || (*key == Key::V && held.command);
-                    if shortcut && !std::mem::take(&mut self.pasted) {
+                    if shortcut && !handled {
                         fire = Some(held);
-                    } else {
-                        let _ = std::mem::take(&mut self.pasted);
                     }
                 }
                 _ => {}
