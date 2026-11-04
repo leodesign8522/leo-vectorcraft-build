@@ -2,12 +2,12 @@
   #define SourceExe "dist\vectorcraft.exe"
 #endif
 
-#define BridgeVersion "0.1.0"
+#define BridgeVersion "0.1.1"
 #define UpstreamVersion "0.21.0"
 
 [Setup]
 AppId=LeoDesignSnappingOverlayForVectorCraftV021
-AppName=Leo Design Snapping Preview (Includes Core Bridge v0.11.0) v{#BridgeVersion} (VectorCraft v{#UpstreamVersion})
+AppName=Leo Design Snapping Preview (Includes Core Bridge v0.11.1) v{#BridgeVersion} (VectorCraft v{#UpstreamVersion})
 AppVersion={#BridgeVersion}
 AppPublisher=Leo Design
 AppPublisherURL=https://github.com/leodesign8522/leo-vectorcraft-build

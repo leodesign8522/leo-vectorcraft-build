@@ -19,4 +19,4 @@ scripts = [
 ]
 for script in scripts:
     subprocess.run([sys.executable, str(repo / script), str(root)], check=True)
-print('PASS Leo Design Snapping v0.1.0 integrated independently of Core')
+print('PASS Leo Design Snapping v0.1.1 integrated independently of Core')

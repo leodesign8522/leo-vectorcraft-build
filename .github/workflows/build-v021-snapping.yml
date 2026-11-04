@@ -1,4 +1,4 @@
-name: Leo Design Snapping v0.1.0 Preview
+name: Leo Design Snapping v0.1.1 Preview
 on:
   workflow_dispatch:
   push:
@@ -18,7 +18,7 @@ jobs:
     uses: ./.github/workflows/build-v021-edition.yml
     with:
       flavor: snapping
-      label: Leo Design Snapping v0.1.0 Preview
-      artifact: Leo_Design_Snapping_v0.1.0_Windows_x64
+      label: Leo Design Snapping v0.1.1 Preview
+      artifact: Leo_Design_Snapping_v0.1.1_Windows_x64
       installer: snapping/Leo_Design_Snapping.iss
-      output: Leo_Design_Snapping_v0.1.0_Installer
+      output: Leo_Design_Snapping_v0.1.1_Installer

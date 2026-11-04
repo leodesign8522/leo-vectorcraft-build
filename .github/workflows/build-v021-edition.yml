@@ -120,6 +120,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Document Info selection statistics patch failed" }
           python v021/patch_action_shortcuts.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Action shortcut integration failed" }
+          python v021/patch_eyedropper_text.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Eyedropper character dimension integration failed" }
           python scripts/patch_color_panel_lock.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo CMYK display-mode lock patch failed" }
           git -C vectorcraft diff --check
@@ -160,6 +162,12 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test Eyedropper character attributes and transformed text
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-engine tests::eyedropper -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Eyedropper character attributes, affine compensation, range or undo regression failed" }
       - name: Test dormant optional preferences in Core only
         if: inputs.flavor == 'core'
         shell: pwsh
@@ -296,6 +304,7 @@ jobs:
           Core Bridge: 智能选择、文字、AI 导入、截图粘贴、导出、面板、动作快捷键等。
           Core 不含 Leo 自定义吸附、整组锚点吸附移动、延长线或辅助线颜色设置。
           官方原生吸附仍由 VectorCraft 提供。
+          文字吸管：字号、显式行距、基线偏移及水平比例按字符面板显示值换算，保留目标文字变换与内容。
           Snapping 预览版在 Core 基础上单独集成吸附模块：新点吸附解析器、
           节点捕捉/释放半径、Shift 方向约束、延长线交点、参考线与颜色控制。
           独立版本、目录、构建入口；不是可动态加载的官方插件。
