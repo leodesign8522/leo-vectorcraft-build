@@ -33,7 +33,7 @@ change(direct,
        "route direct-anchor Shift snap through page-axis constraint")
 change(direct,
        "        let mut d = move_delta(start, p, ev.mods.shift, cx.constrain_angle);\n        let unsnapped = d;\n        self.guides.clear();\n        if !ev.mods.alt\n            && let Some(snap) = &self.partial_snap",
-       "        let mut d = move_delta(start, p, ev.mods.shift, cx.constrain_angle);\n        let unsnapped = if self.partial_snap.is_some() && ev.mods.shift { move_delta(start, p, true, 0.0) } else { d };\n        self.guides.clear();\n        if !ev.mods.alt\n            && let Some(snap) = &self.partial_snap",
+       "        let mut d = if self.partial_snap.is_some() && ev.mods.shift { move_delta(start, p, true, 0.0) } else { move_delta(start, p, ev.mods.shift, cx.constrain_angle) };\n        let unsnapped = d;\n        self.guides.clear();\n        if !ev.mods.alt\n            && let Some(snap) = &self.partial_snap",
        "keep partial-anchor snapped state consistent with page-axis movement")
 change(direct,
        "                let shift = ev.mods.shift.then(|| Leave::segment(cx, held, true));\n                let (q, guides) = snap.snap_from(cx, held + (p - start), shift.as_ref());",

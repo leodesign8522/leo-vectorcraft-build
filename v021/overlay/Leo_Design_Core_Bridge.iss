@@ -2,7 +2,7 @@
   #define SourceExe "dist\vectorcraft.exe"
 #endif
 
-#define BridgeVersion "0.10.4"
+#define BridgeVersion "0.10.5"
 #define UpstreamVersion "0.21.0"
 
 [Setup]

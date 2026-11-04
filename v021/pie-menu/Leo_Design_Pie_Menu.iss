@@ -6,7 +6,7 @@
 #endif
 #define BaseHash GetSHA256OfFile(BaseExe)
 #define PieHash GetSHA256OfFile(PieExe)
-#define PieVersion "0.7.3"
+#define PieVersion "0.7.4"
 
 [Setup]
 AppId=LeoDesignOptionalPieMenuForCoreBridgeV021
@@ -23,20 +23,20 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
-OutputBaseFilename=Leo_Design_Pie_Menu_v{#PieVersion}_Optional_for_Core_Bridge_v0.10.4
+OutputBaseFilename=Leo_Design_Pie_Menu_v{#PieVersion}_Optional_for_Core_Bridge_v0.10.5
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes
 RestartApplications=no
 Uninstallable=yes
-UninstallDisplayName=Leo Design Pie Menu v{#PieVersion} (Core Bridge v0.10.4)
+UninstallDisplayName=Leo Design Pie Menu v{#PieVersion} (Core Bridge v0.10.5)
 UninstallFilesDir={app}\LeoDesignPieMenu
 SetupLogging=yes
 
 [Files]
 ; The primary EXE belongs to Core Bridge and must NEVER be deleted by uninstall.
 Source: "{#PieExe}"; DestDir: "{app}"; DestName: "vectorcraft.exe"; Flags: ignoreversion uninsneveruninstall
-Source: "{#BaseExe}"; DestDir: "{app}\LeoDesignPieMenu"; DestName: "Core_Bridge_v0.10.4_No_Pie.exe"; Flags: ignoreversion
+Source: "{#BaseExe}"; DestDir: "{app}\LeoDesignPieMenu"; DestName: "Core_Bridge_v0.10.5_No_Pie.exe"; Flags: ignoreversion
 Source: "OPTIONAL_INSTALL.md"; DestDir: "{app}\LeoDesignPieMenu"; Flags: ignoreversion
 
 [Code]
@@ -65,7 +65,7 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
   if not CompatibleTarget() then
-    Result := '请先在此目录安装配套的 Leo Design Core Bridge v0.10.4（不含饼菜单）。' + #13#10 +
+    Result := '请先在此目录安装配套的 Leo Design Core Bridge v0.10.5（不含饼菜单）。' + #13#10 +
       '本可选包不会覆盖其他版本。请关闭 VectorCraft 后重试。';
 end;
 
@@ -75,7 +75,7 @@ var
 begin
   Result := False;
   Target := TargetExe();
-  Base := ExpandConstant('{app}\LeoDesignPieMenu\Core_Bridge_v0.10.4_No_Pie.exe');
+  Base := ExpandConstant('{app}\LeoDesignPieMenu\Core_Bridge_v0.10.5_No_Pie.exe');
   Stage := ExpandConstant('{app}\LeoDesignPieMenu\restore.pending.exe');
   Pending := ExpandConstant('{app}\LeoDesignPieMenu\pie.pending.exe');
 
@@ -88,7 +88,7 @@ begin
   end;
   if not HasHash(Base, '{#BaseHash}') then
   begin
-    SuppressibleMsgBox('配套 Core 恢复文件缺失或已改变，卸载已停止。请重新安装 Core Bridge v0.10.4。', mbError, MB_OK, IDOK);
+    SuppressibleMsgBox('配套 Core 恢复文件缺失或已改变，卸载已停止。请重新安装 Core Bridge v0.10.5。', mbError, MB_OK, IDOK);
     Exit;
   end;
   if FileExists(Stage) or FileExists(Pending) then
