@@ -260,6 +260,10 @@ change(clip,
        "leo_bitmap_candidates(vec![b\"invalid\".to_vec()], vec![], || None)",
        "leo_bitmap_candidates(vec![b\"invalid\".to_vec()], vec![], None)",
        "update invalid clipboard regression for native bitmap snapshot")
+ change(clip,
+        "leo_bitmap_candidates(vec![], vec![], || None)",
+        "leo_bitmap_candidates(vec![], vec![], None)",
+        "update empty clipboard regression for native bitmap snapshot")
 
 with (root / keys).open("a", encoding="utf-8") as f:
     f.write("""
