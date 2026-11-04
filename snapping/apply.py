@@ -15,6 +15,7 @@ scripts = [
     'snapping/adapters/patch_anchor_ruler_snap.py',
     'snapping/adapters/patch_anchor_drag_tests.py',
     'snapping/patch_resolver.py',
+    'snapping/patch_guide_tests.py',
 ]
 for script in scripts:
     subprocess.run([sys.executable, str(repo / script), str(root)], check=True)
