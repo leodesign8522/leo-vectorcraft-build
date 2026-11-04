@@ -49,8 +49,8 @@ begin
   if not FileExists(ExePath) then
   begin
     if ShowMessage then
-      MsgBox('û���ҵ��ٷ� VectorCraft ������' + #13#10 + ExePath + #13#10 +
-        '��ѡ���Ѱ�װ VectorCraft ���ļ��У�����ѡ��Ŀ¼��', mbError, MB_OK);
+      MsgBox('没有找到官方 VectorCraft 主程序：' + #13#10 + ExePath + #13#10 +
+        '请选择已安装 VectorCraft 的文件夹，不能选空目录。', mbError, MB_OK);
     Exit;
   end;
 
@@ -62,15 +62,15 @@ begin
     if (S <> '0.21.0.0') and (S <> '0.21.0') then
     begin
       if ShowMessage then
-        MsgBox('Ŀ�����汾Ϊ ' + S + #13#10 +
-          '�˰�װ��ֻ������ VectorCraft v0.21.0�����𸲸������汾��', mbError, MB_OK);
+        MsgBox('目标程序版本为 ' + S + #13#10 +
+          '此安装包只适用于 VectorCraft v0.21.0。请勿覆盖其他版本。', mbError, MB_OK);
       Exit;
     end;
   end
   else
   begin
     if ShowMessage then
-      MsgBox('�޷���ȡĿ�����汾����װ��ֹͣ����ѡ��ٷ� VectorCraft v0.21.0��', mbError, MB_OK);
+      MsgBox('无法读取目标程序版本，安装已停止。请选择官方 VectorCraft v0.21.0。', mbError, MB_OK);
     Exit;
   end;
   Result := True;
@@ -87,7 +87,7 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
   if not CheckTarget(False) then
-    Result := '�Ҳ������ݵ� VectorCraft v0.21 ���������鰲װ·���ͳ���汾��';
+    Result := '找不到兼容的 VectorCraft v0.21 主程序。请检查安装路径和程序版本。';
 end;
 
 
