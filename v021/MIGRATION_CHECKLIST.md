@@ -33,3 +33,9 @@ Windows 可选安装器测试：不兼容程序拒绝、安装后精确切换、
 实际用户 GUI、复杂文件、安装环境仍需验收，自动结果以 Actions 为准。
 
 历史 ICC 工作空间设置持久化、完整自由工作区缺口未宣称补齐。
+
+## Current v0.10.4 verification gate
+
+- Build target: VectorCraft v0.21.0, Core Bridge v0.10.4, optional Pie Menu v0.7.3.
+- Required automated checks: Shift-click/Shift-drag selection, 45-degree edge intersections, arbitrary-angle line-extension intersections, release-only Ctrl+V, PNG/DIB/native CF_BITMAP fallback, and paired Pie install/remove.
+- A successful build is not PixPin GUI acceptance. Confirm an actual PixPin screenshot paste on Windows before marking LC-025 fully accepted.
