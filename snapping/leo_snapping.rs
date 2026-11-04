@@ -23,10 +23,10 @@ impl Targets {
                 None => (q, self.line(f.at, q).into_iter().collect()),
             };
         }
-        // An explicit source extension is resolved before unrelated path projections.
+        // Keep the source direction while extending or shortening, including past its fixed end.
         if let Some((at, end, dir, projected)) = self.extension(p, tol) {
             self.leo_point_lock.set(None);
-            let (hit, target, kind) = self.slide(at, dir, projected, tol, true)
+            let (hit, target, kind) = self.slide(at, dir, projected, tol, false)
                 .filter(|(hit, _, _)| hit.distance(projected) <= tol)
                 .unwrap_or((projected, projected, "extension"));
             let mut ov = vec![];
@@ -98,6 +98,76 @@ impl Targets {
         }
         if aligned { ov.extend(self.label(out, "align")); }
         (out, ov)
+    }
+}
+
+#[cfg(test)]
+mod leo_snapping_bidirectional_extension_tests {
+    use super::*;
+
+    #[test]
+    fn source_direction_keeps_amber_feedback_in_both_directions() {
+        for dir in [Vec2::new(1.0, 0.0), Vec2::new(0.0, 1.0), Vec2::new(0.6, -0.8)] {
+            let at = Point::new(100.0, 200.0);
+            let end = at + dir * 50.0;
+            let normal = Vec2::new(-dir.y, dir.x);
+            let mut t = Targets::default();
+            t.extensions.push((at, end, dir));
+            for along in [80.0, 50.0, 30.0, 0.0, -30.0] {
+                let on = at + dir * along;
+                let (q, overlays) = t.snap_point(on + normal * 0.25, 1.0);
+                assert!(q.distance(on) < 1e-9, "{dir:?} {along}: {q:?}");
+                assert!(overlays.iter().any(|ov| matches!(ov,
+                    Overlay::Line { a, b, color, dashed: true }
+                        if *a == end && b.distance(on) < 1e-9 && *color == EXTENSION_SNAP_COLOR
+                )), "{overlays:?}");
+                assert!(overlays.iter().any(|ov| matches!(ov,
+                    Overlay::Label { text, color, .. }
+                        if text == "延长线吸附" && *color == EXTENSION_SNAP_COLOR
+                )), "{overlays:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn reverse_direction_snaps_to_real_edges_on_either_side_of_fixed_end() {
+        for dir in [Vec2::new(1.0, 0.0), Vec2::new(0.0, 1.0), Vec2::new(0.6, -0.8)] {
+            let at = Point::new(100.0, 200.0);
+            let end = at + dir * 50.0;
+            let normal = Vec2::new(-dir.y, dir.x);
+            for along in [30.0, -30.0] {
+                let on = at + dir * along;
+                let mut t = Targets::default();
+                t.extensions.push((at, end, dir));
+                let a = on - normal * 20.0;
+                let b = on + normal * 20.0;
+                t.segments.push((Rect::from_points(a, b), PathSeg::Line(Line::new(a, b))));
+                let (q, overlays) = t.snap_point(on + dir * 0.4 + normal * 0.2, 1.0);
+                assert!(q.distance(on) < 1e-8, "{dir:?} {along}: {q:?}");
+                assert!(overlays.iter().any(|ov| matches!(ov,
+                    Overlay::Label { text, .. } if text == "intersect"
+                )), "{overlays:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn reverse_preview_runs_past_pointer_and_does_not_snap_outside_radius() {
+        let mut t = Targets::default();
+        let end = Point::new(50.0, 0.0);
+        t.extensions.push((Point::ZERO, end, Vec2::new(1.0, 0.0)));
+        for x in [30.0, -30.0] {
+            let pointer = Point::new(x, 2.0);
+            let (q, overlays) = t.snap_point(pointer, 1.0);
+            assert_eq!(q, pointer);
+            assert!(overlays.iter().any(|ov| matches!(ov,
+                Overlay::Line { a, b, color, dashed: true }
+                    if *a == end && b.x < x && b.y == 0.0 && *color == EXTENSION_PREVIEW_COLOR
+            )), "{overlays:?}");
+            assert!(!overlays.iter().any(|ov| matches!(ov,
+                Overlay::CurvePoint { color, .. } if *color == EXTENSION_SNAP_COLOR
+            )));
+        }
     }
 }
 

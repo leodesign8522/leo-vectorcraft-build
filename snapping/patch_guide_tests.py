@@ -18,15 +18,13 @@ change('''    // 150 along it (2.5 off), and 50 along it (shorter).
         let (q, ov) = t.snap_point(pointer, 4.0);
         assert!((q - on).hypot() < 1e-9, "{q:?}");
         assert_eq!(lines(&ov), vec![(Point::new(300.0, 400.0), q)]);
-    }''', '''    // Only the forward ray beyond the original endpoint is an extension target.
-    let (q, ov) = t.snap_point(Point::new(421.5, 312.0), 4.0);
-    assert!((q - Point::new(420.0, 310.0)).hypot() < 1e-9, "{q:?}");
-    assert_eq!(lines(&ov), vec![(Point::new(380.0, 340.0), q)]);
-    assert!(labels(&ov).contains(&"延长线吸附"));
-    let pointer = Point::new(341.5, 372.0);
-    let (q, ov) = t.snap_point(pointer, 4.0);
-    assert_eq!(q, pointer, "shortening must not acquire a forward-extension lock");
-    assert!(!labels(&ov).contains(&"延长线吸附"));''')
+    }''', '''    // Preserve the source direction both while lengthening and while shortening.
+    for (pointer, on) in [(Point::new(421.5, 312.0), Point::new(420.0, 310.0)), (Point::new(341.5, 372.0), Point::new(340.0, 370.0))] {
+        let (q, ov) = t.snap_point(pointer, 4.0);
+        assert!((q - on).hypot() < 1e-9, "{q:?}");
+        assert_eq!(lines(&ov), vec![(Point::new(380.0, 340.0), q)]);
+        assert!(labels(&ov).contains(&"延长线吸附"));
+    }''')
 change('assert_eq!(lines(&ov), vec![(Point::new(100.0, 300.0), q)]);',
        'assert_eq!(lines(&ov), vec![(Point::new(300.0, 301.0), q)]);')
 change('assert_eq!(lines(&ov).len(), 1, "{ov:?}");\n    // Nothing in reach:',
