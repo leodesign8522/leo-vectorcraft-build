@@ -11,25 +11,20 @@ module = tools / 'guides/leo_snapping.rs'
 prefs = (root / 'crates/engine/src/prefs.rs').read_text(encoding='utf-8')
 direct = (tools / 'direct.rs').read_text(encoding='utf-8')
 targets = (tools / 'guides/targets.rs').read_text(encoding='utf-8')
-if flavor == 'core':
-    assert not module.exists(), 'Custom snap module leaked into Core'
-    assert not (tools / 'guides/leo_rotation.rs').exists(), 'Rotation snapping leaked into Core'
-    for rel in ['select.rs', 'xform/transform.rs', 'xform/free.rs']:
-        assert 'snap_rotation(' not in (tools / rel).read_text(encoding='utf-8'), f'Rotation snapping hook leaked into Core: {rel}'
-    for token in ('leo_point_lock', 'leo_snap_from', 'EXTENSION_PREVIEW_COLOR', 'extension_preview(', 'leo_rotation_lock', 'leo_rotation_hit', 'leo_for_rotation'):
-        assert token not in targets, f'Custom snapping leaked into Core: {token}'
-    assert 'MoveGroupAnchor' not in direct, 'Group-anchor snap adapter leaked into Core'
-    assert 'smart_guide_horizontal_color' not in prefs, 'Custom guide colour preferences leaked into Core'
-else:
-    assert module.is_file(), 'Independent snapping resolver missing'
-    assert (tools / 'guides/leo_rotation.rs').is_file(), 'Rotation snapping resolver missing'
-    assert 'self.leo_snap_from(p, from, tol)' in targets
-    assert 'MoveGroupAnchor' in direct
-    assert 'smart_guide_horizontal_color' in prefs
-    spec = (root / 'crates/engine/src/cmd/prefscmds.rs').read_text(encoding='utf-8')
-    assert '"Leo Snapping"' in spec
+assert module.is_file(), 'Integrated snapping resolver missing'
+assert (tools / 'guides/leo_rotation.rs').is_file(), 'Rotation snapping resolver missing'
+assert 'self.leo_snap_from(p, from, tol)' in targets
+assert 'MoveGroupAnchor' in direct
+assert 'smart_guide_horizontal_color' in prefs
+spec = (root / 'crates/engine/src/cmd/prefscmds.rs').read_text(encoding='utf-8')
+assert '"Leo Core Bridge 吸附"' in spec
+assert 'Leo Design 快捷键备份' not in (root / 'crates/ui-egui/src/menus/tree.rs').read_text(encoding='utf-8')
+for rel in ['apps/vectorcraft/src/clipboard.rs','crates/ui-egui/src/shortcuts.rs','crates/ui-egui/src/shortcuts/paste.rs']:
+    text = (root / rel).read_text(encoding='utf-8')
+    for token in ['leo_pixpin', 'leo_screenshot_paste', 'leo_read_screenshot']:
+        assert token not in text, f'Removed screenshot enhancement in {rel}: {token}'
 for p in (root / 'crates/ui-egui/src').rglob('*.rs'):
     s = p.read_text(encoding='utf-8')
     for token in ('pub mod leo_pie_menu', 'crate::leo_pie_menu', 'ui.leoPieSettings'):
         assert token not in s, f'Archived Pie hook {token} in {p}'
-print(f'PASS {flavor}: independent snapping ownership and no active Pie Menu')
+print(f'PASS {flavor}: integrated Core Bridge, removed screenshot/menu enhancements, and no active Pie Menu')
