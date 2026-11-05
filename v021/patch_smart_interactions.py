@@ -37,7 +37,7 @@ s = file.read_text(encoding="utf-8")
 a = '''                    Some(h) => {
                         let top = h.top_object(scope);
                         let mut out = vec![];
-                        let (mut deselect, mut key) = (None, None);'''
+                        let (mut deselect, mut key, mut exclude) = (None, None, None);'''
 b = '''                    Some(h) => {
                         let top = h.top_object(scope);
                         // Leo Design: after Ctrl-click selects a nested group child,
@@ -48,7 +48,7 @@ b = '''                    Some(h) => {
                             top
                         };
                         let mut out = vec![];
-                        let (mut deselect, mut key) = (None, None);'''
+                        let (mut deselect, mut key, mut exclude) = (None, None, None);'''
 if s.count(a)!=1: raise SystemExit(f"FAIL Selection nested target anchor count={s.count(a)}")
 s=s.replace(a,b,1)
 start=s.index(b)
@@ -62,6 +62,7 @@ needles=['cx.selection.contains(top)', 'deselect = Some(top)', '"id": top.0', '"
 # Ensure we did not accidentally eliminate all key matches in revised upstream.
 if not any(x in block for x in needles):raise SystemExit("FAIL selection target references disappeared")
 for old,new in [
+ ('shift_press(cx, &h, top, &mut out)', 'shift_press(cx, &h, target, &mut out)'),
  ('cx.selection.contains(top)', 'cx.selection.contains(target)'),
  ('deselect = Some(top)', 'deselect = Some(target)'),
  ('"id": top.0', '"id": target.0'),
