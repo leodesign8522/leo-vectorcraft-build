@@ -37,11 +37,11 @@ jobs:
     steps:
       - name: Checkout Leo Design migration source
         uses: actions/checkout@v4
-      - name: Checkout official VectorCraft v0.21.0
+      - name: Checkout official VectorCraft v0.21.1
         uses: actions/checkout@v4
         with:
           repository: storytold/vectorcraft
-          ref: v0.21.0
+          ref: v0.21.1
           path: vectorcraft
           persist-credentials: false
       - name: Install Python for compatibility patches
@@ -72,11 +72,10 @@ jobs:
         working-directory: vectorcraft
         run: |
           $actual = (git rev-parse HEAD).Trim()
-          if ($actual -ne "11862f61198c8f62c0b22b6c9a331cc5950ac98d") {
+          if ($actual -ne "f6aa4309b4e11a6844e156120560b4beabf17fe9") {
             throw "Unexpected upstream source commit"
           }
-          # This exact upstream SHA already passed cargo check in run 41565654553.
-          # Feature-only rebuilds compile/test the enhanced source below.
+          # Keep the new official release fixed while validating migrated modules.
       - name: Apply modular Leo Design Core Bridge
         shell: pwsh
         run: |
@@ -121,17 +120,16 @@ jobs:
           git -C vectorcraft diff --check
           if ($LASTEXITCODE -ne 0) { throw "Source whitespace validation failed" }
           git -C vectorcraft diff --stat
-      - name: Apply independently owned Snapping module
-        if: inputs.flavor == 'snapping'
+      - name: Apply integrated Core Bridge snapping module
         shell: pwsh
         run: |
           python snapping/apply.py vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Independent Snapping integration failed" }
-      - name: Check edition boundaries
+          if ($LASTEXITCODE -ne 0) { throw "Core Bridge snapping integration failed" }
+      - name: Verify integrated Core Bridge boundaries
         shell: pwsh
         run: |
-          python snapping/check_separation.py vectorcraft "${{ inputs.flavor }}"
-          if ($LASTEXITCODE -ne 0) { throw "Core contains custom snapping or pie hooks" }
+          python snapping/check_separation.py vectorcraft core
+          if ($LASTEXITCODE -ne 0) { throw "Core Bridge module verification failed" }
       - name: Apply pinned craft-ui docked flyout resizing
         shell: pwsh
         working-directory: vectorcraft
@@ -163,7 +161,6 @@ jobs:
           cargo test --locked -p vectorcraft-engine tests::eyedropper -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Eyedropper character attributes, affine compensation, range or undo regression failed" }
       - name: Test dormant optional preferences in Core only
-        if: inputs.flavor == 'core'
         shell: pwsh
         working-directory: vectorcraft
         run: |
@@ -188,7 +185,6 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Document Info engine regressions failed" }
           }
       - name: Test Shift page-axis snapping and extension guide feedback
-        if: inputs.flavor == 'snapping'
         shell: pwsh
         working-directory: vectorcraft
         run: |
@@ -209,7 +205,6 @@ jobs:
           cargo test --locked -p vectorcraft-engine leo_segment_copy -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Selected-segment extraction, Copy/Cut, paste and undo regressions failed" }
       - name: Test independent point resolver and ruler snapping
-        if: inputs.flavor == 'snapping'
         shell: pwsh
         working-directory: vectorcraft
         run: |
@@ -219,6 +214,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Independent Snapping resolver regression failed" }
           cargo test --locked -p vectorcraft-tools leo_shift_ruler_snap -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Horizontal/vertical Shift ruler snapping regressions failed" }
+      - name: Test rotation snapping and native clipboard guides
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-tools leo_snapping_rotation -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Rotation snapping regressions failed" }
+          cargo test --locked -p vectorcraft-engine guide_clipboard -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native guide clipboard regressions failed" }
       - name: Compile Windows x64 native EXE
         shell: pwsh
         working-directory: vectorcraft
@@ -230,7 +233,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Core Bridge Windows compilation failed" }
       - name: Test live corner endpoint movement, regeneration and undo
         # Shared backend source is identical in both editions; validate it once.
-        if: inputs.flavor == 'core'
         shell: pwsh
         working-directory: vectorcraft
         env:
@@ -252,7 +254,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "SVG clipboard font alias regression failed" }
       - name: Test PDF CJK resolver migration
         # Shared backend source is identical in both editions; validate it once.
-        if: inputs.flavor == 'core'
         shell: pwsh
         working-directory: vectorcraft
         run: |
@@ -279,34 +280,33 @@ jobs:
           Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
           New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
           @'
-          ${{ inputs.label }} / VectorCraft v0.21.0
+          ${{ inputs.label }} / VectorCraft v0.21.1
 
-          Core Bridge: 智能选择、文字、AI 导入、导出、面板、动作快捷键等。
-          Core 不含 Leo 自定义吸附、整组锚点吸附移动、延长线或辅助线颜色设置。
-          官方原生吸附仍由 VectorCraft 提供。
-          文字吸管：字号、显式行距、基线偏移及水平比例按字符面板显示值换算，保留目标文字变换与内容。
-          Snapping 预览版在 Core 基础上单独集成吸附模块：新点吸附解析器、
-          节点捕捉/释放半径、Shift 方向约束、延长线交点、参考线与颜色控制。
-          独立版本、目录、构建入口；不是可动态加载的官方插件。
-          当前通过重编译完整 EXE 集成，Core 和 Snapping 覆盖安装时不能叠加。
-          需要吸附增强请使用 Snapping 版本；切回 Core 会移除自定义吸附增强。
-          设置位于 Edit > Preferences > Leo Snapping（仅 Snapping 版本）。
-          首版尚未实现 Affinity 候选列表、图层候选范围与完整设置面板。
-          对象移动/缩放、候选几何采集仍复用官方代码，尚非完整替换。
-          饼菜单停止维护，不再构建或打包；历史配置保留但不运行。
+          Leo Design Core Bridge v0.12.0 / 官方 VectorCraft v0.21.1
+          一个安装包：通用增强与吸附增强一起提供。
+          保留：组内选择、选中线段复制/剪切、文字与 AI/PDF/SVG 字体兼容、
+          文字吸管、图像/ICO 导出、面板尺寸、工作区导入导出、
+          单位/颜色快捷面板、动作快捷键、已选物体/编组数量。
+          吸附：整组锚点移动、节点锁定、Shift 水平/垂直/45°、
+          任意角原线方向与交点、参考线、辅助线配色及旋转贴边。
+          吸附设置：Edit > Preferences > Leo Core Bridge 吸附。
+          旋转贴边表示抓取的点落在目标边上，不是整条边自动重合。
+          已删除 34～37 截图粘贴增强，截图与外部图片粘贴使用官方实现。
+          已删除 54 Leo 快捷键备份菜单；官方快捷键功能和工作区导入导出保留。
+          饼菜单继续停用。Snapping 不再单独发布或安装。
           便携版：解压到新文件夹，运行 vectorcraft.exe。
-          覆盖安装：关闭 VectorCraft，选择官方 v0.21.0 安装目录。
-          外部图片与截图粘贴使用官方实现，不集成 Leo 截图剪贴板补丁。
-          自动测试不等于 Windows GUI 手感验收。
+          覆盖安装：先更新官方至 0.21.1，关闭软件，再选择实际安装目录。
+          默认目录：C:\Program Files\ArtCraft\VectorCraft。
+          自动测试不等于用户 Windows 实机手感验收。
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
-          This artifact is uploaded only after all applicable workflow tests and release build pass.
-          Common: action shortcuts, selection statistics, selected-segment clipboard,
-          AI/SVG/PDF font compatibility, ICO/export, selection marquee and workspace JSON.
-          Snapping only: point-lock acquire/release, per-gesture state, zoom-scaled radius,
-          Shift axes, line-extension intersections/visuals and ruler guides.
-          Core only: shared backend regressions and dormant optional JSON roundtrip.
-          Edition boundaries checked before compilation. Windows GUI/manual acceptance pending.
+          Artifact upload requires the release build and every configured regression to pass.
+          Unified Core Bridge v0.12.0 includes common and snapping module tests.
+          Native Actions, custom chords, editable AI import, font matching, selected-segment copy,
+          native guide clipboard, live corners, image/ICO export, workspace JSON, selection statistics,
+          point resolver, Shift constraints, extension/ruler snapping and rotation snapping are checked.
+          Custom screenshot clipboard patches and the shortcut backup menu are not integrated.
+          Windows GUI/manual acceptance remains pending.
           '@ | Set-Content "dist/BUILD_VALIDATION.txt" -Encoding utf8
           Copy-Item LEO_DESIGN_FEATURE_REGISTRY.md dist/
           Copy-Item snapping/README.md dist/SNAPPING.md
