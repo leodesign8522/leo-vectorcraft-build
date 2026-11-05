@@ -62,17 +62,5 @@ replace(
     ("window.workspace.import", "Leo Design Import Workspace", "", "{path? | data?}"),''',
     "register workspace commands for keyboard shortcut editor"
 )
-replace(
-    "crates/ui-egui/src/menus/tree.rs",
-    '''                c("Keyboard Shortcuts…", "edit.keyboardShortcuts"),
-                c("Preferences…", "edit.preferences"),''',
-    '''                c("Keyboard Shortcuts…", "edit.keyboardShortcuts"),
-                sub("Leo Design 快捷键备份", vec![
-                    c("导出快捷键 JSON…", "shortcuts.export"),
-                    c("导入快捷键 JSON / KYS…", "shortcuts.import"),
-                ]),
-                c("Preferences…", "edit.preferences"),''',
-    "expose official shortcut JSON/KYS I/O as a convenient menu"
-)
-print("SUCCESS Leo Design Core Bridge / Workspace & Shortcut IO for v0.21")
+print("SUCCESS Leo Design Core Bridge / Workspace IO for v0.21")
 
