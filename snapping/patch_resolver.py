@@ -26,8 +26,8 @@ path.with_name('leo_snapping.rs').write_text(module, encoding='utf-8', newline='
 spec = root / 'crates/engine/src/cmd/prefscmds.rs'
 s = spec.read_text(encoding='utf-8')
 assert '"Smart Guides"' in s
-spec.write_text(s.replace('"Smart Guides"', '"Leo Snapping"'), encoding='utf-8', newline='\n')
+spec.write_text(s.replace('"Smart Guides"', '"Leo Core Bridge 吸附"'), encoding='utf-8', newline='\n')
 dialog = root / 'crates/ui-egui/src/prefs_dialog.rs'
 s = dialog.read_text(encoding='utf-8')
-dialog.write_text(s.replace('"Smart Guides"', '"Leo Snapping"'), encoding='utf-8', newline='\n')
+dialog.write_text(s.replace('"Smart Guides"', '"Leo Core Bridge 吸附"'), encoding='utf-8', newline='\n')
 print('PASS independent Leo Snapping resolver and preference category')
