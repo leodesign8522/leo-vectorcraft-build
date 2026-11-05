@@ -82,12 +82,6 @@ jobs:
         run: |
           python v021/patch_core_bridge.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo Design Core Bridge source patch failed" }
-          python v021/patch_screenshot_paste.py vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Leo Screenshot Paste patch failed" }
-          python v021/patch_screenshot_paste_v2.py vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Screenshot paste v2 compatibility patch failed" }
-          python v021/patch_screenshot_paste_v3.py vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Native CF_BITMAP and Ctrl+V fallback patch failed" }
           python v021/patch_essential_features.py vectorcraft
           if ($LASTEXITCODE -ne 0) { throw "Leo Design essential v0.21 patches failed" }
           python v021/patch_ai_import.py vectorcraft
@@ -193,18 +187,6 @@ jobs:
             cargo test --locked -p vectorcraft-engine cmd::docinfo::tests -- --nocapture
             if ($LASTEXITCODE -ne 0) { throw "Document Info engine regressions failed" }
           }
-      - name: Test screenshot candidate decoding and paste modifier order
-        shell: pwsh
-        working-directory: vectorcraft
-        run: |
-          cargo test --locked -p vectorcraft-ui-egui leo_pixpin_key_tests -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Screenshot paste modifier regressions failed" }
-          cargo test --locked -p vectorcraft-ui-egui leo_pixpin_modifier_fallback_tests -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Release-only Ctrl+V modifier fallback regressions failed" }
-          if ("${{ inputs.flavor }}" -eq "core") {
-            cargo test --locked -p vectorcraft leo_pixpin_bitmap_tests -- --nocapture
-            if ($LASTEXITCODE -ne 0) { throw "Windows screenshot candidate regressions failed" }
-          }
       - name: Test Shift page-axis snapping and extension guide feedback
         if: inputs.flavor == 'snapping'
         shell: pwsh
@@ -286,8 +268,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ICO encoder regression failed" }
           cargo test --locked -p vectorcraft-tools marquee -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native marquee regression failed" }
-          cargo test --locked -p vectorcraft-ui-egui shortcuts::paste::leo_screenshot_paste_tests -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Screenshot paste regression failed" }
           cargo test --locked -p vectorcraft-ui-egui leo_image_export -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "JPEG/PNG export option regression failed" }
           cargo test --locked -p vectorcraft-ui-egui leo_core_bridge::workspace_io::tests -- --nocapture
@@ -301,7 +281,7 @@ jobs:
           @'
           ${{ inputs.label }} / VectorCraft v0.21.0
 
-          Core Bridge: 智能选择、文字、AI 导入、截图粘贴、导出、面板、动作快捷键等。
+          Core Bridge: 智能选择、文字、AI 导入、导出、面板、动作快捷键等。
           Core 不含 Leo 自定义吸附、整组锚点吸附移动、延长线或辅助线颜色设置。
           官方原生吸附仍由 VectorCraft 提供。
           文字吸管：字号、显式行距、基线偏移及水平比例按字符面板显示值换算，保留目标文字变换与内容。
@@ -316,11 +296,12 @@ jobs:
           饼菜单停止维护，不再构建或打包；历史配置保留但不运行。
           便携版：解压到新文件夹，运行 vectorcraft.exe。
           覆盖安装：关闭 VectorCraft，选择官方 v0.21.0 安装目录。
-          自动测试不等于 Windows GUI 手感和真实 PixPin 剪贴板验收。
+          外部图片与截图粘贴使用官方实现，不集成 Leo 截图剪贴板补丁。
+          自动测试不等于 Windows GUI 手感验收。
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           This artifact is uploaded only after all applicable workflow tests and release build pass.
-          Common: action shortcuts, selection statistics, screenshot paste, selected-segment clipboard,
+          Common: action shortcuts, selection statistics, selected-segment clipboard,
           AI/SVG/PDF font compatibility, ICO/export, selection marquee and workspace JSON.
           Snapping only: point-lock acquire/release, per-gesture state, zoom-scaled radius,
           Shift axes, line-extension intersections/visuals and ruler guides.
