@@ -12,8 +12,19 @@
 - 自定义动作快捷键继续保存、导入导出；官方动作功能键优先，重复绑定被拒绝。保留官方动作颜色、禁用步骤及录制行为。
 - 吸附设置分类：Edit > Preferences > Leo Core Bridge 吸附。
 - 旋转贴边仍表示拖住的点落在目标边上，不表示整条边自动平移重合。
-- 状态：本地补丁适配检查通过；Windows 编译与回归以对应 Actions 结果为准，用户 GUI 实机验收待完成。
+- 状态：本地补丁适配、Windows release 编译、全部配置专项回归和安装器打包均已通过；用户 GUI 实机验收待完成。
 - 覆盖安装仅接受官方 0.21.1；默认目录 C:\Program Files\ArtCraft\VectorCraft。
+
+## v0.12.0 构建与交付验证（2026-11-05）
+
+- 构建源码：3fabe64005b7a5f7b71814912c44f82a693f76a2；官方基线 v0.21.1。
+- [Windows 构建与安装器工作流 #41962681600](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41962681600)：两个 job 均成功。
+- Windows x64 release 编译、EXE --version 冒烟检查及所有配置的专项回归通过（0 失败）。
+- 回归覆盖文字吸管、动作自定义快捷键和原生 Actions、选择统计、Shift/延长线/参考线/旋转吸附、选中线段和原生参考线复制、活动圆角、AI/SVG/PDF 字体、ICO/图像导出和工作区 JSON。
+- [覆盖安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41962681600/artifacts/13387459147)：内含 Leo_Design_Core_Bridge_v0.12.0_Installer_for_VectorCraft_v0.21.1.exe。
+- [便携包 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/41962681600/artifacts/13387692112)。只选一种交付方式，不叠装 Snapping。
+- 安装器编译和版本限制已核对；用户电脑实际安装、真实文件和鼠标手感未在本次自动回归中验收。
+
 
 ---
 
