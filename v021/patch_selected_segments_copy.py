@@ -13,8 +13,8 @@ def change(rel, old, new):
     p.write_text(s.replace(old, new, 1), encoding="utf-8", newline="\n")
 
 change("crates/engine/src/cmd/edit.rs",
-       "    let roots = selected_roots(s)?;\n    s.clipboard = Clipboard::copy(s.doc()?, &roots);",
-       "    let roots = if s.doc()?.selection.anchors.is_empty() { selected_roots(s)? } else { selected_roots_to_transform(s)? };\n    s.clipboard = Clipboard::copy_selected(s.doc()?, &roots);")
+       "    let roots = if st.selection.is_empty() && !guides.is_empty() { vec![] } else { selected_roots(s)? };\n    let st = s.doc()?;\n    let mut clip = Clipboard::copy(st, &roots);",
+       "    let roots = if st.selection.is_empty() && !guides.is_empty() { vec![] } else if st.selection.anchors.is_empty() { selected_roots(s)? } else { selected_roots_to_transform(s)? };\n    let st = s.doc()?;\n    let mut clip = Clipboard::copy_selected(st, &roots);")
 change("crates/engine/src/cmd/clipboard.rs", "mod flavours;", "mod flavours;\nmod selected_segments;")
 change("crates/engine/src/cmd/clipboard.rs",
        "    pub(crate) fn copy(st: &DocState, roots: &[NodeId]) -> Self {\n        let d = &*st.doc;",
