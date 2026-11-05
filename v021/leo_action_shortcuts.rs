@@ -29,6 +29,9 @@ fn pie_conflict(_app: &VectorcraftApp, _chord: &Chord) -> Option<String> { None 
 /// Native bindings always win, including bindings changed after an action was configured.
 fn available(app: &VectorcraftApp, text: &str) -> Result<Chord, String> {
     let c = chord(text).ok_or("此按键用于编辑或导航，请换一个组合键或功能键。")?;
+    if app.ui.action_sets.iter().flat_map(|s| &s.actions).filter_map(|a| a.key.and_then(|k| k.chord())).any(|k| same(&c, &k)) {
+        return Err("与动作的官方功能键冲突，请换一个组合键。".into());
+    }
     let km = crate::keymap::keymap_with(&app.ui.shortcut_overrides);
     if km.is_reserved(&c) { return Err("此快捷键由操作系统保留。".into()); }
     let conflicts = crate::shortcut_editor::conflicts_with(&app.ui.shortcut_overrides, text, "");
@@ -196,14 +199,26 @@ mod leo_action_shortcut_tests {
     fn app() -> VectorcraftApp {
         let mut a = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
         a.ui.action_sets = vec![ActionSet::new("自定义", vec![
-            Action { name: "一".into(), steps: vec![], leo_shortcut: String::new() },
-            Action { name: "二".into(), steps: vec![], leo_shortcut: String::new() },
+            Action::new("一", vec![]),
+            Action::new("二", vec![]),
         ])];
         a
     }
     const FREE: &str = "Ctrl+Alt+Shift+F12";
     fn event(key: Key, modifiers: Modifiers, repeat: bool) -> egui::Event {
         egui::Event::Key { key, physical_key: Some(key), pressed: true, repeat, modifiers }
+    }
+    #[test]
+    fn native_action_function_keys_take_precedence_without_losing_metadata() {
+        let mut a = app();
+        assign(&mut a, (0, 0), FREE).unwrap();
+        a.ui.action_sets[0].actions[1].key = Some(crate::panels::actions::FunctionKey { key: 8, cmd: false, shift: true });
+        assert!(assign(&mut a, (0, 0), "Shift+F8").is_err());
+        let saved = crate::panels::actions::write_set(&a.ui.action_sets[0]);
+        let loaded = crate::panels::actions::read_set(&saved, "").unwrap();
+        assert_eq!(loaded.actions[0].leo_shortcut, FREE);
+        assert_eq!(loaded.actions[1].key.unwrap().key, 8);
+        assert!(loaded.actions[0].copy().leo_shortcut.is_empty());
     }
     #[test]
     fn assignments_clear_conflicts_and_old_preferences_roundtrip() {
