@@ -2,12 +2,12 @@
   #define SourceExe "dist\vectorcraft.exe"
 #endif
 
-#define BridgeVersion "0.11.1"
-#define UpstreamVersion "0.21.0"
+#define BridgeVersion "0.12.0"
+#define UpstreamVersion "0.21.1"
 
 [Setup]
 AppId=LeoDesignCoreBridgeOverlayForVectorCraftV021
-AppName=Leo Design Core Bridge (No Custom Snapping / No Pie Menu) v{#BridgeVersion} (VectorCraft v{#UpstreamVersion})
+AppName=Leo Design Core Bridge v{#BridgeVersion} (VectorCraft v{#UpstreamVersion})
 AppVersion={#BridgeVersion}
 AppPublisher=Leo Design
 AppPublisherURL=https://github.com/leodesign8522/leo-vectorcraft-build
@@ -20,7 +20,7 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
-OutputBaseFilename=Leo_Design_Core_Bridge_v{#BridgeVersion}_No_Pie_Overlay_for_VectorCraft_v{#UpstreamVersion}
+OutputBaseFilename=Leo_Design_Core_Bridge_v{#BridgeVersion}_Installer_for_VectorCraft_v{#UpstreamVersion}
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes
@@ -59,18 +59,18 @@ begin
   // Where the Windows file version is present, block incompatible releases.
   if GetVersionNumbersString(ExePath, S) then
   begin
-    if (S <> '0.21.0.0') and (S <> '0.21.0') then
+    if (S <> '0.21.1.0') and (S <> '0.21.1') then
     begin
       if ShowMessage then
         MsgBox('目标程序版本为 ' + S + #13#10 +
-          '此安装包只适用于 VectorCraft v0.21.0。请勿覆盖其他版本。', mbError, MB_OK);
+          '此安装包只适用于 VectorCraft v0.21.1。请勿覆盖其他版本。', mbError, MB_OK);
       Exit;
     end;
   end
   else
   begin
     if ShowMessage then
-      MsgBox('无法读取目标程序版本，安装已停止。请选择官方 VectorCraft v0.21.0。', mbError, MB_OK);
+      MsgBox('无法读取目标程序版本，安装已停止。请选择官方 VectorCraft v0.21.1。', mbError, MB_OK);
     Exit;
   end;
   Result := True;
