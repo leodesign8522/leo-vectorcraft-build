@@ -187,7 +187,7 @@ palette={
  "冷色工作室":["#ff5bd6","#38d9ff","#ffd166","#7ae582","#b197fc","#38d9ff","#38d9ff","#ff5bd6","#38d9ff","#7ae582"],
 }
 text = 'fn leo_apply_guide_palette(d: &mut Dialog, colors: &[(&str,&str)]) {\n    for (name, color) in colors {\n        d.fields.insert((*name).into(), json!(*color));\n    }\n}\n\n'
-rep(dialog,'fn category_fields(ui: &mut egui::Ui, d: &mut Dialog, cat: &str) {',text+'fn category_fields(ui: &mut egui::Ui, d: &mut Dialog, cat: &str) {',"smart guide palette helper")
+rep(dialog,'fn category_fields(ui: &mut egui::Ui, app: &mut VectorcraftApp, d: &mut Dialog, cat: &str) {',text+'fn category_fields(ui: &mut egui::Ui, app: &mut VectorcraftApp, d: &mut Dialog, cat: &str) {',"smart guide palette helper")
 buttons=""
 for label, values in palette.items():
     pairs=[("smartGuideColor","#ff3dfc")]+[(f"smartGuide{camel}Color",value) for (camel,_,_),value in zip(channels,values)]
