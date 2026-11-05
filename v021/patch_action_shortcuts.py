@@ -22,23 +22,12 @@ change('panels/actions.rs', 'pub struct Action {\n', '''pub struct Action {
     pub leo_shortcut: String,
 ''')
 
-# Match the native Actions constructors by their first field,
-# never the struct declaration, enum patterns, or a string such as "Action {n}".
-for rel in ['panels/actions.rs', 'panels/actions/files.rs']:
-    p = base / rel
-    s = p.read_text(encoding='utf-8')
-    s, n = re.subn(r'\bAction \{(?=\s*name(?:\s*:|\s*,))', 'Action { leo_shortcut: String::new(),', s)
-    if n == 0: raise SystemExit(f'No action constructors: {rel}')
-    p.write_text(s, encoding='utf-8')
+# Native 0.21.1 routes all construction and duplication through Action methods.
+change('panels/actions.rs', 'Self { id: next_action_id(), name: name.into(),',
+       'Self { leo_shortcut: String::new(), id: next_action_id(), name: name.into(),')
+change('panels/actions.rs', 'Self { id: next_action_id(), key: None, ..self.clone() }',
+       'Self { leo_shortcut: String::new(), id: next_action_id(), key: None, ..self.clone() }')
 
-change('panels/pathfinder.rs', 'crate::panels::actions::Action { name:',
-       'crate::panels::actions::Action { leo_shortcut: String::new(), name:')
-
-change('panels/actions.rs', '        copy.name = format!("{} copy", copy.name);',
-       '        copy.leo_shortcut.clear();\n        copy.name = format!("{} copy", copy.name);')
-change('panels/actions.rs', '        let copy = ActionSet::new(format!("{} copy", src.name), src.actions.clone());',
-       '''        let mut copy = ActionSet::new(format!("{} copy", src.name), src.actions.clone());
-        for action in &mut copy.actions { action.leo_shortcut.clear(); }''')
 change('panels/actions.rs', '                    crate::i18n::tn(a.steps.len() as u64, "{n} step", "{n} steps"),',
        '''                    if a.leo_shortcut.is_empty() {
                         crate::i18n::tn(a.steps.len() as u64, "{n} step", "{n} steps")
@@ -53,22 +42,33 @@ change('panels/actions/files.rs', 'struct FileAction {\n', '''struct FileAction 
     leo_shortcut: String,
 ''')
 change('panels/actions/files.rs', '.map(|a| FileAction {\n', '.map(|a| FileAction {\n            leo_shortcut: a.leo_shortcut.clone(),\n')
-change('panels/actions/files.rs', 'Action { leo_shortcut: String::new(), name: a.name,',
-       'Action { leo_shortcut: a.leo_shortcut, name: a.name,')
+change('panels/actions/files.rs', 'Action { key: a.key, color: a.color, excluded_steps,',
+       'Action { leo_shortcut: a.leo_shortcut, key: a.key, color: a.color, excluded_steps,')
 change('panels/actions/files.rs', '    set.name = free_set_name(&app.ui.action_sets, &set.name);',
        '    crate::leo_action_shortcuts::sanitize_import(app, &mut set);\n    set.name = free_set_name(&app.ui.action_sets, &set.name);')
 
-change('dialogs/action_set_options.rs', 'json!({"set": set, "action": action, "name": a.name})',
-       'json!({"set": set, "action": action, "name": a.name, "leo_shortcut": a.leo_shortcut})')
-change('dialogs/action_set_options.rs', 'fn body(_: &mut VectorcraftApp,', 'fn body(app: &mut VectorcraftApp,')
+change('dialogs/action_set_options.rs',
+       '"name": a.name, "key": key,',
+       '"name": a.name, "leo_shortcut": a.leo_shortcut, "key": key,')
+change('dialogs/action_set_options.rs', 'fn body(_app: &mut VectorcraftApp,', 'fn body(app: &mut VectorcraftApp,')
 change('dialogs/action_set_options.rs', '    false\n}', '    crate::leo_action_shortcuts::options(app, ui, d);\n    false\n}')
-change('dialogs/action_set_options.rs', '    if d.fields.contains_key("action") {\n        app.run',
-       '''    if d.fields.contains_key("action") {
-        let index = |k| d.fields.get(k).and_then(Value::as_u64).and_then(|n| usize::try_from(n).ok());
+change('dialogs/action_set_options.rs', '        app.run(crate::panels::actions::ACTION_OPTIONS, p)?;',
+       '''        let index = |k| d.fields.get(k).and_then(Value::as_u64).and_then(|n| usize::try_from(n).ok());
         let target = (index("set").ok_or("no such action set")?, index("action").ok_or("no such action")?);
         if crate::leo_action_shortcuts::recording(app) { return Err("请先完成快捷键录入。".into()); }
-        app.run(crate::leo_action_shortcuts::SET_SHORTCUT, json!({"set":target.0, "action":target.1, "shortcut":d.str("leo_shortcut")}))?;
-        app.run''')
+        let custom = if d.fields.contains_key("leo_shortcut") {
+            Some(crate::leo_action_shortcuts::validate(app, target, &d.str("leo_shortcut"))?)
+        } else { None };
+        if let Some(text) = custom.as_deref().filter(|text| !text.is_empty())
+            && let Some(key) = crate::panels::actions::FunctionKey::from_params(&p)?
+            && key.chord().zip(crate::keymap::vc_chord(text)).is_some_and(|(a,b)| {
+                a.effective(crate::keymap::platform()) == b.effective(crate::keymap::platform())
+            })
+        { return Err("自定义快捷键与功能键重复，请保留其中一个。".into()); }
+        app.run(crate::panels::actions::ACTION_OPTIONS, p)?;
+        if let Some(text) = custom {
+            crate::leo_action_shortcuts::assign(app, target, &text)?;
+        }''')
 
 change('menus/run.rs', '        crate::panels::actions::RENAME_ACTION => crate::panels::actions::rename_action(app, p),',
        '''        crate::panels::actions::RENAME_ACTION => crate::panels::actions::rename_action(app, p),
