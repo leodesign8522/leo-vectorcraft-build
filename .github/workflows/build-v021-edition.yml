@@ -220,6 +220,8 @@ jobs:
         run: |
           cargo test --locked -p vectorcraft-tools leo_snapping_rotation -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Rotation snapping regressions failed" }
+          cargo test --locked -p vectorcraft-tools leo_move_contact_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Editable text and path move snapping regressions failed" }
           cargo test --locked -p vectorcraft-engine guide_clipboard -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native guide clipboard regressions failed" }
       - name: Compile Windows x64 native EXE
@@ -282,7 +284,7 @@ jobs:
           @'
           ${{ inputs.label }} / VectorCraft v0.21.1
 
-          Leo Design Core Bridge v0.12.0 / 官方 VectorCraft v0.21.1
+          Leo Design Core Bridge v0.12.1 / 官方 VectorCraft v0.21.1
           一个安装包：通用增强与吸附增强一起提供。
           保留：组内选择、选中线段复制/剪切、文字与 AI/PDF/SVG 字体兼容、
           文字吸管、图像/ICO 导出、面板尺寸、工作区导入导出、
@@ -301,7 +303,7 @@ jobs:
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Artifact upload requires the release build and every configured regression to pass.
-          Unified Core Bridge v0.12.0 includes common and snapping module tests.
+          Unified Core Bridge v0.12.1 includes common and snapping module tests.
           Native Actions, custom chords, editable AI import, font matching, selected-segment copy,
           native guide clipboard, live corners, image/ICO export, workspace JSON, selection statistics,
           point resolver, Shift constraints, extension/ruler snapping and rotation snapping are checked.

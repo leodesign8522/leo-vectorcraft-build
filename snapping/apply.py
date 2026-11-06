@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The only entry point for the optional Snapping edition. Never run from Core."""
+"""Apply the snapping modules included in Core Bridge."""
 from pathlib import Path
 import subprocess
 import sys
@@ -17,7 +17,9 @@ scripts = [
     'snapping/patch_resolver.py',
     'snapping/patch_guide_tests.py',
     'snapping/patch_rotation.py',
+    'snapping/patch_move_contact.py',
 ]
 for script in scripts:
     subprocess.run([sys.executable, str(repo / script), str(root)], check=True)
-print('PASS Leo Design Snapping v0.1.2 integrated independently of Core')
+print('PASS Core Bridge snapping modules integrated')
+
