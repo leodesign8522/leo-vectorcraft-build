@@ -23,3 +23,10 @@ GitHub Actions (Windows): `cargo test --locked -p vectorcraft-tools leo_snapping
 6. Pointer drag to `path.moveAnchors` preview delta for an anchor and a segment.
 
 **Build/test pass is not Windows hands-on validation.** Before describing this as Affinity-quality, manually check tight geometry, fast pointer movement, dense nodes, zoom, and copy/Shift gestures.
+
+
+## v1.1 screenshot regression (2026-11-06)
+The screenshot shows a polygon corner almost touching the right border of a white artboard.
+- The v1 target set excluded **artboard edges**, as they are not Path objects.
+- Clicking an anchor on a wholly selected path enters the DirectSelection **MoveObject** state. It had still called native PointSnap rather than `direct_anchor_drag`.
+Both are fixed in v1.1: finite edges of every artboard are included as real segment candidates, and whole-path anchor grabs call the same true-geometry engine as partial node moves. Added pointer-level regression tests for both cases.

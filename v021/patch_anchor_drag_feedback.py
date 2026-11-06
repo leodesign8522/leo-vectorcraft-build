@@ -32,7 +32,7 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
     /// snapping override the new true-geometry target detection.
     pub(crate) fn leo_for_anchor_drag(cx: &ToolContext) -> Self {
         let targets = (cx.smart_guides || cx.snap_to_point).then(|| {
-            (Targets::for_anchor_drag(cx.doc, cx.selection).styled(cx), 8.0)
+            (Targets::leo_for_anchor_drag(cx), 8.0)
         });
         Self { targets }
     }
@@ -67,6 +67,12 @@ edit("direct.rs",
 edit("direct.rs",
      "snap.snap_from(cx, held + (p - start), shift.as_ref())",
      "snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift)")
+# When a whole path is selected, pressing one of its anchors enters
+# MoveObject (not MoveAnchors). This path previously fell through to
+# PointSnap::snap_from and completely bypassed our new geometry engine.
+edit("direct.rs",
+     "snap.snap_from(cx, grab + (p - start), shift.as_ref())",
+     "snap.direct_anchor_drag(cx, grab + (p - start), shift.as_ref(), ev.mods.shift)")
 
 # Pointer-to-command integration: a real target must be reflected in Preview(dx,dy).
 with (root / "direct/tests.rs").open("a", encoding="utf-8") as f:
@@ -96,4 +102,45 @@ fn leo_snapping_engine_direct_drag_preview_uses_exact_anchor_and_segment() {
     assert_eq!(labels, vec!["anchor".to_string()]);
 }
 """)
-print("PASS Leo Design Snapping Engine v1: 8px acquire, 12.8px release, true node/path/cubic geometry")
+# Screenshot regression: grab an anchor of a fully selected path and snap
+# the whole polygon to the visible right edge of an otherwise blank artboard.
+with (root / "direct/tests.rs").open("a", encoding="utf-8") as f:
+    f.write("""
+#[test]
+fn leo_snapping_engine_whole_selected_path_anchor_hits_artboard_edge() {
+    use vectorcraft_geom::shapes;
+    let mut d = vectorcraft_doc::Document::new(500.0, 500.0);
+    let layer = d.layers[0].id;
+    let id = d.alloc_id();
+    d.insert(Some(layer), 0, vectorcraft_doc::Node::path(id,
+        shapes::line(Point::new(600.0, 200.0), Point::new(630.0, 200.0)),
+        vectorcraft_doc::Appearance::default_art())).unwrap();
+    let mut selected = Selection::default();
+    selected.set([id]);
+    let p = paint();
+    let cx = cx(&d, &selected, &p);
+    let mut tool = DirectSelectionTool::new(false);
+    let (v, labels) = drag(&mut tool, &cx, (600.0, 200.0), (504.0, 235.0), Mods::default());
+    assert_eq!(v["matrix"], json!([1.0, 0.0, 0.0, 1.0, -100.0, 35.0]), "{v:?} {labels:?}");
+    assert_eq!(labels, vec!["path".to_string()]);
+}
+
+#[test]
+fn leo_snapping_engine_partial_anchor_hits_artboard_edge() {
+    use vectorcraft_geom::shapes;
+    let mut d = vectorcraft_doc::Document::new(500.0, 500.0);
+    let layer = d.layers[0].id;
+    let id = d.alloc_id();
+    d.insert(Some(layer), 0, vectorcraft_doc::Node::path(id,
+        shapes::line(Point::new(600.0, 200.0), Point::new(630.0, 200.0)),
+        vectorcraft_doc::Appearance::default_art())).unwrap();
+    let selected = anchors_of(id, &[(0, 0)]);
+    let p = paint();
+    let cx = cx(&d, &selected, &p);
+    let mut tool = DirectSelectionTool::new(false);
+    let (v, labels) = drag(&mut tool, &cx, (600.0, 200.0), (504.0, 235.0), Mods::default());
+    assert_eq!(v, json!({"dx": -100.0, "dy": 35.0}), "{labels:?}");
+    assert_eq!(labels, vec!["path".to_string()]);
+}
+""")
+print("PASS Leo Design Snapping Engine v1.1: screenshot artboard edge and whole-object anchor drag regression")

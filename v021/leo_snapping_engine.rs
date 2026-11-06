@@ -15,6 +15,24 @@ pub(in crate::guides) enum SnapLock {
 }
 
 impl Targets {
+    /// Gather real path geometry plus the four finite edges of each artboard.
+    /// Artboards are painted as white rectangles but are NOT Path nodes: without
+    /// these edges a dragged node beside the page had no geometric snap target.
+    pub(in crate::guides) fn leo_for_anchor_drag(cx: &ToolContext) -> Self {
+        let mut targets = Self::for_anchor_drag(cx.doc, cx.selection).styled(cx);
+        for artboard in &cx.doc.artboards {
+            let r = artboard.rect;
+            let tl = Point::new(r.x0, r.y0);
+            let tr = Point::new(r.x1, r.y0);
+            let br = Point::new(r.x1, r.y1);
+            let bl = Point::new(r.x0, r.y1);
+            for (a, b) in [(tl, tr), (tr, br), (br, bl), (bl, tl)] {
+                targets.segments.push((Rect::from_points(a, b), PathSeg::Line(Line::new(a, b))));
+            }
+        }
+        targets
+    }
+
     pub(in crate::guides) fn clear_leo_snap(&self) {
         self.leo_snap.set(None);
     }
@@ -181,6 +199,24 @@ mod leo_snapping_engine_tests {
             t.clear_leo_snap();
             assert!(snap(&t, far, zoom).is_none(), "zoom: {zoom}");
         }
+    }
+
+    #[test]
+    fn leo_snapping_engine_artboard_edges_are_real_finite_geometry_targets() {
+        use vectorcraft_doc::Document;
+        let doc = Document::new(500.0, 500.0);
+        let selection = Selection::default();
+        let paint = crate::testutil::paint();
+        let cx = crate::testutil::cx(&doc, &selection, &paint);
+        let t = Targets::leo_for_anchor_drag(&cx);
+        assert_eq!(snap(&t, Point::new(504.0, 235.0), 1.0).unwrap().0,
+            Point::new(500.0, 235.0));
+        t.clear_leo_snap();
+        assert_eq!(snap(&t, Point::new(-4.0, 200.0), 1.0).unwrap().0,
+            Point::new(0.0, 200.0));
+        t.clear_leo_snap();
+        assert!(snap(&t, Point::new(500.0, 515.0), 1.0).is_none(),
+            "beyond the end of an artboard side, no infinite edge extension");
     }
 
     #[test]
