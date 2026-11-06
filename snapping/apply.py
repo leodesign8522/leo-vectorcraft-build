@@ -18,6 +18,7 @@ scripts = [
     'snapping/patch_guide_tests.py',
     'snapping/patch_rotation.py',
     'snapping/patch_move_contact.py',
+    'snapping/patch_target_controls.py',
 ]
 for script in scripts:
     subprocess.run([sys.executable, str(repo / script), str(root)], check=True)
