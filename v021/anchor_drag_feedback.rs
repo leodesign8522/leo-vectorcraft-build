@@ -140,7 +140,7 @@ mod leo_anchor_drag_feedback_tests {
         for along in [-50.0, 50.0] {
             t.clear_drag_guide();
             let q = Point::ZERO + dir * along;
-            let (snapped, hints) = t.snap_direct_drag(q + Vec2::new(1.0, -1.0), None, 5.0, 5.0);
+            let (snapped, hints) = t.snap_direct_drag(q + Vec2::new(0.8, -0.6), None, 5.0, 5.0);
             assert!(snapped.distance(q) < 1e-8);
             assert!(matches!(&hints[..], [Overlay::Line { color: a, .. }, Overlay::CurvePoint { color: b, .. }] if *a == HIT && *b == HIT));
         }
