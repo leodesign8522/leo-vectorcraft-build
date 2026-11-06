@@ -248,7 +248,7 @@ impl ObjectMoveSnap {
     }
 
     fn snap_with_tolerance(
-        &self, start: Point, mut d: Vec2, copy: bool, acquire: f64, release: f64, direction: Option<Vec2>,
+        &self, start: Point, d: Vec2, copy: bool, acquire: f64, release: f64, direction: Option<Vec2>,
     ) -> (Vec2, Vec<Overlay>) {
         if !d.x.is_finite() || !d.y.is_finite() || !acquire.is_finite() || !release.is_finite() || acquire <= 0.0 || release < acquire {
             self.reset_locks();

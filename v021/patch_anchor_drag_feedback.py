@@ -21,7 +21,7 @@ edit("guides/targets.rs",
      "pub struct Targets {\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,")
 edit("guides/targets.rs",
      "use super::snap::",
-     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::SnapLock;\npub(super) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
+     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::SnapLock;\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
 (root / "guides/leo_snapping_engine.rs").write_text(
     Path(__file__).with_name("leo_snapping_engine.rs").read_text(encoding="utf-8"),
     encoding="utf-8", newline="\n"
