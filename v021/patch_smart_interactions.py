@@ -74,4 +74,4 @@ s=s[:start]+block+s[end:]
 file.write_text(s,encoding="utf-8",newline="\n")
 print("OK selected nested child can be dragged without ungrouping")
 
-print("SUCCESS Leo Design Smart Select only; snapping belongs to the separate edition")
+print("SUCCESS Leo Design Smart Select")
