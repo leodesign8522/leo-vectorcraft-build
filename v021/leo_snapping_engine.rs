@@ -825,8 +825,9 @@ mod leo_snapping_engine_tests {
             vec![Point::new(200.0, 100.0)],
             targets,
         );
+        // Shift's geometry source is the grabbed point; grab the moving vertex itself.
         let (d, _) = snapper.snap_with_tolerance(
-            Point::new(150.0, 150.0), Vec2::new(99.0, 0.0), false, 8.0, 12.8, Some(Vec2::new(99.0, 0.0)),
+            Point::new(200.0, 100.0), Vec2::new(99.0, 0.0), false, 8.0, 12.8, Some(Vec2::new(99.0, 0.0)),
         );
         assert_eq!(d, Vec2::new(100.0, 0.0));
     }
