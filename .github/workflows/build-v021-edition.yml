@@ -154,6 +154,12 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test editable text and outlined path snapping
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-tools leo_move_contact_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Editable text and path move snapping regressions failed" }
       - name: Test Eyedropper character attributes and transformed text
         shell: pwsh
         working-directory: vectorcraft
@@ -220,8 +226,6 @@ jobs:
         run: |
           cargo test --locked -p vectorcraft-tools leo_snapping_rotation -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Rotation snapping regressions failed" }
-          cargo test --locked -p vectorcraft-tools leo_move_contact_tests -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Editable text and path move snapping regressions failed" }
           cargo test --locked -p vectorcraft-engine guide_clipboard -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native guide clipboard regressions failed" }
       - name: Compile Windows x64 native EXE

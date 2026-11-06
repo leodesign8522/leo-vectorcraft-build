@@ -30,7 +30,7 @@ mod leo_move_contact;
 
 replace(targets, "    pub(super) style: GuideStyle,", """    pub(super) style: GuideStyle,
     /// Maximum length of an ordinary alignment hint during a direct-selection drag.
-    compact_hint: Option<f64>,""")
+    pub(super) compact_hint: Option<f64>,""")
 replace(targets, """        let color = if (a.y-b.y).abs() <= 1e-6 {""", """        let a = match self.compact_hint {
             Some(limit) if a.distance(b) > limit => b + (a - b) * (limit / a.distance(b)),
             _ => a,
@@ -65,6 +65,12 @@ replace(targets, """            add_rect(&mut t, b, Kind::Edge);""", """        
                 }
             }
             add_rect(&mut t, b, Kind::Edge);""")
+replace(targets, """
+    /// Is a target point (an anchor, a centre) within `tol` of `p`?
+    pub(crate) fn has_point_near(&self, p: Point, tol: f64) -> bool {
+        self.nearest_point(p, tol).is_some()
+    }
+""", "")
 
 replace(select, """    bounds: Option<Rect>,
     targets: Option<Targets>,""", """    bounds: Option<Rect>,
