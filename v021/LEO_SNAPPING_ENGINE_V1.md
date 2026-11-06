@@ -30,3 +30,14 @@ The screenshot shows a polygon corner almost touching the right border of a whit
 - The v1 target set excluded **artboard edges**, as they are not Path objects.
 - Clicking an anchor on a wholly selected path enters the DirectSelection **MoveObject** state. It had still called native PointSnap rather than `direct_anchor_drag`.
 Both are fixed in v1.1: finite edges of every artboard are included as real segment candidates, and whole-path anchor grabs call the same true-geometry engine as partial node moves. Added pointer-level regression tests for both cases.
+
+
+## v1.2 — unified object movement (Core Bridge v0.13.2)
+Object translation now uses the same Leo geometry engine as node dragging:
+- Candidate source features include the selected bounds' corners, edge midpoints and centre, plus up to 256 real path anchors across selected groups.
+- Target candidates include other artwork's anchors, centres and actual finite path/Bezier segments, plus all four finite edges of each artboard.
+- True node/path geometry wins over horizontal/vertical bounds alignment. Bounds alignment uses the sorted target-coordinate index and has independent X/Y lock hysteresis.
+- Multi-object and group movement use one translation delta, so children never deform. Direct Selection whole-path body moves share the same MoveSnap adapter. Alt-copy gathers a second target set that includes the original art.
+- Capture/release remain 8px / 12.8px in screen space. Shift-constrained object movement snaps the grabbed point to nearby anchors/rulers and projects bounds alignment/spacing along its movement line. To avoid false hits near a path endpoint, Shift does not yet capture finite path segments; normal unconstrained object movement does.
+- Grid and Pixel remain independent higher-level constraints. Spacing Guides and ruler guides are retained.
+- Automated tests cover anchor/path/artboard targets, alignment on both axes, lock hysteresis, 25/100/400% zoom, Shift projection, ruler/spacing guides, Alt-copy, multi-object and group translation.
