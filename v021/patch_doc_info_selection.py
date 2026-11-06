@@ -169,9 +169,11 @@ change(engine, '    fn leo_doc_info_selection_counts_current_nodes_without_expan
         let line = s.execute("shape.line", &json!({"x1": 0, "y1": 30, "x2": 50, "y2": 30})).unwrap()["id"].as_u64().unwrap();
         let st = s.active_mut().unwrap();
         let (rect, line) = (NodeId(rect), NodeId(line));
-        st.doc.node_mut(rect).unwrap().opacity = 0.5;
-        st.doc.node_mut(rect).unwrap().appearance.fill_mut().unwrap().opacity = 0.5;
-        st.doc.node_mut(line).unwrap().appearance.stroke_mut().unwrap().opacity = 0.25;
+        let doc = std::sync::Arc::make_mut(&mut st.doc);
+        let node = doc.node_mut(rect).unwrap();
+        node.opacity = 0.5;
+        node.appearance.fill_mut().unwrap().opacity = 0.5;
+        doc.node_mut(line).unwrap().appearance.stroke_mut().unwrap().opacity = 0.25;
         st.selection.set([rect]);
         let v = s.execute("document.info", &json!({})).unwrap();
         assert_eq!(v["objects"]["transparentObjects"], 2);
