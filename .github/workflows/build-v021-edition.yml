@@ -149,12 +149,12 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
-      - name: Test native snapping and anchor drag feedback
+      - name: Test Leo Snapping Engine node geometry, hysteresis, zoom and Direct Selection preview
         shell: pwsh
         working-directory: vectorcraft
         run: |
-          cargo test --locked -p vectorcraft-tools leo_anchor_drag_feedback -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Anchor drag priority, capture, release or feedback regression failed" }
+          cargo test --locked -p vectorcraft-tools leo_snapping_engine -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Leo Snapping Engine v1 node/line/Bezier/capture/zoom regression failed" }
           cargo test --locked -p vectorcraft-tools guides::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native snapping regression failed" }
       - name: Test Eyedropper character attributes and transformed text
@@ -259,15 +259,15 @@ jobs:
           @'
           ${{ inputs.label }} / VectorCraft v0.21.1
 
-          Leo Design Core Bridge v0.12.4 / 官方 VectorCraft v0.21.1
+          Leo Design Core Bridge v0.13.0 / 官方 VectorCraft v0.21.1
           一个安装包：Core Bridge 通用增强与直接选择拖点辅助。
           保留：组内选择、选中线段复制/剪切、文字与 AI/PDF/SVG 字体兼容、
           文字吸管、图像/ICO 导出、面板尺寸、工作区导入导出、
           单位/颜色快捷面板、动作快捷键、已选物体/编组数量。
-          吸附：恢复官方吸附。在直接选择工具拖锚点时增加水平、垂直和原线延长优先反馈。
+          吸附：节点工具采用 Leo Design Snapping Engine v1：8px 捕获、12.8px 释放。真实节点优先于直线/贝塞尔曲线，取消节点拖动中的辅助线抢占。
           文档信息：新增已选路径长度和带透明度的物体数量。
-          颜色：临近垂直为绿色，临近水平为紫色，延长和命中为暖黄色。
-          在「视图 → 智能参考线」下使用。Shift、网格和像素约束沿用原生行为。
+          吸附反馈：青蓝节点命中，金黄路径命中；未发生真实几何吸附时不显示命中辅助线。
+          在「视图 → 智能参考线」或「吸附到点」下使用。Shift 方向约束暂沿用旧流程；网格与像素仅作无几何命中时的回退。
           已删除 34～37 截图粘贴增强，截图与外部图片粘贴使用官方实现。
           已删除 54 Leo 快捷键备份菜单；官方快捷键功能和工作区导入导出保留。
           饼菜单继续停用。
@@ -278,10 +278,10 @@ jobs:
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Artifact upload requires the release build and every configured regression to pass.
-          Unified Core Bridge v0.12.4 includes common, native snapping and anchor drag feedback tests.
+          Core Bridge v0.13.0 includes Leo Snapping Engine v1 true geometry, 8px capture and 12.8px release.
           Native Actions, custom chords, editable AI import, font matching, selected-segment copy,
           native guide clipboard, live corners, image/ICO export, workspace JSON, selection statistics,
-          and native Smart Guides, anchor drag capture and release are checked.
+          and native Smart Guides plus Leo node/segment/Bezier/zoom/hysteresis tests are checked.
           Custom screenshot clipboard patches and the shortcut backup menu are not integrated.
           Windows GUI/manual acceptance remains pending.
           '@ | Set-Content "dist/BUILD_VALIDATION.txt" -Encoding utf8
