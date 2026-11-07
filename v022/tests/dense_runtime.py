@@ -36,7 +36,13 @@ try:
  target=command('shape.line',x1=390,y1=300,x2=410,y2=360)['id']
  call('ui.tool.select',{'tool':'directSelection'})
  command('select.anchors',id=source,anchors=[[0,1]],mode='set')
- call('ui.pointer',{'events':[{'kind':'down','x':380,'y':340},{'kind':'drag','x':402,'y':340},{'kind':'up','x':402,'y':340}],'mods':{'shift':len(sys.argv)<3 or sys.argv[2]!='free'}})
+ mods={'shift':len(sys.argv)<3 or sys.argv[2]!='free'}
+ call('ui.pointer',{'events':[{'kind':'down','x':380,'y':340},{'kind':'drag','x':402,'y':340}],'mods':mods})
+ preview=node(source)['kind']['path']['subpaths'][0]['anchors']
+ x,y=preview[1]['p']
+ assert abs(3*x-y-870.0)<1e-6, ('during drag',preview)
+ if mods['shift']: assert abs(y-340.0)<1e-7, preview
+ call('ui.pointer',{'events':[{'kind':'up','x':402,'y':340}],'mods':mods})
  result=node(source)
  anchors=result['kind']['path']['subpaths'][0]['anchors']
  assert anchors[0]['p']==[300.0,340.0], anchors
@@ -45,9 +51,36 @@ try:
  if len(sys.argv)<3 or sys.argv[2]!='free': assert abs(y-340.0)<1e-7, anchors
  selection=call('document.inspect')['selection']
  assert selection, 'Shift drag erased the live selection'
- output={'pass':True,'check':'Selected node beyond 20k background anchors reaches exact oblique path intersection','source_after':result,'selection':selection}
- (exe.parent/'DENSE_RUNTIME_SMOKE.json').write_text(json.dumps(output,ensure_ascii=False,indent=2),encoding='utf-8')
- print(json.dumps({'pass':True,'anchor':anchors[1]['p'],'stationary_anchor':anchors[0]['p'],'selection':selection}))
+ command('file.close')
+ call('ui.dialog.set',{'field':'discard','value':True})
+ call('ui.dialog.confirm')
+ command('file.new',width=1000,height=1000)
+ command('path.create',d='M10000 10000H10010V10010H10000Z '*5001)
+ a=command('shape.rectangle',x=100,y=100,width=50,height=100)['id']
+ b=command('shape.rectangle',x=160,y=100,width=40,height=100)['id']
+ command('select.set',ids=[a,b])
+ group=command('object.group')['id']
+ command('shape.line',x1=300,y1=100,x2=300,y2=200)
+ command('select.set',ids=[group])
+ before=[node(a),node(b)]
+ call('ui.tool.select',{'tool':'selection'})
+ call('ui.pointer',{'events':[{'kind':'down','x':125,'y':125},{'kind':'drag','x':224,'y':125}],'mods':mods})
+ def group_bounds(): return command('document.node',id=group,summary=True)['bounds']
+ expected={'x':200.0,'y':100.0,'width':100.0,'height':100.0}
+ assert group_bounds()==expected, ('group during drag',group_bounds())
+ for child,want in [(a,{'x':200.0,'y':100.0,'width':50.0,'height':100.0}),
+                    (b,{'x':260.0,'y':100.0,'width':40.0,'height':100.0})]:
+  assert command('document.node',id=child,summary=True)['bounds']==want, 'Dense group child geometry'
+ call('ui.pointer',{'events':[{'kind':'up','x':224,'y':125}],'mods':mods})
+ assert group_bounds()==expected,group_bounds()
+ moved=[node(a),node(b)]
+ command('edit.undo')
+ assert [node(a),node(b)]==before, 'Dense group undo'
+ command('edit.redo')
+ assert [node(a),node(b)]==moved, 'Dense group redo'
+ output={'pass':True,'check':'Node and rigid group beyond 20k background anchors snap during drag and on release','shift':mods['shift'],'source_after':result,'selection':selection,'group_bounds':group_bounds(),'group_undo_redo':True}
+ (exe.parent/('DENSE_RUNTIME_'+('SHIFT' if mods['shift'] else 'FREE')+'.json')).write_text(json.dumps(output,ensure_ascii=False,indent=2),encoding='utf-8')
+ print(json.dumps({'pass':True,'shift':mods['shift'],'anchor':anchors[1]['p'],'stationary_anchor':anchors[0]['p'],'group_bounds':group_bounds(),'group_undo_redo':True}))
 
 finally:
  if connection is not None:

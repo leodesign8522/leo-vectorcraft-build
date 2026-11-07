@@ -1,11 +1,19 @@
-# Core Bridge 0.14.0 / VectorCraft 0.22.0
+# Core Bridge 0.14.1 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
 
+## 0.14.1 dense-document follow-up
+
+The 0.14.0 regressions missed the native target collector's 20,000-anchor budget: later paths were omitted in a dense document, so both free and Shift node drags had no target. Drag-start path snapshots now cover the full visible scene; finite geometry is queried near the pointer or translated bounds. Object alignment bounds are collected independently of anchor counts. Sticky locks retain the actual segment, so changing local candidates cannot change a lock's identity.
+
+Synthetic late line and Bezier targets after 20,004 background anchors pass, including three zoom levels and both Shift states. A local recovery copy of the reported document reproduced the failure in 0.14.0 and passed in 0.14.1 during dragging, on commit and through Undo/Redo, with the stationary anchor and target unchanged. User documents and actual drawing coordinates remain local.
+
+The complete Windows build and installer smoke test passed for `427b1c93cd78960034fd560ff571d3b2b4533754`. The additional Bezier regression in `bccec40aa82741c3bb9e7b137ff4ed1143cb007d` changes tests only. See [current release evidence](VERIFIED_RELEASE.md); the older verification below records the 0.14.0 scenarios and is not evidence for the dense-document case.
+
 ## Diagnosis
 
-The previous successful Actions run, [42257643172](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42257643172), builds Core Bridge 0.13.2 against **0.21.1**. It is a replacement executable, not a dynamically loaded extension. An official 0.22.0 executable does not load that patched engine. Updating the official application cannot carry these source patches forward.
+At the start of the migration, the previous successful Actions run, [42257643172](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42257643172), builds Core Bridge 0.13.2 against **0.21.1**. It is a replacement executable, not a dynamically loaded extension. An official 0.22.0 executable does not load that patched engine. Updating the official application cannot carry these source patches forward.
 
 Independent code defects in the old engine:
 
@@ -16,7 +24,7 @@ Independent code defects in the old engine:
 - Shift object geometry projects nearby anchors onto the drag line and can report a hit at an unreachable point. Segment targets are skipped entirely.
 - Whole-object sources use discrete anchors and nine box features, missing targets alongside the middle of a long edge.
 
-These source findings explain specific failures. An interactive reproduction against the user's exact document remains necessary to confirm every reported symptom.
+These findings explain the earlier failures. The local recovery-copy reproduction above confirms the dense-document follow-up; it does not imply coverage of every possible document or operation.
 
 Windows executable control-channel reproduction with generated rectangles: with Smart Guides and Snap to Grid enabled, a group intended for the artboard's right edge at 500 landed at approximately 498.8976; switching grid snapping off made the same operation land exactly at 500. A selected-endpoint Shift drag in the official executable also left the geometry unmoved and the selection empty. Both cases have explicit regression coverage; no user document or preferences are included in the repository.
 
@@ -44,8 +52,8 @@ Run `python prepare_v022.py <pristine-upstream-checkout>` once on the pinned sou
 
 `.github/workflows/build-v022-core.yml` calls the Windows edition workflow. Artifacts upload only after the configured geometry, tool-pointer, session preview/commit/undo/redo, native guides, and retained Core regression commands pass, followed by the release build and version smoke test.
 
-The installer uses an independent per-user directory, retains the official installation, verifies the installed executable against the tested artifact hash, and checks its build identity. Both artifact sets include source commit identifiers and SHA-256 checksums. About and `--version` identify Core Bridge 0.14.0 / Snapping Engine 1.3.
+The installer uses an independent per-user directory, retains the official installation, verifies the installed executable against the tested artifact hash, and checks its build identity. Both artifact sets include source commit identifiers and SHA-256 checksums. The current About and `--version` identify Core Bridge 0.14.1 / Snapping Engine 1.3.1.
 
-Verified release: all configured regression commands and the Windows x64 release build passed for `f96207bf7203f5b3d9054a581402054c83cf1587`. This includes all 73 Direct Selection tests, three real Session regressions, the adapted clipboard regressions, and the retained Core checks. The initial installer wrapper omitted VERSION.txt because of GUI stdout handling; explicit process waiting and stdout redirection fixed metadata capture. The verified EXE was repackaged without changing its bytes, installed successfully, and checked against its pinned SHA-256. Local executable tests passed with grid snapping enabled for rigid group movement, Undo/Redo, Shift+Alt copying with the original unchanged, and Shift node dragging onto an actual oblique path intersection.
+Historical 0.14.0 verification: all configured regression commands and the Windows x64 release build passed for `f96207bf7203f5b3d9054a581402054c83cf1587`. This includes all 73 Direct Selection tests, three real Session regressions, the adapted clipboard regressions, and the retained Core checks. The initial installer wrapper omitted VERSION.txt because of GUI stdout handling; explicit process waiting and stdout redirection fixed metadata capture. The verified EXE was repackaged without changing its bytes, installed successfully, and checked against its pinned SHA-256. Local executable tests passed with grid snapping enabled for rigid group movement, Undo/Redo, Shift+Alt copying with the original unchanged, and Shift node dragging onto an actual oblique path intersection.
 
 See [verified release, hashes and evidence](VERIFIED_RELEASE.md). Windows control-channel test scripts are in `tests/runtime_smoke.py` and `tests/shift_runtime.py`; run them against an isolated extracted portable copy. They create synthetic documents and record results beside that copy.

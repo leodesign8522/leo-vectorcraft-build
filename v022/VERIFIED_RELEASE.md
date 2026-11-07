@@ -1,63 +1,50 @@
-# Leo Design Core Bridge 0.14.0 验证记录
+# Leo Design Core Bridge 0.14.1 验证记录
 
-适配官方 VectorCraft 0.22.0，Windows x64。安装器和便携版使用同一个已测试的主程序。
+适配官方 VectorCraft 0.22.0，Windows x64。修复 0.14.0 的大文档漏吸附。
 
-## 交付与来源
+## 根因与修复
 
-- [全部回归与正式 EXE 构建：成功的 build job](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42346832709/job/128326307382)
-- [扩展节点回归：成功](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42346832731)
-- [安装器生成及实际安装校验：成功](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42358116808)
-- [安装包 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42358116808/artifacts/13568810730)
-- [便携包 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42346832709/artifacts/13565086229)
+旧目标收集器耗尽 20,000 个锚点预算后，不再收集后续路径。后添加的目标线因此不参与吸附，普通和 Shift 拖动都会失败。
 
-官方源码：`654749c16eb20b6d3182a96defb66e11d1a9649a`。
-主程序构建源码：`f96207bf7203f5b3d9054a581402054c83cf1587`。
-安装器配置提交：`614ddd065369de5296dc0548bebab223f392e026`。
+现在保存拖动开始时的完整路径快照，按指针或移动选区附近的范围查询真实节点、有限直线和 Bezier。对象对齐边界也不再随锚点预算被截断。捕获锁保存实际路径段，附近候选列表变化不会导致锁定跳到另一条线。8px 捕获、12.8px 释放、Shift 方向约束和 Alt 复制保留。
 
-最初的安装器步骤因 Windows 图形程序版本输出未被捕获，缺少 VERSION.txt 而失败。修复的是打包元数据捕获；重新打包严格锁定上述已通过全部测试的 EXE 哈希，没有替换未经测试的主程序。
+## 来源与构建
 
-## 修复与自动回归
+- 官方源码：`654749c16eb20b6d3182a96defb66e11d1a9649a`。
+- 主程序构建源码：`427b1c93cd78960034fd560ff571d3b2b4533754`。
+- 追加 Bezier 测试提交：`bccec40aa82741c3bb9e7b137ff4ed1143cb007d`，仅增加测试，生产引擎代码相同。
+- [完整回归、Windows 编译和安装校验](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42362365957)：成功。
+- [扩展大文档 Bezier 专项回归](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42363539932)：成功。
+- [安装包 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42362365957/artifacts/13570649176)。
+- [便携包 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42362365957/artifacts/13570947701)。
 
-节点拖动、对象、多选及编组移动已接入 Leo Snapping Engine。支持真实节点、有限直线、Bezier 路径和画板四边；捕获 8 屏幕像素、超过 12.8 屏幕像素释放，随缩放换算。编组使用统一平移，内部结构不变。
+## 验证结果
 
-Shift 沿锁定方向求真实交点；按下 Shift 不再先取消被拖节点。Shift 单击仍在未拖动的释放时切换选择。Alt 复制使用一致的几何捕获入口，原对象不变。几何优先，无几何命中时保留网格/像素回退。显式垂直和切线选项保留；节点不把单纯轴向或无限延长线当作真实几何命中。
+- 专项筛选分别通过 31 项引擎/节点测试、17 项对象移动测试、74 项 Direct Selection 测试；这些筛选有重叠，不相加。
+- 4 项真实文档会话回归通过，包括大文档节点拖动的两种 Shift 状态、提交、撤销与重做；其余配置的 Core 回归通过。
+- 20,004 个合成背景锚点之后添加源节点、直线和 Bezier，检查实际有限几何命中；Bezier 覆盖 0.25、1、4 三种缩放。
+- 本机合成大文档：节点与整组移动在拖动中、松开后均命中；组内两个对象保持统一平移，撤销/重做通过。
+- 本机原生程序：网格开启时的画板吸附、组内结构、撤销/重做和 Shift+Alt 复制通过，原对象保持不变。
+- 原文档恢复副本仅在本机测试：相同缩放下，0.14.0 按住与不按 Shift 均复现间隙；0.14.1 两种状态在拖动中均命中目标直线，提交、撤销、重做通过，另一个节点和目标线保持不变。用户文件与实际绘图坐标没有上传。
+- 安装器实际安装成功，安装后的主程序哈希与测试程序一致。
 
-通过的本次回归包括：
+本机检查通过程序原生控制接口发送工具事件。以上是配置的专项回归与上述文档副本结果，不代表对所有文档或全部操作的保证。
 
-- 73 项原生 Direct Selection 交互测试，以及节点/路径/Bezier、缩放、捕获释放、小数且不在网格上的边缘、Shift+Alt 测试。
-- 真实文档会话中的节点 Shift 拖动、整条路径刚性移动、Shift 单击、多选/编组移动、一次提交及撤销/重做。
-- 原生参考线、文字吸管、动作快捷键、文档信息、Live Corner、AI/SVG/PDF 字体、ICO/图像导出和已选线段复制/剪切回归。
-- 安装器静默安装成功，安装后的 EXE 与已测试 EXE 哈希完全一致；版本、独立设置标记及许可文件存在。
+## SHA-256
 
-这是本次配置的专项回归结果，不代表运行了仓库全部测试或对所有设计文档进行了人工验收。
+| 文件 | SHA-256 |
+| --- | --- |
+| 主程序 EXE | `92e0b7029321f230cd432df40ee3ff61f2f6a2924f8b27ed01521b2fa8122ada` |
+| 安装器 EXE | `33c572180a036ecf4c95dce4df565e5abc91998f3ae6b72c771b244061fb3b41` |
+| 便携 ZIP | `5b09504a129e26a1d4b855ea8ff746928c4026eed2a03a85ca535d63a68037a0` |
+| 安装器 ZIP | `7d24c6b73f77d06c80064cbc0a385d3064e0f54bb516e31987f77e7fb1c253e0` |
 
-## 本机程序复测
+## 安装与启动
 
-使用隔离副本和生成图形，通过程序原生控制接口执行实际工具事件，没有改动原有安装或用户设计文件。
+先保存旧窗口中未保存的文档，再安装并从 **Leo Design VectorCraft 0.22 Bridge 0.14.1** 快捷方式启动。该快捷方式强制启动新实例，避免激活仍在运行的旧版。
 
-| 情形 | 官方 0.22.0 基线 | 本次主程序 |
-| --- | --- | --- |
-| 智能参考线与网格同时开启，编组右边缘吸到画板 500 | 停在约 498.8976 | 精确到达 500 |
-| 编组内部结构、撤销与重做 | 网格关闭时可通过 | 网格开启时通过 |
-| Shift+Alt 编组复制 | 网格关闭时可通过 | 网格开启时通过，原对象不变 |
-| Shift 拖动已选节点到斜线路径 | 节点仍为 (380,340)，选择清空 | 节点到 (403.3333333333333,340)，选择保留，另一个节点不动 |
+默认目录：`%LOCALAPPDATA%\Programs\Leo Design\VectorCraft-0.22-Bridge-0.14.1`。保留旧版与官方目录。
 
-## 校验值
+在“关于”核对：`Leo Design Core Bridge 0.14.1 / Snapping Engine 1.3.1`。
 
-安装器 EXE SHA-256：
-`7f38d32ba6cc044180753d3b649bd026390c11b88321bfe9630ea0fe43ca66e2`
-
-安装器 ZIP SHA-256：
-`169249b4200e4c2a5d7ae3e8ddc8b2d5e55557e17f61f1b24bbdf44acab5fa8d`
-
-主程序 EXE SHA-256：
-`300639ffecb3b49c90364b9525f6dfe5260f20ec8904c20a45715d8a506b1983`
-
-便携 ZIP SHA-256：
-`b0675ce8d27fb71c74c27cb6ab6ac78cdfee8a9c6c8e7d4a00e66c700feb6d68`
-
-## 启动
-
-安装器默认装入独立的用户目录，保留官方版本。安装后从“Leo Design VectorCraft 0.22”启动，在“关于”中核对：
-
-`Leo Design Core Bridge 0.14.0 / Snapping Engine 1.3`
+[0.14.0 历史测试记录](VERIFIED_RELEASE_0_14_0.md)没有覆盖此次大文档情形，应结合本次修复记录阅读。

@@ -1,4 +1,12 @@
-# 当前交付 Leo Design Core Bridge v0.14.0 / VectorCraft v0.22.0
+# 当前交付 Leo Design Core Bridge v0.14.1 / VectorCraft v0.22.0
+
+- 修复超过 20,000 个锚点后，后新增目标路径漏收集而不吸附的问题；按拖动范围查询完整路径快照，锁定目标不依赖临时候选索引。
+- 大文档直线/Bezier、普通及 Shift 节点拖动、对象/整组移动、捕获释放及原生 Direct Selection 回归通过；Windows x64 编译与安装后哈希校验通过。
+- 原文档本地恢复副本中，按住/不按 Shift 在拖动中均命中；提交、撤销、重做通过，目标线和另一节点不变。文件和实际绘图坐标没有上传。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42362365957/artifacts/13570649176)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- 默认独立目录，使用 **Leo Design VectorCraft 0.22 Bridge 0.14.1** 快捷方式；关于显示 Core Bridge 0.14.1 / Snapping Engine 1.3.1。
+
+## 历史交付 Leo Design Core Bridge v0.14.0 / VectorCraft v0.22.0
 
 - Windows x64 主程序已通过本次全部配置的回归及正式编译；独立安装器已通过实际安装、版本与哈希一致性检查。
 - 修复网格/像素优先级绕过几何捕获、Shift 按下取消所选节点、Alt 复制入口不一致；保留无几何命中时的网格回退及真实垂直/切线选项。
