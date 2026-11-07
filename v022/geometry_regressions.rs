@@ -20,7 +20,7 @@ mod leo_v022_geometry_tests {
                 assert!(t.leo_extension.get().is_none());
                 assert!(t.leo_snap_extension(on+normal*(8.1/zoom),8.0/zoom,12.8/zoom,None).is_none());
                 assert!(t.leo_snap_extension(on,8.0/zoom,12.8/zoom,Some(Vec2::new(1.0,0.0))).is_none());
-                assert!(t.leo_snap_extension(on,8.0/zoom,12.8/zoom,Some(-dir)).is_some());
+                assert!(t.leo_snap_extension(on,8.0/zoom,12.8/zoom,Some(-dir)).is_none());
             }
         }
     }

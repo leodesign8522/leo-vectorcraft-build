@@ -217,15 +217,14 @@ impl Targets {
     }
 
     /// Bidirectional collinearity is a distinct constraint, not a finite path hit.
-    /// Shift wins when its locked direction disagrees with the original edge.
+    /// Shift keeps its existing constraint without a second extension capture.
     pub(in crate::guides) fn leo_snap_extension(&self, p: Point, acquire: f64, release: f64, direction: Option<Vec2>) -> Option<(Point,Vec<Overlay>)> {
-        if !p.is_finite() || !acquire.is_finite() || !release.is_finite() || acquire <= 0.0 || release < acquire {
+        if direction.is_some() || !p.is_finite() || !acquire.is_finite() || !release.is_finite() || acquire <= 0.0 || release < acquire {
             self.leo_extension.set(None);
             return None;
         }
         let project = |index: usize, reach: f64| {
             let &(at,dir) = self.extensions.get(index)?;
-            if direction.is_some_and(|d| !d.x.is_finite() || !d.y.is_finite() || d.hypot() <= 1e-9 || d.cross(dir).abs() > 1e-9 * d.hypot()) { return None; }
             let q = at + dir * (p-at).dot(dir);
             (q.is_finite() && q.distance(p) <= reach).then_some((index,at,q))
         };

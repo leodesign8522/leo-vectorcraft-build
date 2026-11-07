@@ -35,12 +35,17 @@ try:
  if flags['snap_to_grid']: command('view.snapToGrid')
  command('path.create',d='M10000 10000H10010V10010H10000Z '*5001)
  source=command('path.create',d='M300 300L600 330L600 500L460 420Z')['id']
+ command('view.setZoom',zoom=100,center=[450,400])
  original=node(source)
  call('ui.tool.select',{'tool':'directSelection'})
  checks=[]
  for pointer,want in [([541.5,478.0],[540.0,480.0]),([381.5,358.0],[380.0,360.0]),([221.5,238.0],[220.0,240.0])]:
   command('select.anchors',id=source,anchors=[[0,3]],mode='set')
-  call('ui.pointer',{'events':[{'kind':'down','x':460,'y':420},{'kind':'drag','x':pointer[0],'y':pointer[1]}]})
+  call('ui.pointer',{'events':[{'kind':'down','x':460,'y':420}]})
+  if not checks:
+   call('ui.pointer',{'events':[{'kind':'drag','x':520,'y':440}]})
+   assert node(source)['kind']['path']['subpaths'][0]['anchors'][3]['p']==[520.0,440.0]
+  call('ui.pointer',{'events':[{'kind':'drag','x':pointer[0],'y':pointer[1]}]})
   preview=node(source)['kind']['path']['subpaths'][0]['anchors']
   actual=preview[3]['p']
   assert max(abs(actual[i]-want[i]) for i in [0,1])<1e-7, ('during drag',actual,want)
