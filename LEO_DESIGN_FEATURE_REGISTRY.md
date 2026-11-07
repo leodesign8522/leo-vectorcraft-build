@@ -1,11 +1,13 @@
-# Core Bridge 0.14.4 / Snapping Engine 1.6 边框缩放吸附（验证中）
+# Core Bridge 0.14.4 / Snapping Engine 1.6 边框缩放吸附（已验证）
 
 - 中间手柄缩放接入完整目标快照，修复 20,000 个锚点后目标漏收集。
 - 几何吸附先于网格和像素回退；保持对侧边、Alt 中心与 Shift 比例约束。
 - 四边缩放使用 8px 捕获、12.8px 释放，补充原生工具和会话回归。
-- Windows 构建与本机验证待完成。
+- Windows x64 编译、配置的回归与安装校验、本机四边×三种网格/像素状态、捕获释放和 Shift/Alt 组合均通过。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42394996928/artifacts/13585055650)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- 保存文档后从 **Leo Design VectorCraft 0.22 Bridge 0.14.4** 快捷方式启动，V 工具拖中间手柄。
 
-# Core Bridge 0.14.3 / Snapping Engine 1.5 跨对象延长线与黄色命中（已验证）
+# 历史交付 Core Bridge 0.14.3 / Snapping Engine 1.5 跨对象延长线与黄色命中（已验证）
 
 - A 单节点支持邻边、当前路径其他直边及其他矢量对象直边的双向延长线；非相邻/跨对象参照只取当前视野内的直边。
 - 参照范围随平移缩放更新；已吸住的延长线保持到 12.8px 释放，避免平移画布时突然掉线。
@@ -13,7 +15,7 @@
 - 拖动开始时建立方向/偏移索引，精确投影确认命中；无 20,000 条截断。
 - 保留 8px 捕获、12.8px 释放、真实几何优先与原有 Shift 行为。曲线不作直线延长，隐藏对象不参与。
 - Windows x64 编译、专项/保留功能回归、安装版本与哈希检查，以及本机原生工具事件验证通过。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42385939388/artifacts/13581246846)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42385939388/artifacts/13581246846)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_3.md)。
 - 从 **Leo Design VectorCraft 0.22 Bridge 0.14.3** 快捷方式启动，开启智能参考线，用 A 拖动单节点，无需 Shift。
 
 # 历史交付 Core Bridge v0.14.2 / Snapping Engine 1.4 双向共线升级

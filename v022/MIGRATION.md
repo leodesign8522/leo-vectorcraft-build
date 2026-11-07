@@ -1,7 +1,13 @@
-# Core Bridge 0.14.3 / VectorCraft 0.22.0
+# Core Bridge 0.14.4 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
+
+## 0.14.4 bounding-box resize geometry
+
+The Selection tool's bounding-box handles still entered the official PointSnap/Targets::for_scale path: its 20k anchor budget omitted later targets, and grid/pixel options bypassed geometry. A dedicated scale constructor now uses the immutable full-scene collector and queries finite geometry around the resized box. Legal scale trajectories intersect actual anchors/segments, preserving the opposite handle, proportional scaling and Alt-centred scaling. Side handles have fixed 8px acquisition and 12.8px release; modifier changes reset the lock. Geometry precedes grid/pixel fallback. Object-bound alignment respects Smart Guides; ruler guides keep their configured availability. Yellow extension feedback remains the 0.14.3 node-drag feature.
+
+Expanded native Selection coverage also found and fixed two earlier issues: unconstrained ruler acquisition needed an explicit distance check, and the shared object target set needed spacing boxes. The native resize tolerance expectation is deliberately rebased to Leo's fixed 8px contract; the rest of the original Selection suite runs unchanged. All 47 engine, 17 object, 77 Direct Selection and 83 Selection filtered cases pass, plus seven real Session cases (filters overlap). Windows compilation and installer version/hash checks pass. Actual local control checks cover 12 four-side/grid-mode combinations, hysteresis, Shift/Alt, Commit/Undo/Redo and retained node/object/extension behavior. A synthetic 0.14.3 negative control fails all 12 resize cases. See [verification and exact hashes](VERIFIED_RELEASE.md).
 
 ## 0.14.3 visible-reference extensions and yellow feedback
 
