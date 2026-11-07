@@ -2,6 +2,86 @@
 mod leo_v022_geometry_tests {
     use super::*;
 
+    fn resize_scene(dense: bool) -> (Document,Selection) {
+        use vectorcraft_doc::Appearance;
+        use vectorcraft_geom::shapes;
+        let mut d=Document::new(1400.0,1200.0);
+        if dense {
+            let mut path=shapes::rectangle(Rect::new(10000.0,10000.0,10010.0,10010.0));
+            path.subpaths=vec![path.subpaths[0].clone();5001];
+            let id=d.alloc_id();d.insert(Some(d.layers[0].id),0,Node::path(id,path,Appearance::default_art())).unwrap();
+        }
+        let id=d.alloc_id();d.insert(Some(d.layers[0].id),usize::MAX,Node::path(id,shapes::rectangle(Rect::new(400.0,300.0,700.0,500.0)),Appearance::default_art())).unwrap();
+        let mut selected=Selection::default();selected.set([id]);
+        for (p,q) in [((200.0,0.0),(200.0,900.0)),((900.0,0.0),(900.0,900.0)),((100.0,150.0),(1000.0,150.0)),((100.0,700.0),(1000.0,700.0))] {
+            let id=d.alloc_id();d.insert(Some(d.layers[0].id),usize::MAX,Node::path(id,shapes::line(p.into(),q.into()),Appearance::default_art())).unwrap();
+        }
+        (d,selected)
+    }
+
+    #[test]
+    fn leo_snapping_engine_resize_four_sides_dense_grid_pixel_and_zoom() {
+        let (d,s)=resize_scene(true);let paint=crate::testutil::paint();
+        let bx=OrientedBox::aligned(Rect::new(400.0,300.0,700.0,500.0));
+        for zoom in [0.25,1.0,4.0] {for (grid,pixel) in [(false,false),(true,false),(false,true)] {
+            let cx=ToolContext {zoom,snap_to_grid:grid,snap_to_pixel:pixel,..crate::testutil::cx(&d,&s,&paint)};
+            for (h,want,offset) in [(Handle::Left,Point::new(200.0,400.0),Vec2::new(4.0/zoom,0.0)),(Handle::Right,Point::new(900.0,400.0),Vec2::new(-4.0/zoom,0.0)),(Handle::Top,Point::new(550.0,150.0),Vec2::new(0.0,4.0/zoom)),(Handle::Bottom,Point::new(550.0,700.0),Vec2::new(0.0,-4.0/zoom))] {
+                let t=Targets::leo_scale_targets(&cx);
+                let a=crate::bbox::scale_for_drag(bx.rect,h,want+offset,false,false);
+                let (a,g)=t.leo_resize(&cx,&bx,h,a,false,false).unwrap();
+                assert!((a*h.pos(bx.rect)).distance(want)<1e-7,"{h:?}, zoom={zoom}, grid={grid}, pixel={pixel}");
+                assert!((a*h.opposite().pos(bx.rect)).distance(h.opposite().pos(bx.rect))<1e-7);
+                assert!(g.iter().any(|o| matches!(o,Overlay::Label {text,..} if text=="path")));
+            }
+        }}
+    }
+
+    #[test]
+    fn leo_snapping_engine_resize_release_and_modifier_reset() {
+        let (d,s)=resize_scene(false);let paint=crate::testutil::paint();let cx=crate::testutil::cx(&d,&s,&paint);
+        let bx=OrientedBox::aligned(Rect::new(400.0,300.0,700.0,500.0));let h=Handle::Left;
+        let t=Targets::leo_scale_targets(&cx);
+        for (x,want) in [(204.0,200.0),(212.7,200.0),(212.9,212.9),(208.1,208.1),(207.9,200.0)] {
+            let a=crate::bbox::scale_for_drag(bx.rect,h,Point::new(x,400.0),false,false);
+            let (next,g)=t.leo_resize(&cx,&bx,h,a,false,false).unwrap();
+            assert!((next*h.pos(bx.rect)).distance(Point::new(want,400.0))<1e-7,"{x}: {next:?}");
+            if x==212.9 || x==208.1 {assert!(g.is_empty());}
+        }
+        let a=crate::bbox::scale_for_drag(bx.rect,h,Point::new(204.0,400.0),true,true);
+        let (next,_)=t.leo_resize(&cx,&bx,h,a,true,true).unwrap();
+        assert!((next*bx.rect.center()).distance(bx.rect.center())<1e-7);
+        let [sx,_,_,sy,_,_]=next.as_coeffs();assert!((sx-sy).abs()<1e-7);
+        assert!((next*h.pos(bx.rect)).distance(Point::new(200.0,400.0))<1e-7);
+    }
+
+    #[test]
+    fn leo_snapping_engine_resize_rotated_box_uses_finite_oblique_path() {
+        use vectorcraft_geom::shapes;
+        let mut d=Document::new(2000.0,2000.0);let s=Selection::default();let paint=crate::testutil::paint();
+        let bx=OrientedBox {angle:30.0,rect:Rect::new(400.0,300.0,700.0,500.0)};
+        let h=Handle::Left;let want=Point::new(250.0,400.0);
+        let a=bx.to_doc()*Point::new(250.0,200.0);let b=bx.to_doc()*Point::new(250.0,600.0);
+        let id=d.alloc_id();d.insert(Some(d.layers[0].id),0,Node::path(id,shapes::line(a,b),vectorcraft_doc::Appearance::default_art())).unwrap();
+        let cx=crate::testutil::cx(&d,&s,&paint);let t=Targets::leo_scale_targets(&cx);
+        let raw=crate::bbox::scale_for_drag(bx.rect,h,want+Vec2::new(4.0,0.0),false,false);
+        let (snap,_)=t.leo_resize(&cx,&bx,h,raw,false,false).unwrap();
+        assert!((snap*h.pos(bx.rect)).distance(want)<1e-7);
+        assert!((snap*h.opposite().pos(bx.rect)).distance(h.opposite().pos(bx.rect))<1e-7);
+    }
+
+    #[test]
+    fn leo_snapping_engine_resize_middle_handle_hits_real_bezier() {
+        let mut d=Document::new(1400.0,1200.0);let selected=Selection::default();let paint=crate::testutil::paint();
+        let mut path=BezPath::new();path.move_to((250.0,350.0));path.curve_to((300.0,370.0),(200.0,430.0),(250.0,450.0));
+        let id=d.alloc_id();d.insert(Some(d.layers[0].id),0,Node::path(id,vectorcraft_geom::PathData::from_bezpath(&path),vectorcraft_doc::Appearance::default_art())).unwrap();
+        let cx=crate::testutil::cx(&d,&selected,&paint);let targets=Targets::leo_scale_targets(&cx);
+        let bx=OrientedBox::aligned(Rect::new(400.0,300.0,700.0,500.0));
+        let a=crate::bbox::scale_for_drag(bx.rect,Handle::Left,Point::new(254.0,400.0),false,false);
+        let (a,g)=targets.leo_resize(&cx,&bx,Handle::Left,a,false,false).unwrap();
+        assert!((a*Point::new(400.0,400.0)).distance(Point::new(250.0,400.0))<1e-6);
+        assert!(g.iter().any(|o| matches!(o,Overlay::Label {text,..} if text=="path")));
+    }
+
     #[test]
     fn leo_snapping_engine_extensions_use_actual_visible_reference_segments() {
         let view=crate::ScreenFrame {origin:Point::ORIGIN,right:Vec2::new(1.0,0.0),down:Vec2::new(0.0,1.0),size:(100.0,100.0)};

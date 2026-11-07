@@ -15,6 +15,25 @@ mod leo_v022_session_tests {
     }
 
     #[test]
+    fn leo_v022_resize_side_handle_preview_commit_undo_redo_keeps_opposite_edge() {
+        let mut s=Session::new();s.execute("file.new",&json!({"width":1400,"height":1200})).unwrap();
+        let source=NodeId(s.execute("shape.rectangle",&json!({"x":400,"y":300,"width":300,"height":200})).unwrap()["id"].as_u64().unwrap());
+        let target=NodeId(s.execute("shape.line",&json!({"x1":203.25,"y1":100,"x2":203.25,"y2":800})).unwrap()["id"].as_u64().unwrap());
+        s.execute("select.set",&json!({"ids":[source.0]})).unwrap();
+        let before=bounds(&s,source);let fixed=bounds(&s,target);
+        let view=ViewInfo {snap_to_grid:true,..ViewInfo::default()};s.select_tool("selection",view).unwrap();
+        s.pointer(&PointerEvent::new(PointerKind::Down,400.0,400.0),view).unwrap();
+        for x in [207.25,213.25] {
+            s.pointer(&PointerEvent::new(PointerKind::Drag,x,400.0),view).unwrap();
+            let r=bounds(&s,source);assert!((r.x0-203.25).abs()<1e-7);assert_eq!(r.x1,700.0);assert_eq!((r.y0,r.y1),(300.0,500.0));
+        }
+        s.pointer(&PointerEvent::new(PointerKind::Up,213.25,400.0),view).unwrap();
+        let after=bounds(&s,source);assert_eq!(bounds(&s,target),fixed);
+        s.execute("edit.undo",&json!({})).unwrap();assert_eq!(bounds(&s,source),before);
+        s.execute("edit.redo",&json!({})).unwrap();assert_eq!(bounds(&s,source),after);
+    }
+
+    #[test]
     fn leo_v022_other_objects_extensions_commit_undo_and_keep_target_unchanged() {
         let mut s=Session::new();s.execute("file.new",&json!({"width":1200,"height":1200})).unwrap();
         let source=NodeId(s.execute("shape.line",&json!({"x1":600,"y1":600,"x2":500,"y2":400})).unwrap()["id"].as_u64().unwrap());

@@ -18,10 +18,10 @@ def edit(rel, old, new, expected=1):
 
 edit("guides/targets.rs",
      "pub struct Targets {",
-     "pub struct Targets {\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_extension: std::cell::Cell<Option<LeoExtension>>,\n    pub(super) leo_extension_index: Option<LeoExtensionIndex>,\n    pub(super) leo_scene: Option<LeoScene>,")
+     "pub struct Targets {\n    pub(super) leo_scale: std::cell::RefCell<Option<LeoScaleLock>>,\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_extension: std::cell::Cell<Option<LeoExtension>>,\n    pub(super) leo_extension_index: Option<LeoExtensionIndex>,\n    pub(super) leo_scene: Option<LeoScene>,")
 edit("guides/targets.rs",
      "use super::snap::",
-     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
+     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex, LeoScaleLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
 (root / "guides/leo_snapping_engine.rs").write_text(
     Path(__file__).with_name("leo_snapping_engine.rs").read_text(encoding="utf-8"),
     encoding="utf-8", newline="\n"
@@ -32,6 +32,10 @@ edit("guides.rs",
      "pub use targets::Targets;\npub(crate) use targets::ObjectMoveSnap;")
 
 edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
+    pub(crate) fn leo_for_scale(cx: &ToolContext) -> Self {
+        Self {targets:(cx.smart_guides || cx.snap_to_point).then(|| (Targets::leo_scale_targets(cx),8.0))}
+    }
+
     /// Dedicated node-editing target set: do not let bounds, alignments, grids or pixel
     /// snapping override the new true-geometry target detection.
     pub(crate) fn leo_for_anchor_drag(cx: &ToolContext) -> Self {
@@ -81,6 +85,11 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
         (p, vec![])
     }
 """)
+edit("select.rs", "PointSnap::new(cx, || Targets::for_scale(cx))", "PointSnap::leo_for_scale(cx)")
+edit("guides/snap.rs", "        let step = if cx.snap_to_pixel {", """        if let Some((targets,_))=&self.targets {
+            if let Some(hit)=targets.leo_resize(cx,bx,handle,a,proportional,from_center) {return hit;}
+        }
+        let step = if cx.snap_to_pixel {""")
 # Dragging the selected anchor, or dragging a partial selection from a fill,
 # must both use the same target set and geometric snap calculation.
 edit("select.rs",
@@ -382,4 +391,4 @@ if ui_source.count(ui_anchor)!=1: raise SystemExit("FAIL extension label backgro
 ui_source=ui_source.replace(ui_anchor,ui_anchor+'\n                if text == "延长线吸附" {\n                    let galley=p.layout_no_wrap(text.to_owned(),egui::FontId::proportional(11.0),c32(*color));\n                    let backdrop=egui::Rect::from_min_size(sp-vec2(3.0,2.0),galley.size()+vec2(6.0,4.0));\n                    p.rect_filled(backdrop,CornerRadius::same(3),Color32::from_rgba_unmultiplied(0x20,0x24,0x2b,235));\n                }\n')
 ui_path.write_text(ui_source,encoding="utf-8",newline="\n")
 
-print("PASS Leo Snapping Engine 1.5: finite geometry, indexed extensions and yellow feedback")
+print("PASS Leo Snapping Engine 1.6: finite geometry, indexed extensions and yellow feedback")

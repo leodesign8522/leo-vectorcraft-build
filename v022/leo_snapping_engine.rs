@@ -1,4 +1,4 @@
-//! Leo Design Snapping Engine v1.5: finite geometry and indexed straight-edge extensions.
+//! Leo Design Snapping Engine v1.6: finite geometry and indexed straight-edge extensions.
 //! Node drags use exact anchors and finite path geometry; object moves add selected bounds,
 //! multi-object/group source anchors, alignment axes and artboard edges. Capture is in SCREEN px.
 use super::*;
@@ -248,6 +248,103 @@ impl LeoScene {
 }
 
 impl Targets {
+    pub(in crate::guides) fn leo_scale_targets(cx: &ToolContext) -> Self {
+        Self::leo_for_object_move(cx,&cx.selection.objects)
+    }
+
+    /// Resize has its own legal degrees of freedom. Projecting the pointer like
+    /// a node would move the opposite side or break proportional/centred scaling.
+    pub(in crate::guides) fn leo_resize(
+        &self,cx: &ToolContext,bx: &OrientedBox,handle: Handle,a: Affine,proportional: bool,from_center: bool,
+    ) -> Option<(Affine,Vec<Overlay>)> {
+        self.leo_scene.as_ref()?;
+        let acquire=cx.tol(ACQUIRE_PX);let release=acquire*RELEASE_MULTIPLIER;
+        let to_doc=bx.to_doc();let raw=to_doc*(a*handle.pos(bx.rect));
+        let restricted=!handle.is_corner() || proportional;
+        let held=self.leo_scale.try_borrow().ok().and_then(|v| v.clone());
+        if let Some(held)=held.filter(|l| restricted && l.handle==handle && l.proportional==proportional && l.from_center==from_center) {
+            if raw.distance(to_doc*(held.matrix*handle.pos(bx.rect)))<=release {
+                return Some((held.matrix,held.guides));
+            }
+        }
+        if let Ok(mut held)=self.leo_scale.try_borrow_mut() {*held=None;}
+        let bounds=to_doc.transform_rect_bbox(a.transform_rect_bbox(bx.rect)).inflate(release,release);
+        let nearby=self.leo_near(bounds)?;
+        let origin=if from_center {bx.rect.center()} else {handle.opposite().pos(bx.rect)};
+        let [sx,_,_,sy,_,_]=a.as_coeffs();
+        let valid=|nx: f64,ny: f64| nx.is_finite() && ny.is_finite() && nx*sx>0.0 && ny*sy>0.0 && nx.abs()>=1e-4 && ny.abs()>=1e-4;
+        let matrix=|nx,ny| Affine::translate(origin.to_vec2())*Affine::scale_non_uniform(nx,ny)*Affine::translate(-origin.to_vec2());
+        let mut best: Option<(u8,f64,Affine,Point,&'static str,[u8;3])>=None;
+        let mut consider=|candidate: Affine,q: Point,kind: Kind| {
+            let travel=raw.distance(to_doc*(candidate*handle.pos(bx.rect)));
+            if !travel.is_finite() || travel>acquire {return;}
+            let (priority,label,color)=match kind {Kind::Anchor=>(0,"anchor",ANCHOR_HIT),Kind::Center=>(2,"center",PATH_HIT),_=>(1,"path",PATH_HIT)};
+            if best.as_ref().is_none_or(|b| (priority,travel)<(b.0,b.1)) {best=Some((priority,travel,candidate,q,label,color));}
+        };
+        if restricted {
+            let (ax,_)=handle.axes();
+            let (e,c,s0)=match (handle.is_corner(),ax,proportional) {
+                (true,_,_)=>((sx.signum(),sy.signum()),(0.0,0.0),sx.abs()),
+                (false,true,true)=>((1.0,sx.signum()),(0.0,0.0),sx),
+                (false,true,false)=>((1.0,0.0),(0.0,1.0),sx),
+                (false,false,true)=>((sy.signum(),1.0),(0.0,0.0),sy),
+                (false,false,false)=>((0.0,1.0),(1.0,0.0),sy),
+            };
+            let ends=if handle.is_corner() {vec![handle]} else {vec![handle,Handle::ALL[(handle as usize+1)%8],Handle::ALL[(handle as usize+7)%8]]};
+            for h in ends {
+                let v=h.pos(bx.rect)-origin;
+                let base=to_doc*(origin+Vec2::new(c.0*v.x,c.1*v.y));
+                let dir=to_doc*Point::new(e.0*v.x,e.1*v.y)-to_doc*Point::ORIGIN;
+                let len2=dir.hypot2();if !len2.is_finite() || len2<=1e-18 {continue;}
+                let p=base+dir*s0;
+                let mut accept=|q: Point,kind| {
+                    let s=(q-base).dot(dir)/len2;
+                    let (nx,ny)=(c.0+e.0*s,c.1+e.1*s);
+                    if valid(nx,ny) && (base+dir*s).distance(q)<=1e-7 {consider(matrix(nx,ny),q,kind);}
+                };
+                for &(q,kind) in &nearby.points {
+                    if p.distance(q)<=acquire && matches!(kind,Kind::Anchor|Kind::Center) {accept(q,kind);}
+                }
+                for (_,seg) in &nearby.segments {
+                    if let Some(q)=along_segment(*seg,p,dir,acquire) {accept(q,Kind::Edge);}
+                }
+            }
+        } else {
+            let d0=handle.pos(bx.rect)-origin;
+            if d0.x.abs()>1e-9 && d0.y.abs()>1e-9 {
+                let mut accept=|q: Point,kind| {
+                    let local=to_doc.inverse()*q;
+                    let (nx,ny)=((local.x-origin.x)/d0.x,(local.y-origin.y)/d0.y);
+                    if valid(nx,ny) {consider(matrix(nx,ny),q,kind);}
+                };
+                for &(q,kind) in &nearby.points {
+                    if raw.distance(q)<=acquire && matches!(kind,Kind::Anchor|Kind::Center) {accept(q,kind);}
+                }
+                for (_,seg) in &nearby.segments {
+                    let nearest=seg.nearest(raw,1e-8);
+                    if nearest.distance_sq<=acquire*acquire {accept(seg.eval(nearest.t),Kind::Edge);}
+                }
+            }
+        }
+        let result=if let Some((_,_,a,q,label,color))=best {
+            Some((a,move_hit_guides(self,q,label,color)))
+        } else {
+            // Bounds and ruler alignment retain the official oriented-box math.
+            let (next,guides)=self.snap_scale(bx,handle,a,proportional,from_center,acquire);
+            let travel=raw.distance(to_doc*(next*handle.pos(bx.rect)));
+            ((travel>1e-9 || !guides.is_empty()) && travel<=acquire).then_some((next,guides))
+        };
+        if let Some((matrix,guides))=result {
+            if restricted && let Ok(mut held)=self.leo_scale.try_borrow_mut() {
+                *held=Some(LeoScaleLock {handle,proportional,from_center,matrix,guides:guides.clone()});
+            }
+            return Some((matrix,guides));
+        }
+        // Geometry wins over grid/pixels. With no capture their native fallback
+        // remains available; otherwise do not re-enter the legacy resize query.
+        (!(cx.snap_to_grid || cx.snap_to_pixel)).then_some((a,vec![]))
+    }
+
     fn leo_near(&self, query: Rect) -> Option<Self> {
         let mut targets = self.leo_scene.as_ref()?.near(query);
         targets.style = self.style;
@@ -475,6 +572,15 @@ impl Targets {
         }
         Some((q, guides))
     }
+}
+
+#[derive(Clone)]
+pub(in crate::guides) struct LeoScaleLock {
+    handle: Handle,
+    proportional: bool,
+    from_center: bool,
+    matrix: Affine,
+    guides: Vec<Overlay>,
 }
 
 fn push_artboard_edges(doc: &Document, targets: &mut Targets) {

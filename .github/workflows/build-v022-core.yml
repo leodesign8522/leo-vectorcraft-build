@@ -1,4 +1,4 @@
-name: Leo Design Core Bridge v0.14.3
+name: Leo Design Core Bridge v0.14.4
 on:
   workflow_dispatch:
   push:
@@ -23,7 +23,7 @@ jobs:
     uses: ./.github/workflows/build-v022-edition.yml
     with:
       flavor: core
-      label: Leo Design Core Bridge v0.14.3
-      artifact: Leo_Design_Core_Bridge_v0.14.3_Windows_x64
-      installer: v022/overlay/Leo_Design_Core_Bridge_0_14_3.iss
-      output: Leo_Design_Core_Bridge_v0.14.3_Installer
+      label: Leo Design Core Bridge v0.14.4
+      artifact: Leo_Design_Core_Bridge_v0.14.4_Windows_x64
+      installer: v022/overlay/Leo_Design_Core_Bridge_0_14_4.iss
+      output: Leo_Design_Core_Bridge_v0.14.4_Installer
