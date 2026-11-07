@@ -29,6 +29,13 @@ Source: "{#SourceDir}\README_FIRST.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\BUILD_VALIDATION.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\UPSTREAM_COMMIT.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\BUILD_COMMIT.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\VERSION.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\portable.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\LICENSE-MIT"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\LICENSE-APACHE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\ASSETS.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Leo Design VectorCraft 0.22"; Filename: "{app}\vectorcraft.exe"
