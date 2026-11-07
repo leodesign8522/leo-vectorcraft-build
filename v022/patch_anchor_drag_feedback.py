@@ -392,3 +392,9 @@ ui_source=ui_source.replace(ui_anchor,ui_anchor+'\n                if text == "å
 ui_path.write_text(ui_source,encoding="utf-8",newline="\n")
 
 print("PASS Leo Snapping Engine 1.6: finite geometry, indexed extensions and yellow feedback")
+
+# Resize now shares Leo's fixed 8 screen-pixel acquisition contract. The native
+# readout-preference checks still run, with the superseded 0/4px pull updated.
+edit("select/tests.rs",
+     "for (tol, want) in [(4.0, 94.0), (8.0, 100.0), (0.0, 94.0)] {",
+     "for (tol, want) in [(4.0, 100.0), (8.0, 100.0), (0.0, 100.0)] { // Leo: fixed 8 screen pixels")

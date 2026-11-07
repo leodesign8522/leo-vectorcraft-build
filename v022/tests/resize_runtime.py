@@ -59,7 +59,34 @@ try:
    command('edit.undo');assert node(source)==original
    command('edit.redo');assert node(source)==committed
    command('edit.undo')
- output={'pass':all(x['pass'] for x in records),'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'checks':records,'background_anchors':20004,'undo_redo':True}
+ extras={}
+ if '--observe' not in sys.argv:
+  flags=call('ui.inspect')['ui']['view']
+  for key,cmd in [('snap_to_grid','view.snapToGrid'),('snap_to_pixel','view.snapToPixel')]:
+   if flags[key]:command(cmd)
+  command('select.set',ids=[source])
+  events([('down',[400,400])])
+  for x,want in [(204,200),(212.7,200),(212.9,212.9),(208.1,208.1),(207.9,200)]:
+   events([('drag',[x,400])]);got=bounds()
+   assert abs(got['x']-want)<1e-7,(x,got)
+   assert abs(got['x']+got['width']-700)<1e-7,got
+  events([('up',[207.9,400])]);command('edit.undo');assert node(source)==original
+  extras['capture_release_reacquire']=True
+  for shift,alt in [(True,False),(False,True),(True,True)]:
+   command('select.set',ids=[source])
+   def mod_events(items):return call('ui.pointer',{'events':[{'kind':k,'x':p[0],'y':p[1]} for k,p in items],'mods':{'shift':shift,'alt':alt}})
+   mod_events([('down',[400,400]),('drag',[204,400])]);got=bounds()
+   assert abs(got['x']-200)<1e-7,got
+   if alt:assert abs(got['x']+got['width']/2-550)<1e-7,got
+   else:assert abs(got['x']+got['width']-700)<1e-7,got
+   if shift:assert abs(got['width']/got['height']-1.5)<1e-7,got
+   else:assert got['height']==200,got
+   mod_events([('up',[204,400])]);committed=node(source)
+   command('edit.undo');assert node(source)==original
+   command('edit.redo');assert node(source)==committed
+   command('edit.undo')
+  extras.update({'alt_centre':True,'shift_ratio':True,'shift_alt':True,'opposite_edge_fixed':True})
+ output={'pass':all(x['pass'] for x in records),'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'checks':records,'background_anchors':20004,'undo_redo':True,**extras}
  (exe.parent/'RESIZE_RUNTIME.json').write_text(json.dumps(output,indent=2),encoding='utf-8')
  print(json.dumps(output))
 

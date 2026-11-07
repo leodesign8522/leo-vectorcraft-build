@@ -330,7 +330,9 @@ impl Targets {
             Some((a,move_hit_guides(self,q,label,color)))
         } else {
             // Bounds and ruler alignment retain the official oriented-box math.
-            let (next,guides)=self.snap_scale(bx,handle,a,proportional,from_center,acquire);
+            let rulers=Targets::rulers(cx);
+            let alignment=if cx.smart_guides {self} else {&rulers};
+            let (next,guides)=alignment.snap_scale(bx,handle,a,proportional,from_center,acquire);
             let travel=raw.distance(to_doc*(next*handle.pos(bx.rect)));
             ((travel>1e-9 || !guides.is_empty()) && travel<=acquire).then_some((next,guides))
         };
@@ -406,6 +408,7 @@ impl Targets {
         let mut targets = scene.alignment_targets().styled(cx);
         targets.leo_scene = Some(scene);
         if cx.snap_to_point { targets = targets.with_rulers(cx); }
+        if cx.spacing_guides { targets.boxes = super::object_boxes(cx.doc,exclude); }
         push_artboard_edges(cx.doc, &mut targets);
         targets
     }
@@ -1063,7 +1066,8 @@ fn snap_move_alignment(
         }).chain(sources.iter().flat_map(|source| {
             let current = *source + d;
             targets.rulers.iter().filter(|r| r.vertical).filter_map(move |ruler| {
-                ruler.line_at(current, acquire).map(|(value, from, kind)| ((value - current.x).abs(), AxisLock { source: *source, value, from, kind }))
+                ruler.line_at(current, acquire).filter(|(value,_,_)| (value-current.x).abs()<=acquire)
+                    .map(|(value, from, kind)| ((value - current.x).abs(), AxisLock { source: *source, value, from, kind }))
             })
         })).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, l)| l);
     }
@@ -1097,7 +1101,8 @@ fn snap_move_alignment(
         }).chain(sources.iter().flat_map(|source| {
             let current = *source + d;
             targets.rulers.iter().filter(|r| !r.vertical).filter_map(move |ruler| {
-                ruler.line_at(current, acquire).map(|(value, from, kind)| ((value - current.y).abs(), AxisLock { source: *source, value, from, kind }))
+                ruler.line_at(current, acquire).filter(|(value,_,_)| (value-current.y).abs()<=acquire)
+                    .map(|(value, from, kind)| ((value - current.y).abs(), AxisLock { source: *source, value, from, kind }))
             })
         })).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, l)| l);
     }
