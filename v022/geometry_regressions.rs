@@ -3,6 +3,46 @@ mod leo_v022_geometry_tests {
     use super::*;
 
     #[test]
+    fn leo_snapping_engine_bidirectional_extension_capture_release_and_shift() {
+        for zoom in [0.25,1.0,4.0] {
+            let mut t=Targets::default();
+            let at=Point::new(300.0,300.0);
+            let dir=Vec2::new(0.8,0.6);
+            let normal=Vec2::new(-0.6,0.8);
+            t.extensions.push((at,dir));
+            for length in [300.0,100.0,-100.0] {
+                t.clear_leo_snap();
+                let on=at+dir*length;
+                let (q,_)=t.leo_snap_extension(on+normal*(7.9/zoom),8.0/zoom,12.8/zoom,None).unwrap();
+                assert!(q.distance(on)<1e-9);
+                assert!(t.leo_snap_extension(on+normal*(12.7/zoom),8.0/zoom,12.8/zoom,None).is_some());
+                assert!(t.leo_snap_extension(on+normal*(12.9/zoom),8.0/zoom,12.8/zoom,None).is_none());
+                assert!(t.leo_extension.get().is_none());
+                assert!(t.leo_snap_extension(on+normal*(8.1/zoom),8.0/zoom,12.8/zoom,None).is_none());
+                assert!(t.leo_snap_extension(on,8.0/zoom,12.8/zoom,Some(Vec2::new(1.0,0.0))).is_none());
+                assert!(t.leo_snap_extension(on,8.0/zoom,12.8/zoom,Some(-dir)).is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn leo_snapping_engine_extension_feedback_is_distinct_and_only_on_capture() {
+        let mut t=Targets::default();
+        t.extensions.push((Point::new(300.0,300.0),Vec2::new(1.0,0.0)));
+        t.style.lines=true; t.style.labels=true;
+        let (q,guides)=t.leo_snap_extension(Point::new(450.0,304.0),8.0,12.8,None).unwrap();
+        assert_eq!(q,Point::new(450.0,300.0));
+        assert!(guides.iter().any(|o| matches!(o,Overlay::Line {dashed:true,..})));
+        assert!(guides.iter().any(|o| matches!(o,Overlay::Label {text,..} if text=="extension")));
+        assert!(!guides.iter().any(|o| matches!(o,Overlay::Label {text,..} if text=="path")));
+        assert!(t.leo_snap_extension(Point::new(450.0,320.0),8.0,12.8,None).is_none());
+        t.style.lines=false; t.style.labels=false;
+        assert!(t.leo_snap_extension(Point::new(450.0,304.0),8.0,12.8,None).unwrap().1.is_empty());
+        assert!(t.leo_snap_extension(Point::new(f64::NAN,0.0),8.0,12.8,None).is_none());
+        assert!(t.leo_extension.get().is_none());
+    }
+
+    #[test]
     fn leo_snapping_engine_dense_tail_bezier_uses_actual_curve_at_multiple_zooms() {
         use vectorcraft_doc::{Document, Node, Appearance};
         use vectorcraft_geom::{shapes, PathData};

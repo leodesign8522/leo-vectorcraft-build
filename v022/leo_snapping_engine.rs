@@ -8,6 +8,7 @@ pub(super) const ACQUIRE_PX: f64 = 8.0;
 pub(super) const RELEASE_MULTIPLIER: f64 = 1.6;
 const ANCHOR_HIT: [u8; 3] = [0x35, 0xc2, 0xfa];
 const PATH_HIT: [u8; 3] = [0xff, 0xb3, 0x3d];
+const EXTENSION_HIT: [u8; 3] = [0x42, 0xd9, 0xe8];
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::guides) enum SnapLock {
@@ -164,6 +165,7 @@ impl Targets {
     pub(in crate::guides) fn leo_for_anchor_drag(cx: &ToolContext) -> Self {
         let mut targets = Self::default().styled(cx);
         targets.leo_scene = Some(LeoScene::new(cx, cx.selection, false));
+        if cx.smart_guides { targets.leo_collect_extensions(cx); }
         targets.tangent = cx.smart_guides && cx.snap_tangent;
         targets.perpendicular = cx.smart_guides && cx.snap_perpendicular;
         if cx.snap_to_point { targets = targets.with_rulers(cx); }
@@ -187,6 +189,58 @@ impl Targets {
 
     pub(in crate::guides) fn clear_leo_snap(&self) {
         self.leo_snap.set(None);
+        self.leo_extension.set(None);
+    }
+
+    /// Only the two original straight neighbours of one edited anchor can
+    /// constrain its direction. Freeze them at drag start, not at each preview.
+    fn leo_collect_extensions(&mut self, cx: &ToolContext) {
+        let selection = cx.selection;
+        if !selection.segments.is_empty() || selection.anchors.len() != 1 { return; }
+        let Some((&id, moving)) = selection.anchors.iter().next() else { return };
+        if moving.len() != 1 || selection.objects.iter().any(|other| *other != id) { return; }
+        let Some(&(si, ai)) = moving.iter().next() else { return };
+        let Some(sp) = cx.doc.node(id).and_then(|n| n.path_data()).and_then(|p| p.subpaths.get(si)) else { return };
+        let n = sp.anchors.len();
+        if n < 2 || ai >= n { return; }
+        let previous = if ai > 0 { Some(ai - 1) } else if sp.closed { Some(n - 1) } else { None };
+        for seg in [previous, (ai < sp.segment_count()).then_some(ai)].into_iter().flatten() {
+            if seg >= sp.segment_count() || !sp.segment_is_line(seg) { continue; }
+            let c = sp.segment(seg);
+            let (fixed, dragged) = if seg == ai { (c.p3,c.p0) } else { (c.p0,c.p3) };
+            let d = dragged - fixed;
+            let len = d.hypot();
+            if fixed.is_finite() && dragged.is_finite() && len.is_finite() && len > 1e-9 {
+                self.extensions.push((fixed,d / len));
+            }
+        }
+    }
+
+    /// Bidirectional collinearity is a distinct constraint, not a finite path hit.
+    /// Shift wins when its locked direction disagrees with the original edge.
+    pub(in crate::guides) fn leo_snap_extension(&self, p: Point, acquire: f64, release: f64, direction: Option<Vec2>) -> Option<(Point,Vec<Overlay>)> {
+        if !p.is_finite() || !acquire.is_finite() || !release.is_finite() || acquire <= 0.0 || release < acquire {
+            self.leo_extension.set(None);
+            return None;
+        }
+        let project = |index: usize, reach: f64| {
+            let &(at,dir) = self.extensions.get(index)?;
+            if direction.is_some_and(|d| !d.x.is_finite() || !d.y.is_finite() || d.hypot() <= 1e-9 || d.cross(dir).abs() > 1e-9 * d.hypot()) { return None; }
+            let q = at + dir * (p-at).dot(dir);
+            (q.is_finite() && q.distance(p) <= reach).then_some((index,at,q))
+        };
+        let hit = self.leo_extension.get().and_then(|i| project(i,release))
+            .or_else(|| (0..self.extensions.len()).filter_map(|i| project(i,acquire))
+                .min_by(|a,b| a.2.distance(p).total_cmp(&b.2.distance(p))));
+        self.leo_extension.set(hit.map(|(i,_,_)| i));
+        let (_,at,q) = hit?;
+        let mut guides = vec![];
+        if self.style.lines {
+            guides.push(Overlay::Line { a:at,b:q,color:EXTENSION_HIT,dashed:true });
+            guides.push(Overlay::CurvePoint { p:q,color:EXTENSION_HIT,filled:false,size:8.0 });
+        }
+        if self.style.labels { guides.push(Overlay::Label { p:q,text:"extension".into(),color:EXTENSION_HIT }); }
+        Some((q,guides))
     }
 
     /// Explicit native geometric-guide options still land on real finite geometry.

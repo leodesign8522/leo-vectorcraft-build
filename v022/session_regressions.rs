@@ -15,6 +15,28 @@ mod leo_v022_session_tests {
     }
 
     #[test]
+    fn leo_v022_bidirectional_original_edge_extension_commits_and_undoes() {
+        let mut s=Session::new();
+        s.execute("file.new",&json!({"width":1000,"height":1000})).unwrap();
+        let id=NodeId(s.execute("path.create",&json!({"d":"M300 300 L600 330 L600 500 L460 420 Z"})).unwrap()["id"].as_u64().unwrap());
+        let view=ViewInfo {snap_to_grid:true,..ViewInfo::default()};
+        s.select_tool("directSelection",view).unwrap();
+        for (pointer,expected) in [((541.5,478.0),(540.0,480.0)),((381.5,358.0),(380.0,360.0)),((221.5,238.0),(220.0,240.0))] {
+            s.execute("select.anchors",&json!({"id":id.0,"anchors":[[0,3]],"mode":"set"})).unwrap();
+            for (kind,p) in [(PointerKind::Down,(460.0,420.0)),(PointerKind::Drag,pointer),(PointerKind::Up,pointer)] {
+                s.pointer(&PointerEvent::new(kind,p.0,p.1),view).unwrap();
+            }
+            assert!(endpoint(&s,id,3).distance(Point::new(expected.0,expected.1))<1e-8);
+            assert_eq!(endpoint(&s,id,0),Point::new(300.0,300.0));
+            s.execute("edit.undo",&json!({})).unwrap();
+            assert_eq!(endpoint(&s,id,3),Point::new(460.0,420.0));
+            s.execute("edit.redo",&json!({})).unwrap();
+            assert!(endpoint(&s,id,3).distance(Point::new(expected.0,expected.1))<1e-8);
+            s.execute("edit.undo",&json!({})).unwrap();
+        }
+    }
+
+    #[test]
     fn leo_v022_dense_document_node_drag_commits_and_undoes_for_both_shift_states() {
         for shift in [false,true] {
             let mut s=Session::new();

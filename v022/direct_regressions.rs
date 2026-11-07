@@ -11,6 +11,33 @@ fn leo_dense_background(d: &mut vectorcraft_doc::Document) {
 }
 
 #[test]
+fn leo_snapping_engine_closed_polygon_original_edge_extends_and_shortens_both_ways() {
+    use vectorcraft_geom::{PathData,SubPath};
+    let mut d=vectorcraft_doc::Document::new(1000.0,1000.0);
+    leo_dense_background(&mut d);
+    let id=d.alloc_id();
+    let path=PathData::single(SubPath::polyline(&[Point::new(300.0,300.0),Point::new(600.0,330.0),Point::new(600.0,500.0),Point::new(460.0,420.0)],true));
+    d.insert(Some(d.layers[0].id),1,vectorcraft_doc::Node::path(id,path,vectorcraft_doc::Appearance::default_art())).unwrap();
+    let selection=anchors_of(id,&[(0,3)]);
+    let p=paint(); let c=cx(&d,&selection,&p);
+    for (pointer,expected) in [((541.5,478.0),(540.0,480.0)),((381.5,358.0),(380.0,360.0)),((221.5,238.0),(220.0,240.0))] {
+        let mut tool=DirectSelectionTool::new(false);
+        let (v,labels)=drag(&mut tool,&c,(460.0,420.0),pointer,Mods::default());
+        let hit=Point::new(460.0+v["dx"].as_f64().unwrap(),420.0+v["dy"].as_f64().unwrap());
+        assert!(hit.distance(Point::new(expected.0,expected.1))<1e-8,"{v}");
+        assert_eq!(labels,vec!["extension".to_string()]);
+    }
+    let mut tool=DirectSelectionTool::new(false);
+    let (v,labels)=drag(&mut tool,&c,(460.0,420.0),(541.5,478.0),Mods {shift:true,..Mods::default()});
+    assert!((v["dx"].as_f64().unwrap()-v["dy"].as_f64().unwrap()).abs()<1e-8,"{v}");
+    assert!(!labels.iter().any(|s| s=="extension"));
+    let c=ToolContext {smart_guides:false,snap_to_point:false,..c};
+    let mut tool=DirectSelectionTool::new(false);
+    let (v,labels)=drag(&mut tool,&c,(460.0,420.0),(541.5,478.0),Mods::default());
+    assert_eq!(v,json!({"dx":81.5,"dy":58.0})); assert!(labels.is_empty());
+}
+
+#[test]
 fn leo_snapping_engine_dense_document_tail_node_drag_with_and_without_shift() {
     use vectorcraft_geom::shapes;
     for shift in [false,true] {

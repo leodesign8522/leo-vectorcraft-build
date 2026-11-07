@@ -18,7 +18,7 @@ def edit(rel, old, new, expected=1):
 
 edit("guides/targets.rs",
      "pub struct Targets {",
-     "pub struct Targets {\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_scene: Option<LeoScene>,")
+     "pub struct Targets {\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_extension: std::cell::Cell<Option<usize>>,\n    pub(super) leo_scene: Option<LeoScene>,")
 edit("guides/targets.rs",
      "use super::snap::",
      '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
@@ -42,7 +42,7 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
     }
 
     pub(crate) fn leo_captured(&self) -> bool {
-        self.targets.as_ref().is_some_and(|(targets, _)| targets.leo_snap.get().is_some())
+        self.targets.as_ref().is_some_and(|(targets, _)| targets.leo_snap.get().is_some() || targets.leo_extension.get().is_some())
     }
 
     pub(crate) fn direct_anchor_drag(&self, cx: &ToolContext, p: Point, from: Option<&Leave>, shift: bool) -> (Point, Vec<Overlay>) {
@@ -51,6 +51,7 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
         if let Some((targets, _)) = &self.targets {
             if !shift && let Some(f) = from.filter(|f| f.contact)
                 && let Some(hit) = targets.leo_snap_contact(p, f.at, cx.tol(8.0)) {
+                targets.leo_extension.set(None);
                 return hit;
             }
             let hit = if let (Some(q), Some(f)) = (constrained, from) {
@@ -59,6 +60,11 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
                 targets.leo_snap_anchor(p, cx.tol(8.0), cx.tol(12.8))
             };
             if let Some(hit) = hit {
+                targets.leo_extension.set(None);
+                return hit;
+            }
+            let direction = constrained.zip(from).map(|(q,f)| q-f.at);
+            if let Some(hit) = targets.leo_snap_extension(p,cx.tol(8.0),cx.tol(12.8),direction) {
                 return hit;
             }
         }
@@ -171,19 +177,13 @@ edit("direct/tests.rs",
     assert_eq!(a, vec![Action::Exec("select.anchors".into(), json!({"id": id.0, "anchors": [[0, 0]], "mode": "toggle"}))]);''', expected=2)
 
 # These native assertions describe the deliberately replaced node contract:
-# Leo nodes capture finite geometry at 8px; an axis/ray alone is not a hit.
+# Finite geometry and original-edge extension constraints have distinct labels.
 edit("direct/tests.rs",
      '    assert_eq!((v, labels), (json!({"dx": 0.0, "dy": 30.0}), vec!["align".to_string()]));',
-     '    assert_eq!((v, labels), (json!({"dx": 3.0, "dy": 30.0}), Vec::<String>::new()), "an axis alone is not a geometry hit");')
+     '    assert_eq!((v, labels), (json!({"dx": 0.0, "dy": 30.0}), vec!["extension".to_string()]), "original edge direction is an extension constraint");')
 edit("direct/tests.rs",
      '    assert_eq!(drag(&mut t, &c, (300.0, 300.0), (203.0, 199.0), none).0, json!({"dx": -97.0, "dy": -101.0}));',
      '    assert_eq!(drag(&mut t, &c, (300.0, 300.0), (203.0, 199.0), none).0, json!({"dx": -100.0, "dy": -100.0}), "Snap to Point uses the shared 8px capture");')
-edit("direct/tests.rs",
-     '    assert!((dx - 40.0).abs() < 1e-9 && (dy + 30.0).abs() < 1e-9, "{v}");',
-     '    assert!((dx - 41.5).abs() < 1e-9 && (dy + 28.0).abs() < 1e-9, "a ray without a finite target cannot capture: {v}");')
-edit("direct/tests.rs",
-     '    assert!(matches!(guides[..], [(a, b)] if a == Point::new(300.0, 400.0) && (b - Point::new(420.0, 310.0)).hypot() < 1e-9), "{guides:?}");',
-     '    assert!(guides.is_empty(), "no finite target, no hit guide: {guides:?}");')
 edit("direct/tests.rs",
      '    assert_eq!(drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none).1, Vec::<String>::new());',
      '    assert_eq!(drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none).1, ["path"], "Snap to Point also captures real finite paths");')
