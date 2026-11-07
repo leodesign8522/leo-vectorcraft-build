@@ -1,0 +1,65 @@
+name: VectorCraft v0.22 snapping regressions
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v022-snapping
+    paths:
+      - ".github/workflows/verify-v022-snapping.yml"
+      - "v022/geometry_regressions.rs"
+      - "v022/direct_regressions.rs"
+      - "v022/select_regressions.rs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leo-v022-regressions-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapping:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_TEST_OPT_LEVEL: "0"
+      CARGO_PROFILE_TEST_CODEGEN_UNITS: "256"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: v0.22.0
+          path: vectorcraft
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          if ($LASTEXITCODE -ne 0) { throw "Rust install failed" }
+          rustup default stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          shared-key: "leo-vectorcraft-v018-core-windows-release"
+          cache-all-crates: false
+          cache-on-failure: true
+      - name: Apply verified v0.22 recipe
+        shell: pwsh
+        run: |
+          $actual = (git -C vectorcraft rev-parse HEAD).Trim()
+          if ($actual -ne "654749c16eb20b6d3182a96defb66e11d1a9649a") { throw "Unexpected upstream commit" }
+          python prepare_v022.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "v0.22 patch replay failed" }
+      - name: Verify geometry, pointers, off-grid boundaries and Shift release
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-tools leo_snapping_engine -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Node geometry/pointer regressions failed" }
+          cargo test --locked -p vectorcraft-tools leo_object_move -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Object/off-grid/Shift regressions failed" }

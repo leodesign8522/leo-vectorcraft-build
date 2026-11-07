@@ -7,7 +7,10 @@ on:
     paths:
       - ".github/workflows/build-v022-core.yml"
       - ".github/workflows/build-v022-edition.yml"
-      - "v022/**"
+      - "v022/leo_snapping_engine.rs"
+      - "v022/patch_*.py"
+      - "v022/overlay/**"
+      - "v022/session_regressions.rs"
       - "v021/**"
       - "prepare_v022.py"
       - "scripts/**"
