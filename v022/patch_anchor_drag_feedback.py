@@ -18,10 +18,10 @@ def edit(rel, old, new, expected=1):
 
 edit("guides/targets.rs",
      "pub struct Targets {",
-     "pub struct Targets {\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_extension: std::cell::Cell<Option<usize>>,\n    pub(super) leo_scene: Option<LeoScene>,")
+     "pub struct Targets {\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_extension: std::cell::Cell<Option<LeoExtension>>,\n    pub(super) leo_extension_index: Option<LeoExtensionIndex>,\n    pub(super) leo_scene: Option<LeoScene>,")
 edit("guides/targets.rs",
      "use super::snap::",
-     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
+     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
 (root / "guides/leo_snapping_engine.rs").write_text(
     Path(__file__).with_name("leo_snapping_engine.rs").read_text(encoding="utf-8"),
     encoding="utf-8", newline="\n"
@@ -180,7 +180,7 @@ edit("direct/tests.rs",
 # Finite geometry and original-edge extension constraints have distinct labels.
 edit("direct/tests.rs",
      '    assert_eq!((v, labels), (json!({"dx": 0.0, "dy": 30.0}), vec!["align".to_string()]));',
-     '    assert_eq!((v, labels), (json!({"dx": 0.0, "dy": 30.0}), vec!["extension".to_string()]), "original edge direction is an extension constraint");')
+     '    assert_eq!((v, labels), (json!({"dx": 0.0, "dy": 30.0}), vec!["延长线吸附".to_string()]), "original edge direction is an extension constraint");')
 edit("direct/tests.rs",
      '    assert_eq!(drag(&mut t, &c, (300.0, 300.0), (203.0, 199.0), none).0, json!({"dx": -97.0, "dy": -101.0}));',
      '    assert_eq!(drag(&mut t, &c, (300.0, 300.0), (203.0, 199.0), none).0, json!({"dx": -100.0, "dy": -100.0}), "Snap to Point uses the shared 8px capture");')
@@ -366,4 +366,15 @@ fn leo_object_move_direct_selection_path_body_snaps_to_artboard_edge() {
 }
 """)
 
-print("PASS Leo Design Snapping Engine v1.2: node and whole-object geometry, artboards, multi-selection, groups, Alt-copy and 8px/12.8px hysteresis")
+
+
+
+# Give the extension cue a dark backing so yellow remains legible on a white page.
+ui_path=Path(sys.argv[1]) / "crates/ui-egui/src/canvas/overlays.rs"
+ui_source=ui_path.read_text(encoding="utf-8")
+ui_anchor='                let sp = xf.to_screen(*pt) + vec2(8.0, -14.0);'
+if ui_source.count(ui_anchor)!=1: raise SystemExit("FAIL extension label background anchor")
+ui_source=ui_source.replace(ui_anchor,ui_anchor+'\n                if text == "延长线吸附" {\n                    let galley=p.layout_no_wrap(text.to_owned(),egui::FontId::proportional(11.0),c32(*color));\n                    let backdrop=egui::Rect::from_min_size(sp-vec2(3.0,2.0),galley.size()+vec2(6.0,4.0));\n                    p.rect_filled(backdrop,CornerRadius::same(3),Color32::from_rgba_unmultiplied(0x20,0x24,0x2b,235));\n                }\n')
+ui_path.write_text(ui_source,encoding="utf-8",newline="\n")
+
+print("PASS Leo Snapping Engine 1.5: finite geometry, indexed extensions and yellow feedback")

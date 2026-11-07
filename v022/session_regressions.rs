@@ -15,6 +15,27 @@ mod leo_v022_session_tests {
     }
 
     #[test]
+    fn leo_v022_other_objects_extensions_commit_undo_and_keep_target_unchanged() {
+        let mut s=Session::new();s.execute("file.new",&json!({"width":1200,"height":1200})).unwrap();
+        let source=NodeId(s.execute("shape.line",&json!({"x1":600,"y1":600,"x2":500,"y2":400})).unwrap()["id"].as_u64().unwrap());
+        let target=NodeId(s.execute("shape.line",&json!({"x1":300,"y1":100,"x2":300,"y2":200})).unwrap()["id"].as_u64().unwrap());
+        let view=ViewInfo {snap_to_grid:true,..ViewInfo::default()};s.select_tool("directSelection",view).unwrap();
+        for y in [50.0,350.0] {
+            s.execute("select.anchors",&json!({"id":source.0,"anchors":[[0,1]],"mode":"set"})).unwrap();
+            for (kind,x,y) in [(PointerKind::Down,500.0,400.0),(PointerKind::Drag,304.0,y),(PointerKind::Up,304.0,y)] {
+                s.pointer(&PointerEvent::new(kind,x,y),view).unwrap();
+            }
+            assert_eq!(endpoint(&s,source,1),Point::new(300.0,y));
+            assert_eq!(endpoint(&s,source,0),Point::new(600.0,600.0));
+            assert_eq!(endpoint(&s,target,0),Point::new(300.0,100.0));
+            assert_eq!(endpoint(&s,target,1),Point::new(300.0,200.0));
+            s.execute("edit.undo",&json!({})).unwrap();assert_eq!(endpoint(&s,source,1),Point::new(500.0,400.0));
+            s.execute("edit.redo",&json!({})).unwrap();assert_eq!(endpoint(&s,source,1),Point::new(300.0,y));
+            s.execute("edit.undo",&json!({})).unwrap();
+        }
+    }
+
+    #[test]
     fn leo_v022_bidirectional_original_edge_extension_commits_and_undoes() {
         let mut s=Session::new();
         s.execute("file.new",&json!({"width":1000,"height":1000})).unwrap();

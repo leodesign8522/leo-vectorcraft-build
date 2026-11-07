@@ -3,6 +3,89 @@ mod leo_v022_geometry_tests {
     use super::*;
 
     #[test]
+    fn leo_snapping_engine_extension_index_finds_both_rays_at_bucket_boundaries() {
+        let scene=LeoScene {paths:vec![],rectangles:vec![],centers:false};
+        for i in 0..256 {
+            let angle=i as f64*std::f64::consts::PI/128.0;
+            let dir=Vec2::new(angle.cos(),angle.sin());
+            let normal=Vec2::new(-dir.y,dir.x);
+            let at=Point::new(12500.0+i as f64*7.0,7500.0);
+            let line=LeoExtension::new(at,at+dir*50.0).unwrap();
+            let mut index=LeoExtensionIndex::new(&scene,Point::new(400.0,500.0));
+            index.insert(line);
+            for along in [-500.0,1000.0] {
+                let expected=at+dir*along;
+                let p=expected+normal*7.9;
+                let (_,q)=index.nearest(p,8.0).unwrap();
+                assert!(q.distance(expected)<1e-7,"angle={angle}: {q:?}");
+                assert!(index.nearest(expected+normal*8.1,8.0).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn leo_snapping_engine_other_object_extension_after_twenty_thousand_unique_lines() {
+        use vectorcraft_doc::{Document,Node,Appearance};
+        use vectorcraft_geom::{PathData,shapes};
+        let mut d=Document::new(1200.0,1200.0);
+        let mut filler=PathData::new(vec![]);
+        for i in 0..5001 {
+            let (x,y)=(10000.0+i as f64*20.0,10000.0+i as f64*15.0);
+            filler.subpaths.extend(shapes::rectangle(Rect::new(x,y,x+10.0,y+10.0)).subpaths);
+        }
+        let background=d.alloc_id();
+        d.insert(Some(d.layers[0].id),0,Node::path(background,filler,Appearance::default_art())).unwrap();
+        let source=d.alloc_id();
+        d.insert(Some(d.layers[0].id),1,Node::path(source,shapes::line(Point::new(600.0,600.0),Point::new(500.0,400.0)),Appearance::default_art())).unwrap();
+        let target=d.alloc_id();
+        d.insert(Some(d.layers[0].id),2,Node::path(target,shapes::line(Point::new(300.0,100.0),Point::new(300.0,200.0)),Appearance::default_art())).unwrap();
+        let mut selection=Selection::default();selection.set([source]);
+        selection.anchors.insert(source,[(0,1)].into());
+        let paint=crate::testutil::paint();let cx=crate::testutil::cx(&d,&selection,&paint);
+        let started=std::time::Instant::now();
+        let targets=Targets::leo_for_anchor_drag(&cx);
+        let build_time=started.elapsed();
+        assert!(targets.leo_extension_index.as_ref().unwrap().buckets.iter().map(|b| b.entries.len()).sum::<usize>()>20000);
+        for y in [50.0,350.0] {
+            targets.clear_leo_snap();
+            let (q,guides)=targets.leo_snap_extension(Point::new(304.0,y),8.0,12.8,None).unwrap();
+            assert_eq!(q,Point::new(300.0,y));
+            assert!(guides.iter().any(|g| matches!(g,Overlay::Label {text,color,..} if text=="延长线吸附" && *color==[255,214,0])));
+        }
+        let started=std::time::Instant::now();
+        for i in 0..1000 {
+            targets.clear_leo_snap();
+            assert!(targets.leo_snap_extension(Point::new(304.0,350.0+(i%50) as f64),8.0,12.8,None).is_some());
+        }
+        println!("extension index: 20005 lines, build={build_time:?}, 1000 queries={:?}",started.elapsed());
+    }
+
+    #[test]
+    fn leo_snapping_engine_distant_extension_has_bounded_yellow_feedback() {
+        let mut targets=Targets::default();targets.style.lines=true;targets.style.labels=true;
+        targets.extensions.push((Point::new(1_000_000.0,350.0),Vec2::new(1.0,0.0)));
+        let (q,guides)=targets.leo_snap_extension(Point::new(300.0,354.0),8.0,12.8,None).unwrap();
+        assert_eq!(q,Point::new(300.0,350.0));
+        for guide in guides {
+            if let Overlay::Line {a,b,color,dashed}=guide {
+                assert!(a.distance(b)<=512.0+1e-7);assert_eq!(b,q);assert!(dashed);assert_eq!(color,[255,214,0]);
+            }
+        }
+    }
+
+    #[test]
+    fn leo_snapping_engine_indexed_extension_lock_keeps_identity_and_release() {
+        let scene=LeoScene {paths:vec![],rectangles:vec![],centers:false};
+        let mut index=LeoExtensionIndex::new(&scene,Point::new(500.0,400.0));
+        for x in [300.0,320.0] {index.insert(LeoExtension::new(Point::new(x,100.0),Point::new(x,200.0)).unwrap());}
+        for bucket in &mut index.buckets {bucket.entries.sort_by(|a,b| a.0.total_cmp(&b.0));}
+        let mut t=Targets::default();t.leo_extension_index=Some(index);
+        for (x,want) in [(304.0,300.0),(310.0,300.0),(314.0,320.0)] {
+            assert_eq!(t.leo_snap_extension(Point::new(x,350.0),8.0,12.8,None).unwrap().0,Point::new(want,350.0));
+        }
+    }
+
+    #[test]
     fn leo_snapping_engine_bidirectional_extension_capture_release_and_shift() {
         for zoom in [0.25,1.0,4.0] {
             let mut t=Targets::default();
@@ -33,7 +116,9 @@ mod leo_v022_geometry_tests {
         let (q,guides)=t.leo_snap_extension(Point::new(450.0,304.0),8.0,12.8,None).unwrap();
         assert_eq!(q,Point::new(450.0,300.0));
         assert!(guides.iter().any(|o| matches!(o,Overlay::Line {dashed:true,..})));
-        assert!(guides.iter().any(|o| matches!(o,Overlay::Label {text,..} if text=="extension")));
+        assert!(guides.iter().any(|o| matches!(o,Overlay::Label {text,..} if text=="延长线吸附")));
+        assert!(guides.iter().any(|o| matches!(o,Overlay::Line {color,..} if *color==[255,214,0])));
+        assert!(guides.iter().any(|o| matches!(o,Overlay::Path {width,..} if *width>=3.0)));
         assert!(!guides.iter().any(|o| matches!(o,Overlay::Label {text,..} if text=="path")));
         assert!(t.leo_snap_extension(Point::new(450.0,320.0),8.0,12.8,None).is_none());
         t.style.lines=false; t.style.labels=false;

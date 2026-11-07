@@ -1,4 +1,4 @@
-//! Leo Design Snapping Engine v1.2: shared geometry for node dragging and object translation.
+//! Leo Design Snapping Engine v1.5: finite geometry and indexed straight-edge extensions.
 //! Node drags use exact anchors and finite path geometry; object moves add selected bounds,
 //! multi-object/group source anchors, alignment axes and artboard edges. Capture is in SCREEN px.
 use super::*;
@@ -8,7 +8,103 @@ pub(super) const ACQUIRE_PX: f64 = 8.0;
 pub(super) const RELEASE_MULTIPLIER: f64 = 1.6;
 const ANCHOR_HIT: [u8; 3] = [0x35, 0xc2, 0xfa];
 const PATH_HIT: [u8; 3] = [0xff, 0xb3, 0x3d];
-const EXTENSION_HIT: [u8; 3] = [0x42, 0xd9, 0xe8];
+const EXTENSION_HIT: [u8; 3] = [0xff, 0xd6, 0x00];
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(in crate::guides) struct LeoExtension {
+    at: Point,
+    dir: Vec2,
+}
+
+impl LeoExtension {
+    fn new(at: Point, end: Point) -> Option<Self> {
+        let d=end-at;
+        let length=d.hypot();
+        if !at.is_finite() || !end.is_finite() || !length.is_finite() || length<=1e-9 { return None; }
+        let mut normal=Vec2::new(-d.y/length,d.x/length);
+        if normal.y<0.0 || (normal.y==0.0 && normal.x<0.0) {normal=-normal;}
+        Some(Self {at,dir:Vec2::new(normal.y,-normal.x)})
+    }
+
+    fn project(self, p: Point, reach: f64) -> Option<Point> {
+        let q=self.at+self.dir*(p-self.at).dot(self.dir);
+        (q.is_finite() && q.distance(p)<=reach).then_some(q)
+    }
+}
+
+struct ExtensionBucket {
+    normal: Vec2,
+    entries: Vec<(f64,LeoExtension)>,
+}
+
+/// Sort straight lines by normal direction and signed offset. Queries use a
+/// conservative angular band, followed by exact projection: distant segment
+/// bounds must not hide a valid infinite extension, and no 20k cutoff is used.
+pub(in crate::guides) struct LeoExtensionIndex {
+    origin: Point,
+    buckets: Vec<ExtensionBucket>,
+    angular_error: f64,
+}
+
+impl LeoExtensionIndex {
+    const COUNT: usize=64;
+
+    fn new(scene: &LeoScene, origin: Point) -> Self {
+        let width=std::f64::consts::PI/Self::COUNT as f64;
+        let mut out=Self {origin,angular_error:2.0*(width/4.0).sin(),
+            buckets:(0..Self::COUNT).map(|i| {
+                let angle=(i as f64+0.5)*width;
+                ExtensionBucket {normal:Vec2::new(angle.cos(),angle.sin()),entries:vec![]}
+            }).collect()};
+        for entry in &scene.paths {
+            let Some(path)=entry.node.path_data() else {continue};
+            for (si,sp) in path.subpaths.iter().enumerate() {
+                let n=sp.anchors.len();
+                if n<2 {continue;}
+                for seg in 0..sp.segment_count() {
+                    if entry.moving.contains(&(si,seg)) || entry.moving.contains(&(si,(seg+1)%n)) || !sp.segment_is_line(seg) {continue;}
+                    let c=sp.segment(seg);
+                    if let Some(line)=LeoExtension::new(c.p0,c.p3) {out.insert(line);}
+                }
+            }
+        }
+        for bucket in &mut out.buckets {
+            bucket.entries.sort_by(|a,b| a.0.total_cmp(&b.0).then(a.1.dir.x.total_cmp(&b.1.dir.x)).then(a.1.dir.y.total_cmp(&b.1.dir.y)));
+            // Exact duplicate supporting lines add no target; keep near-parallel
+            // but distinct lines, even in very dense documents.
+            bucket.entries.dedup_by(|a,b| a.0==b.0 && a.1.dir==b.1.dir);
+        }
+        out
+    }
+
+    fn insert(&mut self, line: LeoExtension) {
+        let normal=Vec2::new(-line.dir.y,line.dir.x);
+        let offset=(line.at-self.origin).dot(normal);
+        let angle=normal.y.atan2(normal.x);
+        if !offset.is_finite() || !angle.is_finite() || angle<0.0 {return;}
+        let i=((angle/std::f64::consts::PI*Self::COUNT as f64) as usize).min(Self::COUNT-1);
+        if let Some(bucket)=self.buckets.get_mut(i) {bucket.entries.push((offset,line));}
+    }
+
+    fn nearest(&self, p: Point, reach: f64) -> Option<(LeoExtension,Point)> {
+        let d=p-self.origin;
+        let radius=d.hypot();
+        if !p.is_finite() || !radius.is_finite() || !reach.is_finite() || reach<=0.0 {return None;}
+        let margin=reach+radius*self.angular_error+1e-9*(1.0+radius);
+        let mut best: Option<(LeoExtension,Point)>=None;
+        for bucket in &self.buckets {
+            let center=d.dot(bucket.normal);
+            let lo=bucket.entries.partition_point(|(offset,_)| *offset<center-margin);
+            let hi=bucket.entries.partition_point(|(offset,_)| *offset<=center+margin);
+            for (_,line) in bucket.entries.get(lo..hi).unwrap_or_default() {
+                if let Some(q)=line.project(p,reach) {
+                    if best.is_none_or(|(_,old)| q.distance(p)<old.distance(p)) {best=Some((*line,q));}
+                }
+            }
+        }
+        best
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::guides) enum SnapLock {
@@ -192,8 +288,8 @@ impl Targets {
         self.leo_extension.set(None);
     }
 
-    /// Only the two original straight neighbours of one edited anchor can
-    /// constrain its direction. Freeze them at drag start, not at each preview.
+    /// Freeze the edited anchor's straight neighbours and an indexed snapshot
+    /// of other stationary straight edges at drag start, not at each preview.
     fn leo_collect_extensions(&mut self, cx: &ToolContext) {
         let selection = cx.selection;
         if !selection.segments.is_empty() || selection.anchors.len() != 1 { return; }
@@ -203,6 +299,9 @@ impl Targets {
         let Some(sp) = cx.doc.node(id).and_then(|n| n.path_data()).and_then(|p| p.subpaths.get(si)) else { return };
         let n = sp.anchors.len();
         if n < 2 || ai >= n { return; }
+        if let Some(origin)=sp.anchors.get(ai).map(|a| a.p).filter(|p| p.is_finite()) {
+            self.leo_extension_index=self.leo_scene.as_ref().map(|scene| LeoExtensionIndex::new(scene,origin));
+        }
         let previous = if ai > 0 { Some(ai - 1) } else if sp.closed { Some(n - 1) } else { None };
         for seg in [previous, (ai < sp.segment_count()).then_some(ai)].into_iter().flatten() {
             if seg >= sp.segment_count() || !sp.segment_is_line(seg) { continue; }
@@ -223,22 +322,36 @@ impl Targets {
             self.leo_extension.set(None);
             return None;
         }
-        let project = |index: usize, reach: f64| {
-            let &(at,dir) = self.extensions.get(index)?;
-            let q = at + dir * (p-at).dot(dir);
-            (q.is_finite() && q.distance(p) <= reach).then_some((index,at,q))
-        };
-        let hit = self.leo_extension.get().and_then(|i| project(i,release))
-            .or_else(|| (0..self.extensions.len()).filter_map(|i| project(i,acquire))
-                .min_by(|a,b| a.2.distance(p).total_cmp(&b.2.distance(p))));
-        self.leo_extension.set(hit.map(|(i,_,_)| i));
-        let (_,at,q) = hit?;
+        let hit = self.leo_extension.get().and_then(|line| line.project(p,release).map(|q| (line,q)))
+            .or_else(|| {
+                let local=self.extensions.iter().filter_map(|&(at,dir)| {
+                    let line=LeoExtension {at,dir};
+                    line.project(p,acquire).map(|q| (line,q))
+                }).min_by(|a,b| a.1.distance(p).total_cmp(&b.1.distance(p)));
+                let external=self.leo_extension_index.as_ref().and_then(|index| index.nearest(p,acquire));
+                match (local,external) {
+                    (Some(a),Some(b))=>Some(if b.1.distance(p)<a.1.distance(p) {b} else {a}),
+                    (a,b)=>a.or(b),
+                }
+            });
+        self.leo_extension.set(hit.map(|(line,_)| line));
+        let (line,q) = hit?;
+        // Infinite supporting lines can start far outside the viewport. Bound
+        // painted dash count, without bounding the mathematical snap target.
+        let span=(acquire*64.0).min(1e9);
+        let at=if line.at.distance(q)>span {
+            let sign=if (q-line.at).dot(line.dir)<0.0 {-1.0} else {1.0};
+            q-line.dir*(sign*span)
+        } else {line.at};
         let mut guides = vec![];
         if self.style.lines {
+            let mut outline=BezPath::new(); outline.move_to(at); outline.line_to(q);
+            guides.push(Overlay::Path {path:outline,color:[0x20,0x24,0x2b],width:3.5,dashed:true});
             guides.push(Overlay::Line { a:at,b:q,color:EXTENSION_HIT,dashed:true });
-            guides.push(Overlay::CurvePoint { p:q,color:EXTENSION_HIT,filled:false,size:8.0 });
+            guides.push(Overlay::CurvePoint { p:q,color:[0x20,0x24,0x2b],filled:true,size:12.0 });
+            guides.push(Overlay::CurvePoint { p:q,color:EXTENSION_HIT,filled:false,size:10.0 });
         }
-        if self.style.labels { guides.push(Overlay::Label { p:q,text:"extension".into(),color:EXTENSION_HIT }); }
+        if self.style.labels { guides.push(Overlay::Label { p:q,text:"延长线吸附".into(),color:EXTENSION_HIT }); }
         Some((q,guides))
     }
 

@@ -11,6 +11,62 @@ fn leo_dense_background(d: &mut vectorcraft_doc::Document) {
 }
 
 #[test]
+fn leo_snapping_engine_all_polygon_corners_and_edges_have_two_yellow_rays() {
+    use vectorcraft_geom::{PathData,SubPath};
+    let mut d=vectorcraft_doc::Document::new(1200.0,1200.0);
+    let points=[Point::new(300.0,300.0),Point::new(650.0,380.0),Point::new(580.0,650.0),Point::new(200.0,520.0)];
+    let id=d.alloc_id();
+    d.insert(Some(d.layers[0].id),0,vectorcraft_doc::Node::path(id,PathData::single(SubPath::polyline(&points,true)),vectorcraft_doc::Appearance::default_art())).unwrap();
+    let p=paint();
+    for ai in 0..4 {
+        for neighbor in [(ai+3)%4,(ai+1)%4] {
+            let u=(points[ai]-points[neighbor])/(points[ai]-points[neighbor]).hypot();
+            for amount in [100.0,-80.0] {
+                let selected=anchors_of(id,&[(0,ai)]); let c=cx(&d,&selected,&p);
+                let expected=points[ai]+u*amount;
+                let pointer=expected+vectorcraft_geom::Vec2::new(-u.y,u.x)*3.0;
+                let mut tool=DirectSelectionTool::new(false);
+                let (v,labels)=drag(&mut tool,&c,(points[ai].x,points[ai].y),(pointer.x,pointer.y),Mods::default());
+                let actual=points[ai]+vectorcraft_geom::Vec2::new(v["dx"].as_f64().unwrap(),v["dy"].as_f64().unwrap());
+                assert!(actual.distance(expected)<1e-7,"corner={ai},neighbor={neighbor},amount={amount}: {v}");
+                assert_eq!(labels,vec!["延长线吸附".to_string()]);
+            }
+        }
+    }
+}
+
+#[test]
+fn leo_snapping_engine_other_objects_extend_both_ways_but_hidden_and_curves_do_not() {
+    use vectorcraft_geom::{PathData,BezPath,shapes};
+    for (hidden,curved) in [(false,false),(true,false),(false,true)] {
+        let mut d=vectorcraft_doc::Document::new(1200.0,1200.0);
+        let source=d.alloc_id();
+        d.insert(Some(d.layers[0].id),0,vectorcraft_doc::Node::path(source,shapes::line(Point::new(600.0,600.0),Point::new(500.0,400.0)),vectorcraft_doc::Appearance::default_art())).unwrap();
+        let target=d.alloc_id();
+        let path=if curved {
+            let mut b=BezPath::new();b.move_to((300.0,100.0));b.curve_to((400.0,120.0),(200.0,180.0),(300.0,200.0));PathData::from_bezpath(&b)
+        } else {shapes::line(Point::new(300.0,100.0),Point::new(300.0,200.0))};
+        let mut node=vectorcraft_doc::Node::path(target,path,vectorcraft_doc::Appearance::default_art());node.visible=!hidden;
+        d.insert(Some(d.layers[0].id),1,node).unwrap();
+        let selected=anchors_of(source,&[(0,1)]);let p=paint();let c=cx(&d,&selected,&p);
+        for y in [50.0,350.0] {
+            let mut tool=DirectSelectionTool::new(false);
+            let (v,labels)=drag(&mut tool,&c,(500.0,400.0),(304.0,y),Mods::default());
+            if hidden || curved {
+                assert_eq!(v["dx"],json!(-196.0));assert!(labels.is_empty(),"{labels:?}");
+            } else {
+                assert_eq!(v["dx"],json!(-200.0));assert_eq!(labels,vec!["延长线吸附".to_string()]);
+            }
+        }
+        if !hidden && !curved {
+            let mut tool=DirectSelectionTool::new(false);
+            let (v,labels)=drag(&mut tool,&c,(500.0,400.0),(304.0,150.0),Mods::default());
+            assert_eq!(v["dx"],json!(-200.0));assert_eq!(labels,vec!["path".to_string()]);
+        }
+    }
+}
+
+#[test]
 fn leo_snapping_engine_closed_polygon_original_edge_extends_and_shortens_both_ways() {
     use vectorcraft_geom::{PathData,SubPath};
     let mut d=vectorcraft_doc::Document::new(1000.0,1000.0);
@@ -25,12 +81,12 @@ fn leo_snapping_engine_closed_polygon_original_edge_extends_and_shortens_both_wa
         let (v,labels)=drag(&mut tool,&c,(460.0,420.0),pointer,Mods::default());
         let hit=Point::new(460.0+v["dx"].as_f64().unwrap(),420.0+v["dy"].as_f64().unwrap());
         assert!(hit.distance(Point::new(expected.0,expected.1))<1e-8,"{v}");
-        assert_eq!(labels,vec!["extension".to_string()]);
+        assert_eq!(labels,vec!["延长线吸附".to_string()]);
     }
     let mut tool=DirectSelectionTool::new(false);
     let (v,labels)=drag(&mut tool,&c,(460.0,420.0),(541.5,478.0),Mods {shift:true,..Mods::default()});
     assert!((v["dx"].as_f64().unwrap()-v["dy"].as_f64().unwrap()).abs()<1e-8,"{v}");
-    assert!(!labels.iter().any(|s| s=="extension"));
+    assert!(!labels.iter().any(|s| s=="延长线吸附"));
     let c=ToolContext {smart_guides:false,snap_to_point:false,..c};
     let mut tool=DirectSelectionTool::new(false);
     let (v,labels)=drag(&mut tool,&c,(460.0,420.0),(541.5,478.0),Mods::default());
