@@ -1,4 +1,12 @@
-# 当前版本 Leo Design Core Bridge v0.13.2 / VectorCraft v0.21.1（对象移动吸附升级构建中）
+# 当前交付 Leo Design Core Bridge v0.14.0 / VectorCraft v0.22.0
+
+- Windows x64 主程序已通过本次全部配置的回归及正式编译；独立安装器已通过实际安装、版本与哈希一致性检查。
+- 修复网格/像素优先级绕过几何捕获、Shift 按下取消所选节点、Alt 复制入口不一致；保留无几何命中时的网格回退及真实垂直/切线选项。
+- 8px 捕获、12.8px 释放，真实节点/直线/Bezier/对象与画板边缘，多选和编组统一平移，Shift 方向锁定与 Alt 复制。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42358116808/artifacts/13568810730)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。默认独立安装，保留官方版本。
+- 帮助/关于及 --version 可识别 Core Bridge 0.14.0 / Snapping Engine 1.3。请从 Leo Design VectorCraft 0.22 快捷方式启动。
+
+## 历史版本 Leo Design Core Bridge v0.13.2 / VectorCraft v0.21.1
 
 - Leo Design Snapping Engine v1.2 与 Core Bridge 合并交付，不再拆分独立 Snapping 安装包。
 - 节点与对象移动共享真实几何吸附核心：节点/节点、节点/有限路径与贝塞尔曲线、对象几何点/路径、对象边界对齐及画板四边。
