@@ -13,6 +13,7 @@ const EXTENSION_HIT: [u8; 3] = [0xff, 0xd6, 0x00];
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::guides) struct LeoExtension {
     at: Point,
+    end: Point,
     dir: Vec2,
 }
 
@@ -23,12 +24,32 @@ impl LeoExtension {
         if !at.is_finite() || !end.is_finite() || !length.is_finite() || length<=1e-9 { return None; }
         let mut normal=Vec2::new(-d.y/length,d.x/length);
         if normal.y<0.0 || (normal.y==0.0 && normal.x<0.0) {normal=-normal;}
-        Some(Self {at,dir:Vec2::new(normal.y,-normal.x)})
+        let dir=Vec2::new(normal.y,-normal.x);
+        let (at,end)=if d.dot(dir)<0.0 {(end,at)} else {(at,end)};
+        Some(Self {at,end,dir})
     }
 
     fn project(self, p: Point, reach: f64) -> Option<Point> {
         let q=self.at+self.dir*(p-self.at).dot(self.dir);
         (q.is_finite() && q.distance(p)<=reach).then_some(q)
+    }
+
+    fn reference_in_view(self, view: Option<&crate::ScreenFrame>) -> bool {
+        let Some(view)=view else {return true};
+        if !view.size.0.is_finite() || !view.size.1.is_finite() || view.size.0<=0.0 || view.size.1<=0.0 {return true;}
+        let (Some((ax,ay)),Some((bx,by)))=(view.to_screen(self.at),view.to_screen(self.end)) else {return false};
+        // Clip the actual segment, not its bounding box: diagonal off-screen
+        // edges can have a box spanning the whole view without being visible.
+        let mut lo: f64=0.0;
+        let mut hi: f64=1.0;
+        for (start,delta,min,max) in [(ax,bx-ax,-8.0,view.size.0+8.0),(ay,by-ay,-8.0,view.size.1+8.0)] {
+            if !start.is_finite() || !delta.is_finite() {return false;}
+            if delta.abs()<1e-12 {if start<min || start>max {return false;}continue;}
+            let a=(min-start)/delta;let b=(max-start)/delta;
+            lo=lo.max(a.min(b));hi=hi.min(a.max(b));
+            if lo>hi {return false;}
+        }
+        true
     }
 }
 
@@ -69,10 +90,13 @@ impl LeoExtensionIndex {
             }
         }
         for bucket in &mut out.buckets {
-            bucket.entries.sort_by(|a,b| a.0.total_cmp(&b.0).then(a.1.dir.x.total_cmp(&b.1.dir.x)).then(a.1.dir.y.total_cmp(&b.1.dir.y)));
-            // Exact duplicate supporting lines add no target; keep near-parallel
-            // but distinct lines, even in very dense documents.
-            bucket.entries.dedup_by(|a,b| a.0==b.0 && a.1.dir==b.1.dir);
+            bucket.entries.sort_by(|a,b| a.0.total_cmp(&b.0)
+                .then(a.1.dir.x.total_cmp(&b.1.dir.x)).then(a.1.dir.y.total_cmp(&b.1.dir.y))
+                .then(a.1.at.x.total_cmp(&b.1.at.x)).then(a.1.at.y.total_cmp(&b.1.at.y))
+                .then(a.1.end.x.total_cmp(&b.1.end.x)).then(a.1.end.y.total_cmp(&b.1.end.y)));
+            // Keep distinct collinear segments: one can be on screen while
+            // another supporting the same infinite line is outside the view.
+            bucket.entries.dedup_by(|a,b| a.0==b.0 && a.1==b.1);
         }
         out
     }
@@ -86,7 +110,12 @@ impl LeoExtensionIndex {
         if let Some(bucket)=self.buckets.get_mut(i) {bucket.entries.push((offset,line));}
     }
 
+    #[cfg(test)]
     fn nearest(&self, p: Point, reach: f64) -> Option<(LeoExtension,Point)> {
+        self.nearest_in_view(p,reach,None)
+    }
+
+    fn nearest_in_view(&self, p: Point, reach: f64, view: Option<&crate::ScreenFrame>) -> Option<(LeoExtension,Point)> {
         let d=p-self.origin;
         let radius=d.hypot();
         if !p.is_finite() || !radius.is_finite() || !reach.is_finite() || reach<=0.0 {return None;}
@@ -97,6 +126,7 @@ impl LeoExtensionIndex {
             let lo=bucket.entries.partition_point(|(offset,_)| *offset<center-margin);
             let hi=bucket.entries.partition_point(|(offset,_)| *offset<=center+margin);
             for (_,line) in bucket.entries.get(lo..hi).unwrap_or_default() {
+                if !line.reference_in_view(view) {continue;}
                 if let Some(q)=line.project(p,reach) {
                     if best.is_none_or(|(_,old)| q.distance(p)<old.distance(p)) {best=Some((*line,q));}
                 }
@@ -318,6 +348,10 @@ impl Targets {
     /// Bidirectional collinearity is a distinct constraint, not a finite path hit.
     /// Shift keeps its existing constraint without a second extension capture.
     pub(in crate::guides) fn leo_snap_extension(&self, p: Point, acquire: f64, release: f64, direction: Option<Vec2>) -> Option<(Point,Vec<Overlay>)> {
+        self.leo_snap_extension_in_view(p,acquire,release,direction,None)
+    }
+
+    pub(in crate::guides) fn leo_snap_extension_in_view(&self, p: Point, acquire: f64, release: f64, direction: Option<Vec2>, view: Option<&crate::ScreenFrame>) -> Option<(Point,Vec<Overlay>)> {
         if direction.is_some() || !p.is_finite() || !acquire.is_finite() || !release.is_finite() || acquire <= 0.0 || release < acquire {
             self.leo_extension.set(None);
             return None;
@@ -325,10 +359,10 @@ impl Targets {
         let hit = self.leo_extension.get().and_then(|line| line.project(p,release).map(|q| (line,q)))
             .or_else(|| {
                 let local=self.extensions.iter().filter_map(|&(at,dir)| {
-                    let line=LeoExtension {at,dir};
+                    let line=LeoExtension {at,end:at,dir};
                     line.project(p,acquire).map(|q| (line,q))
                 }).min_by(|a,b| a.1.distance(p).total_cmp(&b.1.distance(p)));
-                let external=self.leo_extension_index.as_ref().and_then(|index| index.nearest(p,acquire));
+                let external=self.leo_extension_index.as_ref().and_then(|index| index.nearest_in_view(p,acquire,view));
                 match (local,external) {
                     (Some(a),Some(b))=>Some(if b.1.distance(p)<a.1.distance(p) {b} else {a}),
                     (a,b)=>a.or(b),

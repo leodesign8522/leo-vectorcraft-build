@@ -89,9 +89,26 @@ try:
  assert math.dist(after[3]['p'],want)<1e-7,('non-adjacent original edge',after[3])
  if '--capture' in sys.argv:call('ui.screenshot',{'path':str(exe.parent/'YELLOW_NONADJACENT.png'),'data':False})
  events([('up',pointer)]);command('edit.undo');assert node(polygon)==original
- output={'pass':True,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'corner_cases':checks,'other_object_both_rays':True,'hold_release':True,'target_unchanged':True,'non_adjacent_edge':True,'background_anchors':20004}
+ # A foreign supporting line near the cursor must not acquire while its real
+ # segment is outside the viewport. Zooming out reveals it during the same drag.
+ command('file.new',width=1400,height=1200)
+ source=command('shape.line',x1=600,y1=600,x2=500,y2=400)['id']
+ target=command('shape.line',x1=900,y1=-1800,x2=900,y2=-1700)['id']
+ before=node(source)
+ command('view.setZoom',zoom=100,center=[850,250])
+ command('select.anchors',id=source,anchors=[[0,1]],mode='set')
+ events([('down',[500,400]),('drag',[904,350])])
+ assert math.dist(endpoint(),[904,350])<1e-7,('offscreen reference stole capture',endpoint())
+ command('view.setZoom',zoom=10,center=[850,-500])
+ events([('drag',[904,350])]);assert math.dist(endpoint(),[900,350])<1e-7,('revealed reference did not capture',endpoint())
+ command('view.setZoom',zoom=100,center=[850,250])
+ events([('drag',[910,350])]);assert math.dist(endpoint(),[900,350])<1e-7,('held reference lost on pan',endpoint())
+ events([('drag',[913,350])]);assert math.dist(endpoint(),[913,350])<1e-7
+ events([('drag',[904,350])]);assert math.dist(endpoint(),[904,350])<1e-7,('offscreen reference reacquired',endpoint())
+ events([('up',[904,350])]);command('edit.undo');assert node(source)==before
+ output={'pass':True,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'corner_cases':checks,'other_object_both_rays':True,'hold_release':True,'target_unchanged':True,'non_adjacent_edge':True,'background_anchors':20004,'viewport_only':True,'view_updates_during_drag':True,'held_target_survives_pan':True}
  (exe.parent/'OTHER_EDGES_RUNTIME.json').write_text(json.dumps(output,indent=2),encoding='utf-8')
- print(json.dumps({'pass':True,'corner_cases':len(checks),'other_object_both_rays':True,'non_adjacent_edge':True,'hold_release':True,'undo_redo':True}))
+ print(json.dumps({'pass':True,'corner_cases':len(checks),'other_object_both_rays':True,'non_adjacent_edge':True,'hold_release':True,'undo_redo':True,'viewport_only':True,'view_updates_during_drag':True,'held_target_survives_pan':True}))
 
 finally:
  if connection is not None:

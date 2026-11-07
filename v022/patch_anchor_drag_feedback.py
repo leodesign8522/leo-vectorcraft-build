@@ -64,7 +64,12 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
                 return hit;
             }
             let direction = constrained.zip(from).map(|(q,f)| q-f.at);
-            if let Some(hit) = targets.leo_snap_extension(p,cx.tol(8.0),cx.tol(12.8),direction) {
+            let extension = if let Some(view)=cx.screen.as_ref() {
+                targets.leo_snap_extension_in_view(p,cx.tol(8.0),cx.tol(12.8),direction,Some(view))
+            } else {
+                targets.leo_snap_extension(p,cx.tol(8.0),cx.tol(12.8),direction)
+            };
+            if let Some(hit) = extension {
                 return hit;
             }
         }

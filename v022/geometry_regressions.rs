@@ -3,6 +3,42 @@ mod leo_v022_geometry_tests {
     use super::*;
 
     #[test]
+    fn leo_snapping_engine_extensions_use_actual_visible_reference_segments() {
+        let view=crate::ScreenFrame {origin:Point::ORIGIN,right:Vec2::new(1.0,0.0),down:Vec2::new(0.0,1.0),size:(100.0,100.0)};
+        assert!(LeoExtension::new(Point::new(-50.0,50.0),Point::new(150.0,50.0)).unwrap().reference_in_view(Some(&view)));
+        // Its bounding box overlaps, but this diagonal stays beyond the corner.
+        assert!(!LeoExtension::new(Point::new(-100.0,50.0),Point::new(50.0,-100.0)).unwrap().reference_in_view(Some(&view)));
+        let outside=LeoExtension::new(Point::new(50.0,1000.0),Point::new(50.0,1100.0)).unwrap();
+        assert!(!outside.reference_in_view(Some(&view)));
+        let scene=LeoScene {paths:vec![],rectangles:vec![],centers:false};
+        let mut index=LeoExtensionIndex::new(&scene,Point::ORIGIN);
+        index.insert(outside);
+        assert!(index.nearest_in_view(Point::new(54.0,20.0),8.0,Some(&view)).is_none());
+        // Same supporting line, distinct segment now visible. Keep both references.
+        index.insert(LeoExtension::new(Point::new(50.0,60.0),Point::new(50.0,80.0)).unwrap());
+        assert_eq!(index.nearest_in_view(Point::new(54.0,20.0),8.0,Some(&view)).unwrap().1,Point::new(50.0,20.0));
+        let rotated=crate::ScreenFrame {origin:Point::new(100.0,0.0),right:Vec2::new(0.0,1.0),down:Vec2::new(-1.0,0.0),size:(100.0,100.0)};
+        assert_eq!(index.nearest_in_view(Point::new(54.0,20.0),8.0,Some(&rotated)).unwrap().1,Point::new(50.0,20.0));
+    }
+
+    #[test]
+    fn leo_snapping_engine_extension_view_updates_and_held_target_survives_pan() {
+        let scene=LeoScene {paths:vec![],rectangles:vec![],centers:false};
+        let mut index=LeoExtensionIndex::new(&scene,Point::ORIGIN);
+        index.insert(LeoExtension::new(Point::new(50.0,60.0),Point::new(50.0,80.0)).unwrap());
+        let mut t=Targets::default();t.leo_extension_index=Some(index);
+        let visible=crate::ScreenFrame {origin:Point::ORIGIN,right:Vec2::new(1.0,0.0),down:Vec2::new(0.0,1.0),size:(100.0,100.0)};
+        let offscreen=crate::ScreenFrame {origin:Point::new(1000.0,1000.0),..visible};
+        let p=Point::new(54.0,20.0);
+        assert!(t.leo_snap_extension_in_view(p,8.0,12.8,None,Some(&offscreen)).is_none());
+        assert_eq!(t.leo_snap_extension_in_view(p,8.0,12.8,None,Some(&visible)).unwrap().0,Point::new(50.0,20.0));
+        assert_eq!(t.leo_snap_extension_in_view(Point::new(62.7,20.0),8.0,12.8,None,Some(&offscreen)).unwrap().0,Point::new(50.0,20.0));
+        assert!(t.leo_snap_extension_in_view(Point::new(62.9,20.0),8.0,12.8,None,Some(&offscreen)).is_none());
+        assert!(t.leo_snap_extension_in_view(p,8.0,12.8,None,Some(&offscreen)).is_none());
+        assert!(t.leo_snap_extension_in_view(p,8.0,12.8,None,Some(&visible)).is_some());
+    }
+
+    #[test]
     fn leo_snapping_engine_extension_index_finds_both_rays_at_bucket_boundaries() {
         let scene=LeoScene {paths:vec![],rectangles:vec![],centers:false};
         for i in 0..256 {
