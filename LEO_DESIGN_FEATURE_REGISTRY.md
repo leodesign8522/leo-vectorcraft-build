@@ -1,11 +1,13 @@
-# Core Bridge 0.14.3 / Snapping Engine 1.5 跨对象延长线与黄色命中（验证中）
+# Core Bridge 0.14.3 / Snapping Engine 1.5 跨对象延长线与黄色命中（已验证）
 
 - A 单节点支持邻边、当前路径其他直边及其他矢量对象直边的双向延长线；非相邻/跨对象参照只取当前视野内的直边。
 - 参照范围随平移缩放更新；已吸住的延长线保持到 12.8px 释放，避免平移画布时突然掉线。
 - 亮黄色虚线与描边圆标、深色底“延长线吸附”标签明确区分延长线命中。
 - 拖动开始时建立方向/偏移索引，精确投影确认命中；无 20,000 条截断。
 - 保留 8px 捕获、12.8px 释放、真实几何优先与原有 Shift 行为。曲线不作直线延长，隐藏对象不参与。
-- 本轮构建和实机验证尚待完成，已验证历史版本见下。
+- Windows x64 编译、专项/保留功能回归、安装版本与哈希检查，以及本机原生工具事件验证通过。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42385939388/artifacts/13581246846)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- 从 **Leo Design VectorCraft 0.22 Bridge 0.14.3** 快捷方式启动，开启智能参考线，用 A 拖动单节点，无需 Shift。
 
 # 历史交付 Core Bridge v0.14.2 / Snapping Engine 1.4 双向共线升级
 
@@ -14,7 +16,7 @@
 - 8px 捕获、12.8px 释放；实际节点/有限路径命中优先，Shift 方向锁定保持原有行为。
 - 命中显示青色虚线、圆标和 extension 标签，与真实路径命中区分；未命中无反馈。
 - 保留 0.14.1 的大文档目标收集修复。Windows 编译、配置的回归、安装哈希校验和本机双向共线/释放/撤销重做均通过。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42369030117/artifacts/13573882985)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42369030117/artifacts/13573882985)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_2.md)。
 - 开启智能参考线，用 A 拖动单节点，无需 Shift。从 **Leo Design VectorCraft 0.22 Bridge 0.14.2** 快捷方式启动。
 
 ## 历史交付 Leo Design Core Bridge v0.14.1 / VectorCraft v0.22.0
@@ -22,7 +24,7 @@
 - 修复超过 20,000 个锚点后，后新增目标路径漏收集而不吸附的问题；按拖动范围查询完整路径快照，锁定目标不依赖临时候选索引。
 - 大文档直线/Bezier、普通及 Shift 节点拖动、对象/整组移动、捕获释放及原生 Direct Selection 回归通过；Windows x64 编译与安装后哈希校验通过。
 - 原文档本地恢复副本中，按住/不按 Shift 在拖动中均命中；提交、撤销、重做通过，目标线和另一节点不变。文件和实际绘图坐标没有上传。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42362365957/artifacts/13570649176)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42362365957/artifacts/13570649176)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_1.md)。
 - 默认独立目录，使用 **Leo Design VectorCraft 0.22 Bridge 0.14.1** 快捷方式；关于显示 Core Bridge 0.14.1 / Snapping Engine 1.3.1。
 
 ## 历史交付 Leo Design Core Bridge v0.14.0 / VectorCraft v0.22.0
@@ -30,7 +32,7 @@
 - Windows x64 主程序已通过本次全部配置的回归及正式编译；独立安装器已通过实际安装、版本与哈希一致性检查。
 - 修复网格/像素优先级绕过几何捕获、Shift 按下取消所选节点、Alt 复制入口不一致；保留无几何命中时的网格回退及真实垂直/切线选项。
 - 8px 捕获、12.8px 释放，真实节点/直线/Bezier/对象与画板边缘，多选和编组统一平移，Shift 方向锁定与 Alt 复制。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42358116808/artifacts/13568810730)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。默认独立安装，保留官方版本。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42358116808/artifacts/13568810730)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_0.md)。默认独立安装，保留官方版本。
 - 帮助/关于及 --version 可识别 Core Bridge 0.14.0 / Snapping Engine 1.3。请从 Leo Design VectorCraft 0.22 快捷方式启动。
 
 ## 历史版本 Leo Design Core Bridge v0.13.2 / VectorCraft v0.21.1

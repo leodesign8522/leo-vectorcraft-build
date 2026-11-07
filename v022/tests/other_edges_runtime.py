@@ -96,6 +96,7 @@ try:
  target=command('shape.line',x1=900,y1=-1800,x2=900,y2=-1700)['id']
  before=node(source)
  command('view.setZoom',zoom=100,center=[850,250])
+ call('ui.tool.select',{'tool':'directSelection'})
  command('select.anchors',id=source,anchors=[[0,1]],mode='set')
  events([('down',[500,400]),('drag',[904,350])])
  assert math.dist(endpoint(),[904,350])<1e-7,('offscreen reference stole capture',endpoint())

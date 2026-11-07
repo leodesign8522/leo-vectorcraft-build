@@ -1,7 +1,15 @@
-# Core Bridge 0.14.2 / VectorCraft 0.22.0
+# Core Bridge 0.14.3 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
+
+## 0.14.3 visible-reference extensions and yellow feedback
+
+Single-anchor Direct Selection now includes stationary non-adjacent straight edges and other visible vector objects. A direction/offset index queries actual supporting lines without the 20k cutoff. Acquisition of these references requires their real segment to intersect the current screen frame (with an 8px boundary allowance); segment clipping handles rotated views and excludes diagonals whose bounding boxes alone overlap. The view is read on every query, so panning/zooming can reveal new references. An already-held line survives panning until its normal 12.8px release. Adjacent original-edge directions remain frozen at drag start.
+
+True finite geometry keeps priority. Curves and hidden objects are excluded from external straight-edge references. The distinct extension overlay is bright yellow, with a dark dashed underlay, outlined marker and dark-backed Chinese label. Painted dashes are bounded to about 512 screen pixels; mathematical extension remains bidirectional. Shift retains its existing constraint.
+
+Windows compilation, installer hash/version checks, viewport/index/native Direct Selection regressions and local actual-app control checks passed. The local cases cover all 16 corner/neighbor/direction combinations, foreign and non-adjacent edges, viewport changes during dragging, release, Commit/Undo/Redo and retained dense-document/Shift/Alt behavior. See [verification and exact hashes](VERIFIED_RELEASE.md). User documents remain local.
 
 ## 0.14.2 bidirectional original-edge constraints
 
