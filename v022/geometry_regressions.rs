@@ -3,6 +3,36 @@ mod leo_v022_geometry_tests {
     use super::*;
 
     #[test]
+    fn leo_snapping_engine_dense_tail_bezier_uses_actual_curve_at_multiple_zooms() {
+        use vectorcraft_doc::{Document, Node, Appearance};
+        use vectorcraft_geom::{shapes, PathData};
+        let mut d=Document::new(1000.0,1000.0);
+        let mut filler=shapes::rectangle(Rect::new(10000.0,10000.0,10010.0,10010.0));
+        filler.subpaths=vec![filler.subpaths[0].clone();5001];
+        let id=d.alloc_id();
+        d.insert(Some(d.layers[0].id),0,Node::path(id,filler,Appearance::default_art())).unwrap();
+        let id=d.alloc_id();
+        let curve=vectorcraft_geom::kurbo::CubicBez::new((400.0,300.0),(450.0,320.0),(350.0,360.0),(400.0,380.0));
+        let mut bez=BezPath::new();
+        bez.move_to(curve.p0); bez.curve_to(curve.p1,curve.p2,curve.p3);
+        d.insert(Some(d.layers[0].id),1,Node::path(id,PathData::from_bezpath(&bez),Appearance::default_art())).unwrap();
+        let selection=Selection::default();
+        let paint=crate::testutil::paint();
+        let cx=crate::testutil::cx(&d,&selection,&paint);
+        // t=1/4 is on the curved bulge, well away from its endpoint chord.
+        let expected=Point::new(414.0625,318.125);
+        for zoom in [0.25,1.0,4.0] {
+            let t=Targets::leo_for_anchor_drag(&cx);
+            let p=expected+Vec2::new(3.0/zoom,0.0);
+            let (q,_) = t.leo_snap_anchor(p,8.0/zoom,12.8/zoom).unwrap();
+            assert!(curve.nearest(q,1e-8).distance_sq<1e-12);
+            t.clear_leo_snap();
+            let (q,_) = t.leo_snap_anchor_along(p,Point::new(350.0,expected.y),8.0/zoom,12.8/zoom).unwrap();
+            assert!(q.distance(expected)<1e-7,"zoom={zoom}: {q:?}");
+        }
+    }
+
+    #[test]
     fn leo_snapping_engine_local_query_retains_segment_identity_when_candidates_change() {
         use vectorcraft_doc::{Document, Node, Appearance};
         use vectorcraft_geom::shapes;
