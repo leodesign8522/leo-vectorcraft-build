@@ -3,6 +3,21 @@ mod leo_v022_geometry_tests {
     use super::*;
 
     #[test]
+    fn leo_object_move_shift_alignment_keeps_twelve_point_eight_pixel_release() {
+        let mut t = Targets::default();
+        t.xs.push((300.0, Point::new(300.0, 600.0), Kind::Edge));
+        let (x, y) = (Cell::new(None), Cell::new(None));
+        let sources = [Point::new(100.0, 100.0)];
+        let snap = |dx| snap_move_alignment(&t, &sources, Some(Rect::new(100.0, 100.0, 200.0, 200.0)),
+            Vec2::new(dx, 0.0), 8.0, 12.8, &x, &y, Some(Vec2::new(1.0, 0.0)), None);
+        assert_eq!(snap(199.0).0.x, 200.0);
+        assert_eq!(snap(210.0).0.x, 200.0);
+        let (d, guides) = snap(213.0);
+        assert_eq!(d.x, 213.0);
+        assert!(guides.is_empty());
+    }
+
+    #[test]
     fn leo_snapping_engine_shift_path_is_exact_and_has_hysteresis() {
         let mut t = Targets::default();
         let line = Line::new((100.0, 0.0), (120.0, 100.0));
