@@ -11,6 +11,7 @@ on:
       - "v022/patch_*.py"
       - "v022/overlay/**"
       - "v022/session_regressions.rs"
+      - "v022/selected_segments_clipboard_tests.rs"
       - "v021/**"
       - "prepare_v022.py"
       - "scripts/**"

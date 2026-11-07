@@ -25,7 +25,7 @@ for source, target in [('geometry_regressions.rs', 'guides/leo_snapping_engine.r
 # v0.22 implements partial clipboard geometry natively; retain it and test it.
 p = Path(sys.argv[1]) / 'crates/engine/src/tests/clipboard.rs'
 with p.open('a', encoding='utf-8') as f:
-    f.write((root / 'v021/selected_segments_clipboard_tests.rs').read_text(encoding='utf-8'))
+    f.write((dest / 'selected_segments_clipboard_tests.rs').read_text(encoding='utf-8'))
     f.write((dest / 'session_regressions.rs').read_text(encoding='utf-8'))
 
 p = Path(sys.argv[1]) / 'apps/vectorcraft/src/main.rs'
