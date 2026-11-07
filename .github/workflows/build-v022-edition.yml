@@ -233,12 +233,12 @@ jobs:
           @'
           ${{ inputs.label }} / VectorCraft v0.22.0
 
-          Leo Design Core Bridge v0.14.0 / 官方 VectorCraft v0.22.0
+          Leo Design Core Bridge v0.14.1 / 官方 VectorCraft v0.22.0
           一个安装包：Core Bridge 通用增强与 Leo Design 节点/对象统一吸附引擎。
           保留：组内选择、选中线段复制/剪切、文字与 AI/PDF/SVG 字体兼容、
           文字吸管、图像/ICO 导出、面板尺寸、工作区导入导出、
           单位/颜色快捷面板、动作快捷键、已选物体/编组数量。
-          吸附：节点与对象移动统一使用 Leo Design Snapping Engine v1.3。8px 捕获、12.8px 释放；真实节点、路径/贝塞尔曲线、画板边缘、对象边界对齐。支持普通对象、多选、编组、Direct Selection 整条路径移动和 Alt 复制。
+          吸附：节点与对象移动统一使用 Leo Design Snapping Engine v1.3.1。8px 捕获、12.8px 释放；真实节点、路径/贝塞尔曲线、画板边缘、对象边界对齐。支持普通对象、多选、编组、Direct Selection 整条路径移动和 Alt 复制。
           文档信息：新增已选路径长度和带透明度的物体数量。
           吸附反馈：青蓝节点命中、金黄路径/画板边缘命中；几何目标优先于水平/垂直对齐，只有真实捕获才显示命中标记。
           在「视图 → 智能参考线」或「吸附到点」下使用。对象移动的 Shift 方向约束也由新引擎处理；网格和像素仍作为独立约束。
@@ -252,7 +252,7 @@ jobs:
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Artifact upload requires the release build and every configured regression to pass.
-          Core Bridge v0.14.0 includes Leo Snapping Engine v1.3: unified node and object movement geometry, finite path/Bezier and artboard edges, bounds alignment, group/multi-object movement, Alt-copy, 8px capture and 12.8px release.
+          Core Bridge v0.14.1 includes Leo Snapping Engine v1.3.1: unified node and object movement geometry, finite path/Bezier and artboard edges, bounds alignment, group/multi-object movement, Alt-copy, 8px capture and 12.8px release.
           Native Actions, custom chords, editable AI import, font matching, selected-segment copy,
           native guide clipboard, live corners, image/ICO export, workspace JSON, selection statistics,
           and Leo node/segment/Bezier, artboard, object edge, group, multi-selection, Alt-copy, Shift, zoom and hysteresis tests are checked.
@@ -269,7 +269,7 @@ jobs:
           $versionFile = Join-Path (Resolve-Path dist).Path "VERSION.txt"
           $versionProcess = Start-Process -FilePath (Resolve-Path dist/vectorcraft.exe).Path -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
           $version = [string](Get-Content $versionFile -Raw)
-          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.14.0; Snapping Engine 1.3") { throw "EXE build identity smoke test failed" }
+          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.14.1; Snapping Engine 1.3.1") { throw "EXE build identity smoke test failed" }
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
@@ -317,7 +317,7 @@ jobs:
           $versionFile = Join-Path $installDir "installed-version.txt"
           $versionProcess = Start-Process -FilePath $installed -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
           $version = [string](Get-Content $versionFile -Raw)
-          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.14.0") { throw "Installed EXE identity check failed" }
+          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.14.1") { throw "Installed EXE identity check failed" }
           Get-FileHash $installer -Algorithm SHA256 | Format-List | Out-String | Set-Content overlay-output/SHA256.txt
           Copy-Item overlay-source/BUILD_COMMIT.txt overlay-output/
           Copy-Item overlay-source/UPSTREAM_COMMIT.txt overlay-output/

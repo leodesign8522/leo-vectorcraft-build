@@ -12,10 +12,122 @@ const PATH_HIT: [u8; 3] = [0xff, 0xb3, 0x3d];
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::guides) enum SnapLock {
     Anchor(Point),
-    Segment(usize),
+    Segment(PathSeg),
+}
+
+/// Immutable path references from the drag-start scene. Query all intersecting
+/// geometry locally instead of silently truncating the document's first 20k anchors.
+pub(in crate::guides) struct LeoScene {
+    paths: Vec<LeoPath>,
+    rectangles: Vec<(Rect, Kind)>,
+    centers: bool,
+}
+
+struct LeoPath {
+    node: Arc<Node>,
+    bounds: Rect,
+    moving: HashSet<(usize, usize)>,
+}
+
+fn overlaps(a: Rect, b: Rect) -> bool {
+    a.x0 <= b.x1 && a.x1 >= b.x0 && a.y0 <= b.y1 && a.y1 >= b.y0
+}
+
+impl LeoScene {
+    fn new(cx: &ToolContext, selected: &Selection, object_bounds: bool) -> Self {
+        let mut scene = Self { paths: vec![], rectangles: cx.doc.artboards.iter().map(|a| (a.rect, Kind::Artboard)).collect(), centers: object_bounds };
+        let skip: HashSet<NodeId> = selected.objects.iter().copied().collect();
+        let mut pending: Vec<&Arc<Node>> = cx.doc.layers.iter().rev().collect();
+        while let Some(node) = pending.pop() {
+            if !node.visible || skip.contains(&node.id) { continue; }
+            if node.path_data().is_some() {
+                if let Some(bounds) = node.geometric_bounds().filter(|b| b.is_finite()) {
+                    scene.paths.push(LeoPath { node: Arc::clone(node), bounds, moving: HashSet::new() });
+                }
+            } else if object_bounds && !node.is_container() {
+                if let Some(bounds) = node.geometric_bounds().filter(|b| b.is_finite()) {
+                    scene.rectangles.push((bounds, Kind::Edge));
+                }
+            }
+            if let Some(children) = node.children() {
+                let shown = children.get(usize::from(node.extras().shaper.is_some())..).unwrap_or_default();
+                pending.extend(shown.iter().rev());
+            }
+        }
+        // Stationary anchors/segments of a partly edited path remain valid targets.
+        // Descendants of a selected whole group move with it and must be excluded.
+        for (id, moving) in &selected.anchors {
+            if cx.doc.ancestry(*id).is_some_and(|a| a.iter().rev().skip(1).any(|p| skip.contains(p))) { continue; }
+            let Some(node) = cx.doc.node(*id).filter(|n| n.visible && n.path_data().is_some()) else { continue };
+            if let Some(bounds) = node.geometric_bounds().filter(|b| b.is_finite()) {
+                scene.paths.push(LeoPath { node: Arc::new(node.clone()), bounds, moving: moving.iter().copied().collect() });
+            }
+        }
+        scene
+    }
+
+    fn alignment_targets(&self) -> Targets {
+        let mut out = Targets::default();
+        for (r, kind) in self.paths.iter().filter(|e| e.moving.is_empty()).map(|e| (e.bounds, Kind::Edge))
+            .chain(self.rectangles.iter().copied()) {
+            for p in [Point::new(r.x0,r.y0), Point::new(r.x1,r.y0), Point::new(r.x1,r.y1), Point::new(r.x0,r.y1)] {
+                out.xs.push((p.x,p,kind));
+                out.ys.push((p.y,p,kind));
+            }
+            let p = r.center();
+            out.xs.push((p.x,p,Kind::Center));
+            out.ys.push((p.y,p,Kind::Center));
+        }
+        out.index()
+    }
+
+    fn near(&self, query: Rect) -> Targets {
+        let mut out = Targets::default();
+        if !query.is_finite() { return out; }
+        for entry in self.paths.iter().filter(|e| overlaps(e.bounds, query)) {
+            let Some(path) = entry.node.path_data() else { continue };
+            if self.centers && entry.moving.is_empty() && query.contains(entry.bounds.center()) {
+                out.points.push((entry.bounds.center(), Kind::Center));
+            }
+            for (si, sp) in path.subpaths.iter().enumerate() {
+                for (ai, anchor) in sp.anchors.iter().enumerate() {
+                    if !entry.moving.contains(&(si, ai)) && query.contains(anchor.p) {
+                        out.points.push((anchor.p, Kind::Anchor));
+                    }
+                }
+                let n = sp.anchors.len();
+                for i in 0..sp.segment_count() {
+                    if n == 0 || entry.moving.contains(&(si, i)) || entry.moving.contains(&(si, (i + 1) % n)) { continue; }
+                    let c = sp.segment(i);
+                    let bounds = Rect::from_points(c.p0, c.p1).union_pt(c.p2).union_pt(c.p3);
+                    if overlaps(bounds, query) {
+                        let segment = if sp.segment_is_line(i) { PathSeg::Line(Line::new(c.p0, c.p3)) } else { PathSeg::Cubic(c) };
+                        out.segments.push((bounds, segment));
+                    }
+                }
+            }
+        }
+        for (r, _) in self.rectangles.iter().filter(|(r, _)| overlaps(*r, query)) {
+            if self.centers && query.contains(r.center()) { out.points.push((r.center(),Kind::Center)); }
+            let corners = [Point::new(r.x0,r.y0),Point::new(r.x1,r.y0),Point::new(r.x1,r.y1),Point::new(r.x0,r.y1)];
+            for i in 0..4 {
+                let line = Line::new(corners[i], corners[(i+1)%4]);
+                let bounds = Rect::from_points(line.p0,line.p1);
+                if overlaps(bounds,query) { out.segments.push((bounds,PathSeg::Line(line))); }
+            }
+        }
+        out
+    }
 }
 
 impl Targets {
+    fn leo_near(&self, query: Rect) -> Option<Self> {
+        let mut targets = self.leo_scene.as_ref()?.near(query);
+        targets.style = self.style;
+        targets.tangent = self.tangent;
+        targets.perpendicular = self.perpendicular;
+        Some(targets)
+    }
     /// Shift captures only geometry that the locked drag line really reaches.
     pub(in crate::guides) fn leo_snap_anchor_along(&self, p: Point, at: Point, acquire: f64, release: f64) -> Option<(Point, Vec<Overlay>)> {
         let dir = p - at;
@@ -23,20 +135,22 @@ impl Targets {
             self.clear_leo_snap();
             return None;
         }
-        let anchor = self.points.iter().filter(|(_, k)| *k == Kind::Anchor)
+        let nearby = self.leo_near(Rect::from_points(p,p).inflate(release,release));
+        let geometry = nearby.as_ref().unwrap_or(self);
+        let anchor = geometry.points.iter().filter(|(_, k)| *k == Kind::Anchor)
             .filter(|(q, _)| q.distance(p) <= acquire && on_direction(*q - at, dir))
             .min_by(|a, b| a.0.distance(p).total_cmp(&b.0.distance(p)))
             .map(|(q, _)| (SnapLock::Anchor(*q), *q));
         let held = self.leo_snap.get().and_then(|lock| {
             let q = match lock {
                 SnapLock::Anchor(q) => (q.distance(p) <= release && on_direction(q - at, dir)).then_some(q),
-                SnapLock::Segment(i) => self.segments.get(i).and_then(|(_, s)| along_segment(*s, p, dir, release)),
+                SnapLock::Segment(segment) => along_segment(segment, p, dir, release),
             }?;
             Some((lock, q))
         });
         let choice = held.filter(|(l, _)| matches!(l, SnapLock::Anchor(_))).or(anchor).or(held)
-            .or_else(|| self.segments.iter().enumerate().filter_map(|(i, (_, s))| {
-                along_segment(*s, p, dir, acquire).map(|q| (SnapLock::Segment(i), q))
+            .or_else(|| geometry.segments.iter().filter_map(|(_, s)| {
+                along_segment(*s, p, dir, acquire).map(|q| (SnapLock::Segment(*s), q))
             }).min_by(|a, b| a.1.distance(p).total_cmp(&b.1.distance(p))));
         self.leo_snap.set(choice.map(|(l, _)| l));
         let (lock, q) = choice?;
@@ -48,7 +162,8 @@ impl Targets {
     /// Artboards are painted as white rectangles but are NOT Path nodes: without
     /// these edges a dragged node beside the page had no geometric snap target.
     pub(in crate::guides) fn leo_for_anchor_drag(cx: &ToolContext) -> Self {
-        let mut targets = Self::for_anchor_drag(cx.doc, cx.selection).styled(cx);
+        let mut targets = Self::default().styled(cx);
+        targets.leo_scene = Some(LeoScene::new(cx, cx.selection, false));
         targets.tangent = cx.smart_guides && cx.snap_tangent;
         targets.perpendicular = cx.smart_guides && cx.snap_perpendicular;
         if cx.snap_to_point { targets = targets.with_rulers(cx); }
@@ -62,7 +177,9 @@ impl Targets {
     pub(in crate::guides) fn leo_for_object_move(cx: &ToolContext, exclude: &[NodeId]) -> Self {
         let mut selection = Selection::default();
         selection.set(exclude.iter().copied());
-        let mut targets = Self::for_anchor_drag(cx.doc, &selection).styled(cx);
+        let scene = LeoScene::new(cx, &selection, true);
+        let mut targets = scene.alignment_targets().styled(cx);
+        targets.leo_scene = Some(scene);
         if cx.snap_to_point { targets = targets.with_rulers(cx); }
         push_artboard_edges(cx.doc, &mut targets);
         targets
@@ -74,11 +191,13 @@ impl Targets {
 
     /// Explicit native geometric-guide options still land on real finite geometry.
     pub(in crate::guides) fn leo_snap_contact(&self, p: Point, at: Point, acquire: f64) -> Option<(Point, Vec<Overlay>)> {
-        if self.leo_nearest_anchor(p, acquire).is_some() { return None; }
+        let nearby = self.leo_near(Rect::from_points(p,p).inflate(acquire,acquire));
+        let geometry = nearby.as_ref().unwrap_or(self);
+        if geometry.leo_nearest_anchor(p, acquire).is_some() { return None; }
         if self.leo_snap.get().is_some_and(|lock| matches!(lock, SnapLock::Anchor(q) if q.distance(p) <= acquire * RELEASE_MULTIPLIER)) { return None; }
-        let (q, perpendicular, dir) = self.touching(at, p, acquire)?;
-        let index = self.segments.iter().position(|(_, s)| s.nearest(q, 1e-8).distance_sq < 1e-12)?;
-        self.leo_snap.set(Some(SnapLock::Segment(index)));
+        let (q, perpendicular, dir) = geometry.touching(at, p, acquire)?;
+        let (_, segment) = geometry.segments.iter().find(|(_, s)| s.nearest(q, 1e-8).distance_sq < 1e-12)?;
+        self.leo_snap.set(Some(SnapLock::Segment(*segment)));
         Some((q, self.touch_guides(at, q, perpendicular, dir, acquire)))
     }
 
@@ -91,17 +210,16 @@ impl Targets {
             .map(|(q, _)| *q)
     }
 
-    fn leo_nearest_segment(&self, p: Point, reach: f64) -> Option<(usize, Point)> {
+    fn leo_nearest_segment(&self, p: Point, reach: f64) -> Option<(PathSeg, Point)> {
         self.segments
             .iter()
-            .enumerate()
-            .filter(|(_, (bounds, _))| bounds.inflate(reach, reach).contains(p))
-            .filter_map(|(index, (_, segment))| {
+            .filter(|(bounds, _)| bounds.inflate(reach, reach).contains(p))
+            .filter_map(|(_, segment)| {
                 // Kurbo's nearest-point solver projects onto the actual finite
                 // line or Bezier, never its bounding rectangle or guide line.
                 let nearest = segment.nearest(p, 1e-8);
                 (nearest.distance_sq.is_finite() && nearest.distance_sq <= reach * reach)
-                    .then_some((index, segment.eval(nearest.t), nearest.distance_sq))
+                    .then_some((*segment, segment.eval(nearest.t), nearest.distance_sq))
             })
             .min_by(|a, b| a.2.total_cmp(&b.2))
             .map(|(index, q, _)| (index, q))
@@ -110,11 +228,11 @@ impl Targets {
     fn leo_locked_point(&self, lock: SnapLock, p: Point, release: f64) -> Option<Point> {
         match lock {
             SnapLock::Anchor(q) => (q.distance(p) <= release).then_some(q),
-            SnapLock::Segment(index) => self.segments.get(index).and_then(|(_, segment)| {
+            SnapLock::Segment(segment) => {
                 let nearest = segment.nearest(p, 1e-8);
                 (nearest.distance_sq.is_finite() && nearest.distance_sq <= release * release)
                     .then(|| segment.eval(nearest.t))
-            }),
+            },
         }
     }
 
@@ -127,7 +245,9 @@ impl Targets {
             return None;
         }
 
-        let anchor = self.leo_nearest_anchor(p, acquire);
+        let nearby = self.leo_near(Rect::from_points(p,p).inflate(release,release));
+        let geometry = nearby.as_ref().unwrap_or(self);
+        let anchor = geometry.leo_nearest_anchor(p, acquire);
         let held = self.leo_snap.get();
         let choice = match held {
             // Keep an existing anchor even if a nearby path looks closer.
@@ -138,7 +258,7 @@ impl Targets {
                 .or_else(|| self.leo_locked_point(lock, p, release).map(|q| (lock, q))),
             None => anchor.map(|q| (SnapLock::Anchor(q), q)),
         }
-        .or_else(|| self.leo_nearest_segment(p, acquire).map(|(i, q)| (SnapLock::Segment(i), q)));
+        .or_else(|| geometry.leo_nearest_segment(p, acquire).map(|(segment, q)| (SnapLock::Segment(segment), q)));
 
         self.leo_snap.set(choice.map(|(lock, _)| lock));
         let (lock, q) = choice?;
@@ -284,7 +404,7 @@ fn rect_features(r: Rect) -> [Point; 9] {
 #[derive(Clone, Copy, Debug)]
 enum MoveTarget {
     Point { point: Point, kind: Kind },
-    Segment(usize),
+    Segment(PathSeg),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -365,7 +485,7 @@ impl ObjectMoveSnap {
     fn snap_with_tolerance(
         &self, start: Point, d: Vec2, copy: bool, acquire: f64, release: f64, direction: Option<Vec2>,
     ) -> (Vec2, Vec<Overlay>) {
-        if !d.x.is_finite() || !d.y.is_finite() || !acquire.is_finite() || !release.is_finite() || acquire <= 0.0 || release < acquire {
+        if !start.is_finite() || !d.x.is_finite() || !d.y.is_finite() || !acquire.is_finite() || !release.is_finite() || acquire <= 0.0 || release < acquire {
             self.reset_locks();
             return (d, vec![]);
         }
@@ -373,6 +493,9 @@ impl ObjectMoveSnap {
             self.reset_locks();
         }
         let targets = self.targets(copy);
+        let moved = self.bounds.map(|r| r + d).unwrap_or_else(|| Rect::from_points(start+d,start+d)).union_pt(start+d);
+        let nearby = targets.leo_near(moved.inflate(release,release));
+        let geometry = nearby.as_ref().unwrap_or(targets);
         if direction.is_some() {
             if self.lock.get().is_some_and(|lock| lock.source != start) {
                 self.lock.set(None);
@@ -380,7 +503,7 @@ impl ObjectMoveSnap {
         }
         let mut sources = self.sources.clone();
         push_unique(&mut sources, start);
-        if direction.is_none() { edge_sources(&self.edges, targets, d, acquire, &mut sources); }
+        if direction.is_none() { edge_sources(&self.edges, geometry, d, acquire, &mut sources); }
         if sources.is_empty() {
             return (d, vec![]);
         }
@@ -397,28 +520,28 @@ impl ObjectMoveSnap {
         // acquisition radius. This preserves the node-over-path priority of node drags.
         if let Some(mut lock) = self.lock.get() {
             if matches!(lock.target, MoveTarget::Segment(_) | MoveTarget::Point { kind: Kind::Center, .. }) {
-                if let Some(anchor) = find_move_geometry(targets, &geometry_sources, self.bounds, d, acquire, direction)
+                if let Some(anchor) = find_move_geometry(geometry, &geometry_sources, self.bounds, d, acquire, direction)
                     .filter(|candidate| matches!(candidate.target, MoveTarget::Point { kind: Kind::Anchor, .. }))
                 {
                     lock = anchor;
                     self.lock.set(Some(lock));
                 }
             }
-            if let Some((next, q, label, color)) = resolve_move_lock(targets, lock, d, release, direction) {
+            if let Some((next, q, label, color)) = resolve_move_lock(geometry, lock, d, release, direction) {
                 self.x_lock.set(None);
                 self.y_lock.set(None);
-                return (next, move_hit_guides(targets, q, label, color));
+                return (next, move_hit_guides(geometry, q, label, color));
             }
             self.lock.set(None);
         }
 
         // True anchors first, then finite paths/Bezier curves. Alignment never steals a geometry hit.
-        if let Some(lock) = find_move_geometry(targets, &geometry_sources, self.bounds, d, acquire, direction) {
-            if let Some((next, q, label, color)) = resolve_move_lock(targets, lock, d, release, direction) {
+        if let Some(lock) = find_move_geometry(geometry, &geometry_sources, self.bounds, d, acquire, direction) {
+            if let Some((next, q, label, color)) = resolve_move_lock(geometry, lock, d, release, direction) {
                 self.lock.set(Some(lock));
                 self.x_lock.set(None);
                 self.y_lock.set(None);
-                return (next, move_hit_guides(targets, q, label, color));
+                return (next, move_hit_guides(geometry, q, label, color));
             }
         }
 
@@ -439,7 +562,7 @@ fn move_hit_guides(targets: &Targets, q: Point, label: &'static str, color: [u8;
 }
 
 fn resolve_move_lock(
-    targets: &Targets, lock: MoveLock, d: Vec2, release: f64, direction: Option<Vec2>,
+    _targets: &Targets, lock: MoveLock, d: Vec2, release: f64, direction: Option<Vec2>,
 ) -> Option<(Vec2, Point, &'static str, [u8; 3])> {
     let current = lock.source + d;
     let (q, label, color) = match lock.target {
@@ -452,10 +575,9 @@ fn resolve_move_lock(
             };
             (point, label, color)
         }
-        MoveTarget::Segment(index) => {
-            let (_, segment) = targets.segments.get(index)?;
+        MoveTarget::Segment(segment) => {
             if let Some(dir) = direction {
-                let q = along_segment(*segment, current, dir, release)?;
+                let q = along_segment(segment, current, dir, release)?;
                 return Some((d + (q - current), q, "path", PATH_HIT));
             }
             let nearest = segment.nearest(current, 1e-8);
@@ -521,7 +643,7 @@ fn find_move_geometry(
                 if !nearest.distance_sq.is_finite() || nearest.distance_sq > acquire * acquire { continue; }
                 nearest.distance_sq.sqrt()
             };
-            let candidate = MoveLock { source: *source, target: MoveTarget::Segment(*index) };
+            let candidate = MoveLock { source: *source, target: MoveTarget::Segment(*segment) };
             let score = distance;
             if best.is_none_or(|b| (1u8, score).lt(&(b.0, b.1))) {
                 best = Some((1, score, candidate));

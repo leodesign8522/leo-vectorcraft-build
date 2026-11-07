@@ -15,6 +15,38 @@ mod leo_v022_session_tests {
     }
 
     #[test]
+    fn leo_v022_dense_document_node_drag_commits_and_undoes_for_both_shift_states() {
+        for shift in [false,true] {
+            let mut s=Session::new();
+            s.execute("file.new",&json!({"width":500,"height":500})).unwrap();
+            {
+                let d=std::sync::Arc::make_mut(&mut s.doc_mut().unwrap().doc);
+                let mut path=vectorcraft_geom::shapes::rectangle(Rect::new(10000.0,10000.0,10010.0,10010.0));
+                path.subpaths=vec![path.subpaths[0].clone();5001];
+                let id=d.alloc_id();
+                d.insert(Some(d.layers[0].id),0,vectorcraft_doc::Node::path(id,path,
+                    vectorcraft_doc::Appearance::default_art())).unwrap();
+            }
+            let source=NodeId(s.execute("shape.line",&json!({"x1":300,"y1":340,"x2":380,"y2":340})).unwrap()["id"].as_u64().unwrap());
+            s.execute("shape.line",&json!({"x1":390,"y1":300,"x2":410,"y2":360})).unwrap();
+            let view=ViewInfo {snap_to_grid:false,snap_to_pixel:false,..ViewInfo::default()};
+            s.select_tool("directSelection",view).unwrap();
+            s.execute("select.anchors",&json!({"id":source.0,"anchors":[[0,1]],"mode":"set"})).unwrap();
+            for (kind,x) in [(PointerKind::Down,380.0),(PointerKind::Drag,402.0),(PointerKind::Up,402.0)] {
+                s.pointer(&PointerEvent::new(kind,x,340.0).with_mods(Mods {shift,..Mods::default()}),view).unwrap();
+            }
+            let hit=endpoint(&s,source,1);
+            assert!((3.0*hit.x-hit.y-870.0).abs()<1e-6,"shift={shift}: {hit:?}");
+            if shift {assert!((hit.y-340.0).abs()<1e-9);}
+            assert_eq!(endpoint(&s,source,0),Point::new(300.0,340.0));
+            s.execute("edit.undo",&json!({})).unwrap();
+            assert_eq!(endpoint(&s,source,1),Point::new(380.0,340.0));
+            s.execute("edit.redo",&json!({})).unwrap();
+            assert_eq!(endpoint(&s,source,1),hit);
+        }
+    }
+
+    #[test]
     fn leo_v022_shift_selected_anchor_drag_retains_live_selection_and_snaps_exactly() {
         for whole in [false, true] {
             let mut s = Session::new();

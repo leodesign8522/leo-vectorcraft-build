@@ -33,7 +33,7 @@ s = p.read_text(encoding='utf-8')
 old = 'println!("vectorcraft {}", env!("CARGO_PKG_VERSION"));'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.22 executable version identity anchor')
-s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.22.0 (Leo Design Core Bridge 0.14.0; Snapping Engine 1.3)\\n");')
+s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.22.0 (Leo Design Core Bridge 0.14.1; Snapping Engine 1.3.1)\\n");')
 p.write_text(s, encoding='utf-8', newline='\n')
 
 p = Path(sys.argv[1]) / 'crates/ui-egui/src/dialogs/about.rs'
@@ -41,5 +41,5 @@ s = p.read_text(encoding='utf-8')
 old = '    crate::community::links(app, ui);'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.22 About build identity anchor')
-s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.14.0 / Snapping Engine 1.3");\n' + old)
+s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.14.1 / Snapping Engine 1.3.1");\n' + old)
 p.write_text(s, encoding='utf-8', newline='\n')

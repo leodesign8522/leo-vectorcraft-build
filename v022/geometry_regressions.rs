@@ -3,6 +3,50 @@ mod leo_v022_geometry_tests {
     use super::*;
 
     #[test]
+    fn leo_snapping_engine_local_query_retains_segment_identity_when_candidates_change() {
+        use vectorcraft_doc::{Document, Node, Appearance};
+        use vectorcraft_geom::shapes;
+        let mut d=Document::new(1000.0,1000.0);
+        for x in [450.0,430.0] {
+            let id=d.alloc_id();
+            d.insert(Some(d.layers[0].id),usize::MAX,Node::path(id,
+                shapes::line(Point::new(x,300.0),Point::new(x,400.0)),Appearance::default_art())).unwrap();
+        }
+        let selection=Selection::default();
+        let paint=crate::testutil::paint();
+        let cx=crate::testutil::cx(&d,&selection,&paint);
+        let t=Targets::leo_for_anchor_drag(&cx);
+        for (x,want) in [(434.0,430.0),(438.0,430.0),(444.0,450.0)] {
+            let (q,_)=t.leo_snap_anchor(Point::new(x,350.0),8.0,12.8).unwrap();
+            assert_eq!(q,Point::new(want,350.0));
+        }
+    }
+
+    #[test]
+    fn leo_object_move_dense_document_tail_target_is_not_truncated() {
+        use vectorcraft_doc::{Document, Node, Appearance};
+        use vectorcraft_geom::shapes;
+        let mut d=Document::new(1000.0,1000.0);
+        let mut filler=shapes::rectangle(Rect::new(10000.0,10000.0,10010.0,10010.0));
+        filler.subpaths=vec![filler.subpaths[0].clone();5001];
+        let id=d.alloc_id();
+        d.insert(Some(d.layers[0].id),0,Node::path(id,filler,Appearance::default_art())).unwrap();
+        let source=d.alloc_id();
+        d.insert(Some(d.layers[0].id),1,Node::path(source,
+            shapes::rectangle(Rect::new(100.0,100.0,200.0,200.0)),Appearance::default_art())).unwrap();
+        let target=d.alloc_id();
+        d.insert(Some(d.layers[0].id),2,Node::path(target,
+            shapes::line(Point::new(300.0,100.0),Point::new(300.0,200.0)),Appearance::default_art())).unwrap();
+        let mut selection=Selection::default(); selection.set([source]);
+        let paint=crate::testutil::paint();
+        let cx=crate::testutil::cx(&d,&selection,&paint);
+        let snapper=ObjectMoveSnap::new(&cx,Some(Rect::new(100.0,100.0,200.0,200.0)));
+        let (delta,guides)=snapper.snap_with_tolerance(Point::new(150.0,150.0),Vec2::new(99.0,0.0),false,8.0,12.8,None);
+        assert_eq!(delta,Vec2::new(100.0,0.0));
+        assert!(!guides.is_empty());
+    }
+
+    #[test]
     fn leo_object_move_shift_alignment_keeps_twelve_point_eight_pixel_release() {
         let mut t = Targets::default();
         t.xs.push((300.0, Point::new(300.0, 600.0), Kind::Edge));

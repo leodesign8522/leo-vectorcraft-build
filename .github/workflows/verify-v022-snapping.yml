@@ -6,6 +6,7 @@ on:
       - leo-v022-snapping
     paths:
       - ".github/workflows/verify-v022-snapping.yml"
+      - "v022/leo_snapping_engine.rs"
       - "v022/geometry_regressions.rs"
       - "v022/direct_regressions.rs"
       - "v022/select_regressions.rs"
