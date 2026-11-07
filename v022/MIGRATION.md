@@ -1,7 +1,13 @@
-# Core Bridge 0.14.1 / VectorCraft 0.22.0
+# Core Bridge 0.14.2 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
+
+## 0.14.2 bidirectional original-edge constraints
+
+Direct Selection of one anchor now gathers at most its two original straight neighbours at drag start. A separate extension lock projects onto these original lines in either direction, including a closed path and movement past the fixed neighbour. Its 8px acquisition and 12.8px release are independent of the immutable finite-geometry target snapshot. Finite geometry keeps priority; Shift retains its original constraint without a duplicate extension capture. Curves, whole-object moves and multiple-anchor selections do not gain these direction constraints.
+
+Captured extensions emit cyan dashed lines, a point marker and an `extension` label, not a finite `path` hit. The complete Windows workflow, installer smoke test and local native-control cases passed for `893781382e36117022d990d086b3d7ecbfbe3575`. Local cases include outward/inward/past-end movement, frozen drag-start direction after a free preview, 12.7px hold versus 12.9px release, unchanged stationary nodes, Commit/Undo/Redo, retained dense-document snapping and Shift/Alt behavior. See [current evidence and hashes](VERIFIED_RELEASE.md). `tests/extension_runtime.py` uses synthetic geometry only and takes an isolated portable executable path.
 
 ## 0.14.1 dense-document follow-up
 
@@ -52,7 +58,7 @@ Run `python prepare_v022.py <pristine-upstream-checkout>` once on the pinned sou
 
 `.github/workflows/build-v022-core.yml` calls the Windows edition workflow. Artifacts upload only after the configured geometry, tool-pointer, session preview/commit/undo/redo, native guides, and retained Core regression commands pass, followed by the release build and version smoke test.
 
-The installer uses an independent per-user directory, retains the official installation, verifies the installed executable against the tested artifact hash, and checks its build identity. Both artifact sets include source commit identifiers and SHA-256 checksums. The current About and `--version` identify Core Bridge 0.14.1 / Snapping Engine 1.3.1.
+The installer uses an independent per-user directory, retains the official installation, verifies the installed executable against the tested artifact hash, and checks its build identity. Both artifact sets include source commit identifiers and SHA-256 checksums. The current About and `--version` identify Core Bridge 0.14.2 / Snapping Engine 1.4.
 
 Historical 0.14.0 verification: all configured regression commands and the Windows x64 release build passed for `f96207bf7203f5b3d9054a581402054c83cf1587`. This includes all 73 Direct Selection tests, three real Session regressions, the adapted clipboard regressions, and the retained Core checks. The initial installer wrapper omitted VERSION.txt because of GUI stdout handling; explicit process waiting and stdout redirection fixed metadata capture. The verified EXE was repackaged without changing its bytes, installed successfully, and checked against its pinned SHA-256. Local executable tests passed with grid snapping enabled for rigid group movement, Undo/Redo, Shift+Alt copying with the original unchanged, and Shift node dragging onto an actual oblique path intersection.
 

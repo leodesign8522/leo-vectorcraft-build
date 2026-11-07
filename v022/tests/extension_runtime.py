@@ -33,6 +33,7 @@ try:
  call('ui.set',{'smartGuides':True})
  flags=call('ui.inspect')['ui']['view']
  if flags['snap_to_grid']: command('view.snapToGrid')
+ if flags['snap_to_pixel']: command('view.snapToPixel')
  command('path.create',d='M10000 10000H10010V10010H10000Z '*5001)
  source=command('path.create',d='M300 300L600 330L600 500L460 420Z')['id']
  command('view.setZoom',zoom=100,center=[450,400])
@@ -45,13 +46,27 @@ try:
   if not checks:
    call('ui.pointer',{'events':[{'kind':'drag','x':520,'y':440}]})
    assert node(source)['kind']['path']['subpaths'][0]['anchors'][3]['p']==[520.0,440.0]
+  elif len(checks)==2:
+   call('ui.pointer',{'events':[{'kind':'drag','x':301,'y':301}]})
+   assert node(source)['kind']['path']['subpaths'][0]['anchors'][3]['p']==[300.0,300.0]
   call('ui.pointer',{'events':[{'kind':'drag','x':pointer[0],'y':pointer[1]}]})
+  if not checks:
+   for distance,held in [(12.7,True),(12.9,False)]:
+    off=[want[0]-0.6*distance,want[1]+0.8*distance]
+    call('ui.pointer',{'events':[{'kind':'drag','x':off[0],'y':off[1]}]})
+    got=node(source)['kind']['path']['subpaths'][0]['anchors'][3]['p']
+    expected=want if held else off
+    assert max(abs(got[i]-expected[i]) for i in [0,1])<1e-7, ('release hysteresis',got,expected)
+    if not held and '--capture' in sys.argv:
+     call('ui.screenshot',{'path':str(exe.parent/'EXTENSION_RELEASE.png'),'data':False})
+   call('ui.pointer',{'events':[{'kind':'drag','x':pointer[0],'y':pointer[1]}]})
   preview=node(source)['kind']['path']['subpaths'][0]['anchors']
   actual=preview[3]['p']
   assert max(abs(actual[i]-want[i]) for i in [0,1])<1e-7, ('during drag',actual,want)
   assert preview[:3]==original['kind']['path']['subpaths'][0]['anchors'][:3]
-  if not checks and '--capture' in sys.argv:
-   call('ui.screenshot',{'path':str(exe.parent/'EXTENSION_HIT.png'),'data':False})
+  if '--capture' in sys.argv:
+   label=['OUTWARD','INWARD','REVERSE'][len(checks)]
+   call('ui.screenshot',{'path':str(exe.parent/('EXTENSION_'+label+'.png')),'data':False})
   call('ui.pointer',{'events':[{'kind':'up','x':pointer[0],'y':pointer[1]}]})
   committed=node(source)
   assert committed['kind']['path']['subpaths'][0]['anchors']==preview
@@ -59,7 +74,8 @@ try:
   command('edit.redo'); assert node(source)==committed
   command('edit.undo')
   checks.append({'endpoint':actual,'commit_undo_redo':True,'stationary_nodes_unchanged':True})
- output={'pass':True,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'checks':checks}
+ output={'pass':True,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'checks':checks,
+         'drag_start_direction_frozen':True,'hold_at_12_7_release_at_12_9':True,'crossed_stationary_anchor':True}
  (exe.parent/'EXTENSION_RUNTIME.json').write_text(json.dumps(output,indent=2),encoding='utf-8')
  print(json.dumps(output))
 

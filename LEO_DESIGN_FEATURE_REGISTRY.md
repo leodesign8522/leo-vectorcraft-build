@@ -1,12 +1,14 @@
-# Core Bridge v0.14.2 / Snapping Engine 1.4 双向共线升级（验证中）
+# 当前交付 Core Bridge v0.14.2 / Snapping Engine 1.4 双向共线升级
 
 - A 工具单节点可沿原有直边双向延长、回缩；同时支持闭合路径和任意角度直边。
 - 只冻结该节点相邻直边，最多两个方向，不进行全图延长线搜索；曲边不当作直线延长。
 - 8px 捕获、12.8px 释放；实际节点/有限路径命中优先，Shift 方向锁定保持原有行为。
 - 命中显示青色虚线、圆标和 extension 标签，与真实路径命中区分；未命中无反馈。
-- 保留 0.14.1 的大文档目标收集修复。构建与实机结果待本轮验证，之前的已验证交付见下。
+- 保留 0.14.1 的大文档目标收集修复。Windows 编译、配置的回归、安装哈希校验和本机双向共线/释放/撤销重做均通过。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42369030117/artifacts/13573882985)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- 开启智能参考线，用 A 拖动单节点，无需 Shift。从 **Leo Design VectorCraft 0.22 Bridge 0.14.2** 快捷方式启动。
 
-# 已验证版本 Leo Design Core Bridge v0.14.1 / VectorCraft v0.22.0
+## 历史交付 Leo Design Core Bridge v0.14.1 / VectorCraft v0.22.0
 
 - 修复超过 20,000 个锚点后，后新增目标路径漏收集而不吸附的问题；按拖动范围查询完整路径快照，锁定目标不依赖临时候选索引。
 - 大文档直线/Bezier、普通及 Shift 节点拖动、对象/整组移动、捕获释放及原生 Direct Selection 回归通过；Windows x64 编译与安装后哈希校验通过。
