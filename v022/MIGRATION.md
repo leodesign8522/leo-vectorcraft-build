@@ -36,6 +36,8 @@ Object, multiple-object and group moves return one translation. Continuous sourc
 
 Shift object moves preserve the constrained direction and resolve actual path intersections. Geometry and alignment locks use the same capture/release thresholds. Alt switches target sets so originals remain targets for a copy. Grid/pixel options serve as fallback when Leo geometry is enabled.
 
+Native grid-only edge snapping is retained when no Leo geometry is captured, including mixed anchor/object drags. Explicit perpendicular and tangent options still resolve onto finite target paths. Node-only axis alignment and unbounded source-extension rays do not count as physical captures; their old expectations are replaced with assertions that the node stays unsnapped and no hit guide appears.
+
 ## Verification and delivery
 
 Run `python prepare_v022.py <pristine-upstream-checkout>` once on the pinned source. Reapplying to already patched source deliberately fails.

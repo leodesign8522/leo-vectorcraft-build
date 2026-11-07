@@ -49,6 +49,8 @@ impl Targets {
     /// these edges a dragged node beside the page had no geometric snap target.
     pub(in crate::guides) fn leo_for_anchor_drag(cx: &ToolContext) -> Self {
         let mut targets = Self::for_anchor_drag(cx.doc, cx.selection).styled(cx);
+        targets.tangent = cx.smart_guides && cx.snap_tangent;
+        targets.perpendicular = cx.smart_guides && cx.snap_perpendicular;
         if cx.snap_to_point { targets = targets.with_rulers(cx); }
         if cx.spacing_guides { targets.boxes = super::object_boxes(cx.doc, &cx.selection.objects); }
         push_artboard_edges(cx.doc, &mut targets);
@@ -68,6 +70,16 @@ impl Targets {
 
     pub(in crate::guides) fn clear_leo_snap(&self) {
         self.leo_snap.set(None);
+    }
+
+    /// Explicit native geometric-guide options still land on real finite geometry.
+    pub(in crate::guides) fn leo_snap_contact(&self, p: Point, at: Point, acquire: f64) -> Option<(Point, Vec<Overlay>)> {
+        if self.leo_nearest_anchor(p, acquire).is_some() { return None; }
+        if self.leo_snap.get().is_some_and(|lock| matches!(lock, SnapLock::Anchor(q) if q.distance(p) <= acquire * RELEASE_MULTIPLIER)) { return None; }
+        let (q, perpendicular, dir) = self.touching(at, p, acquire)?;
+        let index = self.segments.iter().position(|(_, s)| s.nearest(q, 1e-8).distance_sq < 1e-12)?;
+        self.leo_snap.set(Some(SnapLock::Segment(index)));
+        Some((q, self.touch_guides(at, q, perpendicular, dir, acquire)))
     }
 
     fn leo_nearest_anchor(&self, p: Point, reach: f64) -> Option<Point> {
@@ -305,6 +317,9 @@ pub(crate) struct ObjectMoveSnap {
 }
 
 impl ObjectMoveSnap {
+    pub(crate) fn captured(&self) -> bool {
+        self.lock.get().is_some() || self.x_lock.get().is_some() || self.y_lock.get().is_some()
+    }
     pub(crate) fn new(cx: &ToolContext, bounds: Option<Rect>) -> Self {
         let mut sources = Vec::new();
         if let Some(bounds) = bounds {

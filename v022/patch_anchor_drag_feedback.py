@@ -41,10 +41,18 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
         Self { targets }
     }
 
+    pub(crate) fn leo_captured(&self) -> bool {
+        self.targets.as_ref().is_some_and(|(targets, _)| targets.leo_snap.get().is_some())
+    }
+
     pub(crate) fn direct_anchor_drag(&self, cx: &ToolContext, p: Point, from: Option<&Leave>, shift: bool) -> (Point, Vec<Overlay>) {
         let constrained = if shift { from.and_then(|f| f.constrained(p)) } else { None };
         let p = constrained.unwrap_or(p);
         if let Some((targets, _)) = &self.targets {
+            if !shift && let Some(f) = from.filter(|f| f.contact)
+                && let Some(hit) = targets.leo_snap_contact(p, f.at, cx.tol(8.0)) {
+                return hit;
+            }
             let hit = if let (Some(q), Some(f)) = (constrained, from) {
                 targets.leo_snap_anchor_along(q, f.at, cx.tol(8.0), cx.tol(12.8))
             } else {
@@ -78,10 +86,10 @@ edit("select.rs",
      "        Self { bounds, targets: None, points: None, copy_targets: None, copy_points: None, rulers: None, leo: None }")
 edit("select.rs",
      "    pub(crate) fn snap(&self, cx: &ToolContext, start: Point, mut d: Vec2, copy: bool) -> (Vec2, Vec<Overlay>) {",
-     "    pub(crate) fn snap(&self, cx: &ToolContext, start: Point, mut d: Vec2, copy: bool) -> (Vec2, Vec<Overlay>) {\n        if let Some(leo) = &self.leo { return leo.snap(cx, start, d, copy); }")
+     "    pub(crate) fn snap(&self, cx: &ToolContext, start: Point, mut d: Vec2, copy: bool) -> (Vec2, Vec<Overlay>) {\n        if let Some(leo) = &self.leo {\n            let hit = leo.snap(cx, start, d, copy);\n            if leo.captured() || !(cx.snap_to_grid || cx.snap_to_pixel) || (hit.0 - d).hypot() > 1e-9 { return hit; }\n        }")
 edit("select.rs",
      "    pub(crate) fn snap_along(&self, cx: &ToolContext, start: Point, mut d: Vec2, copy: bool) -> (Vec2, Vec<Overlay>) {",
-     "    pub(crate) fn snap_along(&self, cx: &ToolContext, start: Point, mut d: Vec2, copy: bool) -> (Vec2, Vec<Overlay>) {\n        if let Some(leo) = &self.leo { return leo.snap_along(cx, start, d, copy); }")
+     "    pub(crate) fn snap_along(&self, cx: &ToolContext, start: Point, mut d: Vec2, copy: bool) -> (Vec2, Vec<Overlay>) {\n        if let Some(leo) = &self.leo {\n            let hit = leo.snap_along(cx, start, d, copy);\n            if leo.captured() || !(cx.snap_to_grid || cx.snap_to_pixel) || (hit.0 - d).hypot() > 1e-9 { return hit; }\n        }")
 
 edit("direct.rs",
      "PointSnap::new(cx, || Targets::for_anchor_drag(cx.doc, cx.selection))",
@@ -110,8 +118,19 @@ edit("guides/snap.rs", "    pub fn new(cx: &ToolContext, targets:", """    pub(c
     pub fn new(cx: &ToolContext, targets:""")
 edit("direct.rs", "PointSnap::new(cx, || Targets::for_anchor_drag(cx.doc, &Selection::default()))",
      "PointSnap::leo_for_anchor_copy(cx)")
-edit("direct.rs", "let grid = self.partial_snap.is_some() && grab.is_none() && (cx.snap_to_grid || cx.snap_to_pixel);",
-     "let grid = self.partial_snap.is_some() && grab.is_none() && !(cx.smart_guides || cx.snap_to_point) && (cx.snap_to_grid || cx.snap_to_pixel);")
+edit("direct.rs", '''            if let Some(grid) = &self.partial_grid {
+                (d, self.guides) = if ev.mods.shift { grid.snap_along(cx, held, d, false) } else { grid.snap(cx, held, d, false) };
+            } else {
+                let shift = ev.mods.shift.then(|| Leave::segment(cx, held, true));
+                let (q, guides) = snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift);
+                (d, self.guides) = (q - held, guides);
+            }''', '''            let shift = ev.mods.shift.then(|| Leave::segment(cx, held, true));
+            let (q, guides) = snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift);
+            (d, self.guides) = (q - held, guides);
+            if !snap.leo_captured() && let Some(grid) = &self.partial_grid {
+                let raw = move_delta(start, p, ev.mods.shift, cx.constrain_angle);
+                (d, self.guides) = if ev.mods.shift { grid.snap_along(cx, held, raw, false) } else { grid.snap(cx, held, raw, false) };
+            }''')
 
 # Shift-click toggles a selected anchor only on release. Toggling it on Down
 # empties the live Session selection before path.moveAnchors can move anything.
@@ -150,6 +169,24 @@ edit("direct/tests.rs",
      '''    assert!(t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 100.0, 100.0).with_mods(shift)).is_empty());
     let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 100.0, 100.0).with_mods(shift));
     assert_eq!(a, vec![Action::Exec("select.anchors".into(), json!({"id": id.0, "anchors": [[0, 0]], "mode": "toggle"}))]);''', expected=2)
+
+# These native assertions describe the deliberately replaced node contract:
+# Leo nodes capture finite geometry at 8px; an axis/ray alone is not a hit.
+edit("direct/tests.rs",
+     '    assert_eq!((v, labels), (json!({"dx": 0.0, "dy": 30.0}), vec!["align".to_string()]));',
+     '    assert_eq!((v, labels), (json!({"dx": 3.0, "dy": 30.0}), Vec::<String>::new()), "an axis alone is not a geometry hit");')
+edit("direct/tests.rs",
+     '    assert_eq!(drag(&mut t, &c, (300.0, 300.0), (203.0, 199.0), none).0, json!({"dx": -97.0, "dy": -101.0}));',
+     '    assert_eq!(drag(&mut t, &c, (300.0, 300.0), (203.0, 199.0), none).0, json!({"dx": -100.0, "dy": -100.0}), "Snap to Point uses the shared 8px capture");')
+edit("direct/tests.rs",
+     '    assert!((dx - 40.0).abs() < 1e-9 && (dy + 30.0).abs() < 1e-9, "{v}");',
+     '    assert!((dx - 41.5).abs() < 1e-9 && (dy + 28.0).abs() < 1e-9, "a ray without a finite target cannot capture: {v}");')
+edit("direct/tests.rs",
+     '    assert!(matches!(guides[..], [(a, b)] if a == Point::new(300.0, 400.0) && (b - Point::new(420.0, 310.0)).hypot() < 1e-9), "{guides:?}");',
+     '    assert!(guides.is_empty(), "no finite target, no hit guide: {guides:?}");')
+edit("direct/tests.rs",
+     '    assert_eq!(drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none).1, Vec::<String>::new());',
+     '    assert_eq!(drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none).1, ["path"], "Snap to Point also captures real finite paths");')
 
 # Pointer-to-command integration: a real target must be reflected in Preview(dx,dy).
 with (root / "direct/tests.rs").open("a", encoding="utf-8") as f:
