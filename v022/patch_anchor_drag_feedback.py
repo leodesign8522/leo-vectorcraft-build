@@ -113,6 +113,44 @@ edit("direct.rs", "PointSnap::new(cx, || Targets::for_anchor_drag(cx.doc, &Selec
 edit("direct.rs", "let grid = self.partial_snap.is_some() && grab.is_none() && (cx.snap_to_grid || cx.snap_to_pixel);",
      "let grid = self.partial_snap.is_some() && grab.is_none() && !(cx.smart_guides || cx.snap_to_point) && (cx.snap_to_grid || cx.snap_to_pixel);")
 
+# Shift-click toggles a selected anchor only on release. Toggling it on Down
+# empties the live Session selection before path.moveAnchors can move anything.
+edit("direct.rs",
+     "    click: Option<(NodeId, usize, usize)>,\n    /// A click on a whole path picks the segment on release;",
+     "    click: Option<(NodeId, usize, usize)>,\n    /// A selected anchor's Shift-click toggles only when released without dragging.\n    shift_deselect: Option<(NodeId, usize, usize)>,\n    /// A click on a whole path picks the segment on release;")
+edit("direct.rs", "            click: None,\n            click_segment: None,",
+     "            click: None,\n            shift_deselect: None,\n            click_segment: None,")
+edit("direct.rs",
+     "        (self.click, self.click_segment, self.click_group, self.frame_click) = (None, None, None, None);",
+     "        (self.click, self.click_segment, self.click_group, self.frame_click) = (None, None, None, None);\n        self.shift_deselect = None;")
+edit("direct.rs",
+     "    fn press_anchor(&mut self, cx: &ToolContext, ev: &PointerEvent, p: Point, (id, si, ai, grab): (NodeId, usize, usize, Point)) -> Vec<Action> {\n",
+     "    fn press_anchor(&mut self, cx: &ToolContext, ev: &PointerEvent, p: Point, (id, si, ai, grab): (NodeId, usize, usize, Point)) -> Vec<Action> {\n        self.shift_deselect = None;\n")
+edit("direct.rs",
+     '        if ev.mods.shift {\n            return vec![Action::Exec("select.anchors".into(), json!({"id": id.0, "anchors": [[si, ai]], "mode": "toggle"}))];\n        }\n',
+     '''        if ev.mods.shift {
+            if already || cx.selection.anchors.get(&id).is_some_and(|anchors| anchors.contains(&(si, ai))) {
+                self.shift_deselect = Some((id, si, ai));
+                return vec![];
+            }
+            return vec![Action::Exec("select.anchors".into(), json!({"id": id.0, "anchors": [[si, ai]], "mode": "toggle"}))];
+        }
+''')
+edit("direct.rs",
+     "        let group = self.click_group.take();\n        // A click on one of several selected frame anchors selects it alone.",
+     '''        let group = self.click_group.take();
+        let shift_deselect = self.shift_deselect.take();
+        if !began && let Some((id, si, ai)) = shift_deselect {
+            return vec![Action::Exec("select.anchors".into(), json!({"id": id.0, "anchors": [[si, ai]], "mode": "toggle"}))];
+        }
+        // A click on one of several selected frame anchors selects it alone.''')
+edit("direct/tests.rs",
+     '''    let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 100.0, 100.0).with_mods(shift));
+    assert_eq!(a, vec![Action::Exec("select.anchors".into(), json!({"id": id.0, "anchors": [[0, 0]], "mode": "toggle"}))]);''',
+     '''    assert!(t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 100.0, 100.0).with_mods(shift)).is_empty());
+    let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 100.0, 100.0).with_mods(shift));
+    assert_eq!(a, vec![Action::Exec("select.anchors".into(), json!({"id": id.0, "anchors": [[0, 0]], "mode": "toggle"}))]);''', expected=2)
+
 # Pointer-to-command integration: a real target must be reflected in Preview(dx,dy).
 with (root / "direct/tests.rs").open("a", encoding="utf-8") as f:
     f.write("""

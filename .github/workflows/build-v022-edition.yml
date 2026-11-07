@@ -120,6 +120,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Direct Selection whole-object movement regression failed" }
           cargo test --locked -p vectorcraft-tools guides::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native snapping regression failed" }
+          cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native Direct Selection click, drag and modifier regression failed" }
       - name: Test Eyedropper character attributes and transformed text
         shell: pwsh
         working-directory: vectorcraft

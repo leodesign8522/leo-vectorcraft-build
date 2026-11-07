@@ -3,11 +3,64 @@ mod leo_v022_session_tests {
     use crate::{Session, ViewInfo};
     use serde_json::json;
     use vectorcraft_doc::NodeId;
-    use vectorcraft_geom::{Rect, Vec2};
-    use vectorcraft_tools::{PointerEvent, PointerKind};
+    use vectorcraft_geom::{Point, Rect, Vec2};
+    use vectorcraft_tools::{Mods, PointerEvent, PointerKind};
 
     fn bounds(s: &Session, id: NodeId) -> Rect {
         s.doc().unwrap().doc.node(id).unwrap().geometric_bounds().unwrap()
+    }
+
+    fn endpoint(s: &Session, id: NodeId, index: usize) -> Point {
+        s.doc().unwrap().doc.node(id).unwrap().path_data().unwrap().subpaths[0].anchors[index].p
+    }
+
+    #[test]
+    fn leo_v022_shift_selected_anchor_drag_retains_live_selection_and_snaps_exactly() {
+        for whole in [false, true] {
+            let mut s = Session::new();
+            s.execute("file.new", &json!({"width":500,"height":500})).unwrap();
+            let source = NodeId(s.execute("shape.line", &json!({"x1":300,"y1":340,"x2":380,"y2":340})).unwrap()["id"].as_u64().unwrap());
+            s.execute("shape.line", &json!({"x1":390,"y1":300,"x2":410,"y2":360})).unwrap();
+            let view = ViewInfo { snap_to_grid: true, ..ViewInfo::default() };
+            s.select_tool("directSelection", view).unwrap();
+            if whole {
+                s.execute("select.set", &json!({"ids":[source.0]})).unwrap();
+            } else {
+                s.execute("select.anchors", &json!({"id":source.0,"anchors":[[0,1]],"mode":"set"})).unwrap();
+            }
+            let undo = s.doc().unwrap().history.undo.len();
+            let ev = |kind, x, y| PointerEvent::new(kind, x, y).with_mods(Mods { shift:true, ..Mods::default() });
+            s.pointer(&ev(PointerKind::Down,380.0,340.0),view).unwrap();
+            assert!(s.doc().unwrap().selection.contains(source), "Shift Down must not erase the live selection");
+            for kind in [PointerKind::Drag, PointerKind::Up] {
+                s.pointer(&ev(kind,402.0,340.0),view).unwrap();
+            }
+            assert!(endpoint(&s,source,1).distance(Point::new(403.333333333333,340.0)) < 1e-6);
+            let first_x = if whole {323.333333333333} else {300.0};
+            assert!(endpoint(&s,source,0).distance(Point::new(first_x,340.0)) < 1e-6);
+            assert_eq!(s.doc().unwrap().history.undo.len(),undo+1);
+            s.execute("edit.undo",&json!({})).unwrap();
+            assert_eq!(endpoint(&s,source,0),Point::new(300.0,340.0));
+            assert_eq!(endpoint(&s,source,1),Point::new(380.0,340.0));
+            s.execute("edit.redo",&json!({})).unwrap();
+            assert!((endpoint(&s,source,1).x-403.333333333333).abs()<1e-6);
+        }
+    }
+
+    #[test]
+    fn leo_v022_shift_click_without_drag_still_deselects_the_anchor_on_release() {
+        let mut s = Session::new();
+        s.execute("file.new",&json!({"width":500,"height":500})).unwrap();
+        let id = NodeId(s.execute("shape.line",&json!({"x1":300,"y1":340,"x2":380,"y2":340})).unwrap()["id"].as_u64().unwrap());
+        let view = ViewInfo::default();
+        s.select_tool("directSelection",view).unwrap();
+        s.execute("select.anchors",&json!({"id":id.0,"anchors":[[0,1]],"mode":"set"})).unwrap();
+        let ev = |kind| PointerEvent::new(kind,380.0,340.0).with_mods(Mods {shift:true,..Mods::default()});
+        s.pointer(&ev(PointerKind::Down),view).unwrap();
+        assert!(s.doc().unwrap().selection.contains(id));
+        s.pointer(&ev(PointerKind::Up),view).unwrap();
+        assert!(!s.doc().unwrap().selection.anchors.get(&id).is_some_and(|a| a.contains(&(0,1))));
+        assert_eq!(endpoint(&s,id,1),Point::new(380.0,340.0));
     }
 
     #[test]

@@ -9,6 +9,7 @@ on:
       - "v022/geometry_regressions.rs"
       - "v022/direct_regressions.rs"
       - "v022/select_regressions.rs"
+      - "v022/patch_anchor_drag_feedback.py"
 
 permissions:
   contents: read
@@ -63,3 +64,5 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Node geometry/pointer regressions failed" }
           cargo test --locked -p vectorcraft-tools leo_object_move -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Object/off-grid/Shift regressions failed" }
+          cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native Direct Selection click/drag/modifier regressions failed" }

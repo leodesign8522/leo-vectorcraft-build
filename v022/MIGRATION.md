@@ -10,6 +10,7 @@ The previous successful Actions run, [42257643172](https://github.com/leodesign8
 Independent code defects in the old engine:
 
 - Shift node drags return through native `PointSnap::snap_from`, bypassing Leo geometry and its hysteresis.
+- A Shift Down on an already-selected anchor immediately toggles it off in native Direct Selection. A real Session then has no selected anchor for the drag, even though a tool-only test with a frozen context can still report a Preview. Shift deselection is now deferred until a click releases without a drag, including whole-path and segment-endpoint selections.
 - `MoveSnap` does not instantiate Leo snapping with grid or pixel snapping enabled; node and object behavior disagree.
 - Direct Selection's Alt-copy point snapper uses the native constructor, which discards geometry targets with grid/pixel snapping.
 - Shift object geometry projects nearby anchors onto the drag line and can report a hit at an unreachable point. Segment targets are skipped entirely.
@@ -17,12 +18,14 @@ Independent code defects in the old engine:
 
 These source findings explain specific failures. An interactive reproduction against the user's exact document remains necessary to confirm every reported symptom.
 
+Windows executable control-channel reproduction with generated rectangles: with Smart Guides and Snap to Grid enabled, a group intended for the artboard's right edge at 500 landed at approximately 498.8976; switching grid snapping off made the same operation land exactly at 500. A selected-endpoint Shift drag in the official executable also left the geometry unmoved and the selection empty. Both cases have explicit regression coverage; no user document or preferences are included in the repository.
+
 ## API migration
 
 - Tool pointer events and Begin/Preview/Commit still use the same interfaces. All source anchors are checked and the complete recipe has been applied to a clean 0.22.0 checkout.
 - Native shortcut dispatch now feeds Type Enter events in event order and skips Enter in its generic tool-key loop. The migrated Ctrl+Enter patch preserves that new loop.
 - `Session::lent_tool` now handles Direct Selection Cmd with a combined branch. Smart Select inserts its Selection Cmd override before that branch.
-- Native clipboard extraction now supports selected segments. The obsolete clipboard implementation patch is omitted; its command-level regressions remain.
+- Native clipboard extraction now supports selected segments and creates one editable node per disconnected run. The obsolete clipboard implementation patch is omitted; command regressions check each run's exact endpoints, open-path state, Copy/Paste and Cut/Undo instead of the old compound-subpath object count.
 - Dependencies remain the versions in the official `Cargo.lock`.
 
 ## Snapping behavior
@@ -41,4 +44,4 @@ Run `python prepare_v022.py <pristine-upstream-checkout>` once on the pinned sou
 
 The installer uses an independent per-user directory, retains the official installation, verifies the installed executable against the tested artifact hash, and checks its build identity. Both artifact sets include source commit identifiers and SHA-256 checksums. About and `--version` identify Core Bridge 0.14.0 / Snapping Engine 1.3.
 
-Local checks completed: Python syntax, clean-source patch replay, optional-feature separation, and whitespace validation. Rust tests, Windows release compilation, and installer execution **have not run yet**: this machine has no Rust toolchain; Actions requires authorization to push the changes to the public repository. No verified new executable or installer is available at this stage.
+Local checks completed: Python syntax, clean-source patch replay, optional-feature separation, whitespace validation, and official-executable baseline reproduction. Windows Actions has passed geometry/pointer/hysteresis, off-grid boundaries, Shift alignment release, rigid group Session/Undo/Redo, eyedropper, action shortcuts, and document-information regressions. The initial full run exposed the native clipboard representation change described above. Final Shift live-selection tests, Windows release compilation and installer verification remain in progress. No installer is considered verified until that run succeeds.

@@ -33,9 +33,11 @@ fn leo_snapping_engine_alt_copy_full_path_keeps_geometric_snap_with_pixel_option
     selected.set([id]);
     let p = paint();
     let c = ToolContext { snap_to_pixel: true, ..cx(&d, &selected, &p) };
-    let mut tool = DirectSelectionTool::new(false);
-    let (v, labels) = drag(&mut tool, &c, (600.0, 200.0), (504.0, 235.0), Mods { alt: true, ..Mods::default() });
-    assert_eq!(v["copy"], json!(true));
-    assert_eq!(v["matrix"], json!([1.0, 0.0, 0.0, 1.0, -100.0, 35.0]));
-    assert_eq!(labels, vec!["path".to_string()]);
+    for shift in [false, true] {
+        let mut tool = DirectSelectionTool::new(false);
+        let (v, labels) = drag(&mut tool, &c, (600.0, 200.0), (504.0, 235.0), Mods { alt: true, shift, ..Mods::default() });
+        assert_eq!(v["copy"], json!(true));
+        assert_eq!(v["matrix"], json!([1.0, 0.0, 0.0, 1.0, -100.0, if shift { 0.0 } else { 35.0 }]));
+        assert_eq!(labels, vec!["path".to_string()]);
+    }
 }
