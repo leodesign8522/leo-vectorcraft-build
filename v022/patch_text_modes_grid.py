@@ -21,6 +21,12 @@ edit('crates/engine/src/prefs.rs','    pub auto_size_area_type: bool,', '''    p
     pub leo_text_defaults_v1: bool,''')
 edit('crates/engine/src/prefs.rs','            auto_size_area_type: false,',
      '            auto_size_area_type: true,\n            leo_text_defaults_v1: true,')
+# This import regression deliberately needs overflow from a fixed first frame.
+# Specify that fixture precondition now that NEW area text defaults to Auto Height.
+# The assertion that the second frame receives/outlines text remains unchanged.
+edit('crates/engine/src/cmd/fileio/tests_aiimport.rs',
+     'fn outlined_threaded_type_of_the_editing_data_shows_the_text_of_every_frame() {\n    let mut s = Session::new();',
+     'fn outlined_threaded_type_of_the_editing_data_shows_the_text_of_every_frame() {\n    let mut s = Session::new();\n    s.prefs.auto_size_area_type = false; // Fixed-frame threading fixture, independent of creation defaults.')
 edit('crates/ui-egui/src/prefs_dialog.rs',
      '    app.session.apply_prefs(p);', '''    if !p.leo_text_defaults_v1 {
         p.auto_size_area_type = true;

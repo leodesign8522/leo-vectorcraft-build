@@ -172,15 +172,6 @@ jobs:
         run: |
           cargo test --locked -p vectorcraft-engine guide_clipboard -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native guide clipboard regressions failed" }
-      - name: Compile Windows x64 native EXE
-        shell: pwsh
-        working-directory: vectorcraft
-        env:
-          CARGO_INCREMENTAL: "0"
-          CARGO_TERM_COLOR: always
-        run: |
-          cargo build --release --locked -p vectorcraft
-          if ($LASTEXITCODE -ne 0) { throw "Core Bridge Windows compilation failed" }
       - name: Test live corner endpoint movement, regeneration and undo
         # Shared backend source is identical in both editions; validate it once.
         shell: pwsh
@@ -223,6 +214,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "JPEG/PNG export option regression failed" }
           cargo test --locked -p vectorcraft-ui-egui leo_core_bridge::workspace_io::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Workspace JSON compatibility regression failed" }
+      - name: Compile Windows x64 native EXE
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+          CARGO_TERM_COLOR: always
+        run: |
+          cargo build --release --locked -p vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Core Bridge Windows compilation failed" }
       - name: Package portable v0.22 experimental build
         shell: pwsh
         run: |

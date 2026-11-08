@@ -81,3 +81,6 @@ jobs:
 
           cargo test --locked -p vectorcraft-engine leo_text_modes_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Text modes/defaults/grid regressions failed" }
+
+          cargo test --locked -p vectorcraft-engine cmd::fileio::tests_aiimport -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native editing-data/threaded-text regressions failed" }
