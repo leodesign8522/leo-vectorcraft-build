@@ -34,7 +34,8 @@ edit('        // On a gradient mesh a click picks the point,', '''        if !se
             && cx.doc.node(h.leaf).is_some_and(|n| n.path_data().is_some())
         {
             self.state = State::MoveObject { start: p, grab: None, hold: hold_point(cx, &h, p), began: false, deselect: None };
-            if !ev.mods.alt {
+            if ev.mods.alt { self.click_group = next_group(cx, &h.ancestry); }
+            else {
                 if matches!(h.kind, HitKind::Stroke | HitKind::Outline) {
                     if let Some(seg) = segment_at(cx, h.leaf, p) { self.click_segment = Some((h.leaf, seg.si, seg.seg)); }
                 } else { self.leo_click_leaf = Some(h.leaf); }
