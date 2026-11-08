@@ -42,7 +42,7 @@ edit("xform/transform.rs","                let (m, text) = self.matrix_for(d.ori
                 if let Some(rotation)=&self.rotation {
                     let raw=(p-d.origin).atan2()-(d.pick-d.origin).atan2();
                     let c=m.as_coeffs();text=format!("{:.1}°",vectorcraft_geom::normalize_deg(-c[1].atan2(c[0]).to_degrees()));
-                    if let Some((matrix,angle,guides))=rotation.snap(cx,raw,p,ev.mods.shift) {
+                    if let Some((matrix,angle,guides))=rotation.snap(cx,raw,p,ev.mods.shift || ev.backquote) {
                         m=matrix;text=format!("{:.1}°",vectorcraft_geom::normalize_deg(-angle.to_degrees()));self.hover=guides;
                     }
                 }""")

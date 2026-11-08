@@ -25,5 +25,16 @@ mod leo_rotation_tool_tests {
             assert_eq!(t.overlays(&cx).iter().any(|o| matches!(o,Overlay::Label {text,..} if text.starts_with("旋转吸附"))),!mods.shift);
             let out=t.pointer(&cx,&PointerEvent::new(PointerKind::Up,p.x,p.y).with_mods(mods));assert!(out.iter().any(|a| matches!(a,Action::Commit)));
         }
+        // Backquote transforms pattern fills only: the actual outline must not
+        // advertise a geometric edge hit when its geometry is stationary.
+        let mut t=TransformTool::new(TransformKind::Rotate);
+        for kind in [PointerKind::Down,PointerKind::Up] {t.pointer(&cx,&PointerEvent::new(kind,600.0,600.0));}
+        t.pointer(&cx,&PointerEvent::new(PointerKind::Down,200.0,600.0));
+        let p=origin+(Affine::rotate(0.5f64.atan()+0.01)*Point::new(-400.0,0.0)).to_vec2();
+        let mut event=PointerEvent::new(PointerKind::Drag,p.x,p.y);event.backquote=true;
+        let out=t.pointer(&cx,&event);
+        let Some(Action::Preview(_,v))=out.last() else {panic!("{out:?}")};
+        assert_eq!(v["objects"],json!(false));assert_eq!(v["patterns"],json!(true));
+        assert!(!t.overlays(&cx).iter().any(|o| matches!(o,Overlay::Label {text,..} if text.starts_with("旋转吸附"))));
     }
 }
