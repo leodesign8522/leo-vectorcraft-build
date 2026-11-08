@@ -94,6 +94,23 @@ mod leo_glyph_bounds_tests {
     }
 
     #[test]
+    fn leo_glyph_bounds_group_and_preview_controls_preserve_render_geometry() {
+        for preview in [false,true] {
+            let (mut s,id)=fixture("a\nAgjp",true);s.prefs.use_preview_bounds=preview;
+            let other=NodeId(s.execute("shape.rectangle",&json!({"x":400,"y":220,"width":30,"height":30})).unwrap()["id"].as_u64().unwrap());
+            s.execute("select.set",&json!({"ids":[id.0,other.0]})).unwrap();
+            let group=NodeId(s.execute("object.group",&json!({})).unwrap()["id"].as_u64().unwrap());
+            let geo=s.doc().unwrap().doc.bounds_of(&[group],false);
+            toggle(&mut s,true);assert!(text(&s,id).leo_glyph_bounds);
+            assert_eq!(s.doc().unwrap().doc.bounds_of(&[group],false),geo);
+            let t=text(&s,id);
+            let lay=vectorcraft_text::layout(vectorcraft_text::FontDb::global(),t);
+            let expected=t.xf.transform_rect_bbox(lay.ink_bounds().unwrap()).union(s.transform_bounds(&[other]).unwrap());
+            close(s.transform_bounds(&[group]).unwrap(),expected);
+        }
+    }
+
+    #[test]
     fn leo_glyph_bounds_editing_updates_controls_and_numeric_scale_keeps_frame() {
         let (mut s,id)=fixture("a",true);toggle(&mut s,true);
         let before=s.transform_box(&[id]).unwrap();

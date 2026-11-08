@@ -35,8 +35,8 @@ try:
         return hashlib.sha256(base64.b64decode(image['pngBase64'])).hexdigest()
     def flag_only(before, after, on):
         expected = copy.deepcopy(before)
-        if on: expected['kind']['text']['leoGlyphBounds'] = True
-        else: expected['kind']['text'].pop('leoGlyphBounds', None)
+        if on: expected['kind']['leoGlyphBounds'] = True
+        else: expected['kind'].pop('leoGlyphBounds', None)
         assert expected == after, 'Selection preference must be the only object-data change'
     cases = []
     for index, (text, area, rotated) in enumerate([
@@ -67,7 +67,7 @@ try:
         assert node(id) == enabled, 'Selection preference did not survive reopen'
         assert ink() == before_pixels
         command('text.setText', id=id, text='Editable text\n仍可编辑')
-        assert node(id)['kind']['text']['leoGlyphBounds'] is True
+        assert node(id)['kind']['leoGlyphBounds'] is True
         command('edit.undo'); assert node(id) == enabled
         command('type.glyphSelectionBounds', on=False); flag_only(enabled,node(id),False)
         command('edit.undo'); assert node(id) == enabled

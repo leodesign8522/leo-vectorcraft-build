@@ -100,6 +100,13 @@ edit('crates/ui-egui/src/canvas/overlays.rs',
 edit('crates/ui-egui/src/canvas/overlays.rs',
      '&& matches!(tx.kind, vectorcraft_doc::TextKind::Point)\n',
      '&& matches!(tx.kind, vectorcraft_doc::TextKind::Point) && !tx.leo_glyph_bounds\n')
+edit('crates/ui-egui/src/canvas/outline.rs',
+     '        NodeKind::Text(t) => {\n',
+     '''        NodeKind::Text(t) => {
+            // Ink controls replace the metric outline even when this text is nested
+            // in a selected group. The Type tool draws its real editing frame itself.
+            if t.leo_glyph_bounds { return; }
+''')
 
 # Selection's ports remain available from the Type tool, where the real frame is visible.
 edit('crates/tools/src/text/ports.rs',

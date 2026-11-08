@@ -236,6 +236,7 @@ jobs:
           ${{ inputs.label }} / VectorCraft v0.22.0
 
           Leo Design Core Bridge v0.14.6 / 官方 VectorCraft v0.22.0
+          新增：字符面板“贴合字形选框”按钮，只收紧选择框；保留文字位置、换行和可编辑状态。再次点击恢复。
           新增：R 旋转工具按当前视野内其他对象的真实直边方向吸附，自定义中心不动；共线/平行分别提示，捕获 8px、释放 12.8px，保留 Shift 固定角度与 Alt 复制。
           新增：边框中间手柄缩放接入完整几何目标，修复大文档目标遗漏和网格/像素抢先；支持直线、Bezier、对侧固定、Alt 中心缩放及 Shift 比例，四边捕获 8px、释放 12.8px。
           一个安装包：Core Bridge 通用增强与 Leo Design 节点/对象统一吸附引擎。
@@ -257,7 +258,8 @@ jobs:
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Artifact upload requires the release build and every configured regression to pass.
-          Core Bridge v0.14.6 includes Leo Snapping Engine v1.7: unified node and object movement geometry, finite path/Bezier and artboard edges, bounds alignment, group/multi-object movement, Alt-copy, 8px capture and 12.8px release.
+          Core Bridge v0.14.6 adds Character > 贴合字形选框: tight glyph selection controls without changing editable text, position or wrapping. Click again to restore the metric frame.
+          Includes Leo Snapping Engine v1.7: unified node and object movement geometry, finite path/Bezier and artboard edges, bounds alignment, group/multi-object movement, Alt-copy, 8px capture and 12.8px release.
           Native Actions, custom chords, editable AI import, font matching, selected-segment copy,
           native guide clipboard, live corners, image/ICO export, workspace JSON, selection statistics,
           and Leo node/segment/Bezier, artboard, object edge, group, multi-selection, Alt-copy, Shift, zoom and hysteresis tests are checked.
