@@ -1,10 +1,19 @@
-# Core Bridge 0.14.5 / Snapping Engine 1.7 R 旋转边方向吸附（已验证）
+# Core Bridge 0.14.6 / 贴合字形选框（已验证）
+
+- 字符面板和 Type 菜单增加“贴合字形选框”开关；再次点击恢复原框。
+- 原文字位置、字号、段落框和换行不变，继续可编辑；只改变选择/变换控件的测量方式。
+- 覆盖点文字、多行段落、中文、旋转、空白回退、普通编组、预览边界、保存重开和撤销重做；贴合模式 V 手柄缩放文字而不重新换行。
+- 8 项文字回归、原有吸附回归、完整 Windows x64 构建及安装校验通过；本机五种合成文字渲染前后完全一致，实际字符按钮及保留旋转/缩放/延长线验证通过。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42460703778/artifacts/13610064059)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- 从 **Leo Design VectorCraft 0.22 Bridge 0.14.6** 新快捷方式启动，选中文字 → 字符 / Character → **贴合字形选框**。
+
+# 历史交付 Core Bridge 0.14.5 / Snapping Engine 1.7 R 旋转边方向吸附（已验证）
 
 - 自定义旋转中心保持不动，参照当前视野内其他矢量对象直边，分别提示共线或平行。
 - 8px 捕获、12.8px 释放，按旋转造成的最大端点/鼠标位移计量；保留 Shift 固定角度及 Alt 复制。
 - 旋转目标和原始边方向在拖动开始时冻结，当前视野用于新捕获，辅助线只在真实角度命中时显示。
 - Windows x64 编译、专项/保留功能回归及安装校验通过；本机普通/Alt/Shift、共线/平行、中心固定、捕获释放、整组刚性及撤销重做通过。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42436304050/artifacts/13600848737)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42436304050/artifacts/13600848737)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_5.md)。
 - 从 **Leo Design VectorCraft 0.22 Bridge 0.14.5** 新快捷方式启动，开启智能参考线，选物体后 R 单击指定中心、拖动旋转。
 
 # 历史交付 Core Bridge 0.14.4 / Snapping Engine 1.6 边框缩放吸附（已验证）

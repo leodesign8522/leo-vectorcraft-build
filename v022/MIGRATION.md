@@ -1,7 +1,13 @@
-# Core Bridge 0.14.5 / VectorCraft 0.22.0
+# Core Bridge 0.14.6 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
+
+## 0.14.6 non-destructive glyph selection controls
+
+Character panel and Type menu add **贴合字形选框** (`type.glyphSelectionBounds`). A per-text persisted flag chooses laid-out glyph ink for selection and transform controls, without changing TextKind frames, transforms, runs, paragraph breaks or render geometry. The Type tool keeps its real editing frame. V handles and numeric transforms use the same tight measurement and scale editable area text without resizing its flow frame. Empty ink falls back to the native frame; transformed/effected objects retain native controls where needed. Mixed ordinary groups include the selected text's ink, while stale metric-frame outlines and Selection-only text ports are hidden in this mode. Turning the flag off restores native controls.
+
+Eight engine regressions pass, including point/area/CJK text, exact rotated-outline measurement, old/new serialization, edits, actual V pointer scaling, numeric scaling, preview bounds, groups, and undo/redo. Five isolated native-app cases preserve rendered PNG bytes exactly and survive save/reopen and continued text editing. The actual Character button and selected-frame screenshots were checked. Windows x64 build, retained regressions and installer identity/hash checks pass. See [verification and exact hashes](VERIFIED_RELEASE.md).
 
 ## 0.14.5 R-tool fixed-pivot edge directions
 

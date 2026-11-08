@@ -66,6 +66,7 @@ try:
         call('app.open', {'path':str(path)})
         assert node(id) == enabled, 'Selection preference did not survive reopen'
         assert ink() == before_pixels
+        command('select.set', ids=[id])
         command('text.setText', id=id, text='Editable text\n仍可编辑')
         assert node(id)['kind']['leoGlyphBounds'] is True
         command('edit.undo'); assert node(id) == enabled
