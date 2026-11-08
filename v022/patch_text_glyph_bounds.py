@@ -36,6 +36,19 @@ for rel in ['crates/tools/src/select.rs', 'crates/engine/src/cmd/object/align.rs
         s = s.replace('preview::oriented_bounds(', 'preview::leo_selection_box(')
     p.write_text(s, encoding='utf-8', newline='\n')
 
+edit('crates/engine/src/cmd/object/align.rs',
+     'return effects::preview::bounds_of(d, ids, self.preview);',
+     'return effects::preview::leo_selection_bounds(d, ids, self.preview);')
+edit('crates/engine/src/cmd/object/align.rs',
+     '    fn of(self, d: &Document, id: NodeId) -> Option<Rect> {\n',
+     '''    fn of(self, d: &Document, id: NodeId) -> Option<Rect> {
+        // Per-object ink controls must also define Align/Distribute measurements,
+        // including text nested in ordinary groups and key-object references.
+        if effects::preview::leo_has_glyph_bounds(d, &[id]) {
+            return effects::preview::leo_selection_bounds(d, &[id], self.preview);
+        }
+''')
+
 edit('crates/tools/src/select.rs',
      'let is_area = |id: &NodeId| cx.doc.node(*id).is_some_and(is_area_type);',
      'let is_area = |id: &NodeId| cx.doc.node(*id).is_some_and(|n| is_area_type(n) && !matches!(&n.kind, vectorcraft_doc::NodeKind::Text(t) if t.leo_glyph_bounds));')
@@ -83,7 +96,7 @@ edit('crates/ui-egui/src/panels/character.rs',
     ui.add_space(4.0);
     let tight = shared_text_flag(app, |t| t.leo_glyph_bounds) == Some(true);
     if ui.selectable_label(tight, "贴合字形选框")
-        .on_hover_text("选框贴合实际字形；保留文字位置、字号和换行。再次点击恢复排版框。文字仍可编辑。")
+        .on_hover_text("选框和对象对齐按实际字形计算；保留字号和换行。再次点击恢复排版框。文字仍可编辑。")
         .clicked()
     {
         let p = if let Some((id, _, _)) = text_editing(app) {

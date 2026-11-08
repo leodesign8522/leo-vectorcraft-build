@@ -142,4 +142,66 @@ mod leo_glyph_bounds_tests {
         assert!((s.transform_box(&[id]).unwrap().rect.width()/r.width()-2.0).abs()<1e-6);
         s.execute("edit.undo",&json!({})).unwrap();assert_eq!(text(&s,id),&before);
     }
+
+    #[test]
+    fn leo_glyph_bounds_align_centers_on_key_keeps_rectangle_and_text_layout() {
+        for area in [false,true] {
+            for preview in [false,true] {
+                for (horizontal,vertical) in [(true,false),(false,true),(true,true)] {
+                    let (mut s,id)=fixture(if area {"B5\nAgjp"} else {"B5"},area);
+                    s.prefs.use_preview_bounds=preview;
+                    toggle(&mut s,true);
+                    let before=text(&s,id).clone();
+                    let old=s.transform_bounds(&[id]).unwrap();
+                    let key=NodeId(s.execute("shape.rectangle",&json!({"x":400,"y":250,"width":600,"height":300})).unwrap()["id"].as_u64().unwrap());
+                    let key_before=s.doc().unwrap().doc.node(key).unwrap().clone();
+                    let reference=s.transform_bounds(&[key]).unwrap();
+                    s.execute("select.set",&json!({"ids":[id.0,key.0]})).unwrap();
+                    s.execute("select.key",&json!({"id":key.0})).unwrap();
+                    let mut p=json!({"to":"key"});
+                    if horizontal {p["horizontal"]=json!("center");}
+                    if vertical {p["vertical"]=json!("center");}
+                    s.execute("object.align",&p).unwrap();
+                    let ink=s.transform_bounds(&[id]).unwrap();
+                    assert!((ink.center().x-if horizontal {reference.center().x}else{old.center().x}).abs()<1e-7);
+                    assert!((ink.center().y-if vertical {reference.center().y}else{old.center().y}).abs()<1e-7);
+                    assert_eq!(s.doc().unwrap().doc.node(key).unwrap(),&key_before);
+                    assert_eq!(text(&s,id).kind,before.kind);assert_eq!(text(&s,id).runs,before.runs);
+                    let moved=text(&s,id).clone();
+                    s.execute("edit.undo",&json!({})).unwrap();assert_eq!(text(&s,id),&before);
+                    s.execute("edit.redo",&json!({})).unwrap();assert_eq!(text(&s,id),&moved);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn leo_glyph_bounds_artboard_selection_and_key_text_use_same_ink_box() {
+        for mode in ["artboard","selection","key"] {
+            let (mut s,id)=fixture("B5",false);toggle(&mut s,true);
+            s.execute("object.transform",&json!({"matrix":[0.8,0.6,-0.6,0.8,50,20]})).unwrap();
+            let other=NodeId(s.execute("shape.rectangle",&json!({"x":700,"y":500,"width":160,"height":90})).unwrap()["id"].as_u64().unwrap());
+            s.execute("select.set",&json!({"ids":[id.0,other.0]})).unwrap();
+            let target=match mode {
+                "artboard"=>Point::new(600.0,500.0),
+                "key"=>{s.execute("select.key",&json!({"id":id.0})).unwrap();s.transform_bounds(&[id]).unwrap().center()},
+                _=>s.transform_bounds(&[id,other]).unwrap().center(),
+            };
+            let key_before=text(&s,id).clone();
+            s.execute("object.align",&json!({"horizontal":"center","vertical":"center","to":mode,"artboard":0})).unwrap();
+            for moved in [id,other] {
+                assert!(s.transform_bounds(&[moved]).unwrap().center().distance(target)<1e-7, "{mode}");
+            }
+            if mode=="key" {assert_eq!(text(&s,id),&key_before);}
+        }
+    }
+
+    #[test]
+    fn leo_glyph_bounds_disabled_alignment_keeps_legacy_metrics() {
+        let (mut s,id)=fixture("B5",false);
+        let old=text(&s,id).clone();
+        s.execute("object.align",&json!({"horizontal":"center","vertical":"center","to":"artboard","artboard":0})).unwrap();
+        assert!(text(&s,id).bounds().unwrap().center().distance(Point::new(600.0,500.0))<1e-7);
+        assert_eq!(text(&s,id).runs,old.runs);assert!(!text(&s,id).leo_glyph_bounds);
+    }
 }
