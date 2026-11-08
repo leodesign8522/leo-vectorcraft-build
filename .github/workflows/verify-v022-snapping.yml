@@ -8,10 +8,12 @@ on:
       - ".github/workflows/verify-v022-snapping.yml"
       - "v022/leo_snapping_engine.rs"
       - "v022/rotation_*.rs"
+      - "v022/text_glyph_*.rs"
       - "v022/geometry_regressions.rs"
       - "v022/direct_regressions.rs"
       - "v022/select_regressions.rs"
-      - "v022/patch_anchor_drag_feedback.py"
+      - "v022/patch_*.py"
+      - "prepare_v022.py"
 
 permissions:
   contents: read
@@ -72,3 +74,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Native Selection resize/move/rotation regressions failed" }
           cargo test --locked -p vectorcraft-tools xform::transform:: -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native R/reflect/scale/shear regressions failed" }
+
+          cargo test --locked -p vectorcraft-engine leo_glyph_bounds_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Text glyph bounds regressions failed" }

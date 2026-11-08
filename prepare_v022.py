@@ -17,6 +17,7 @@ for name in patches:
     subprocess.run([sys.executable, str(root / folder / f'patch_{name}.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(root / 'scripts/patch_color_panel_lock.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(dest / 'patch_anchor_drag_feedback.py'), sys.argv[1]], check=True)
+subprocess.run([sys.executable, str(dest / 'patch_text_glyph_bounds.py'), sys.argv[1]], check=True)
 for source, target in [('geometry_regressions.rs', 'guides/leo_snapping_engine.rs'),
                        ('rotation_regressions.rs', 'guides/leo_snapping_engine.rs'),
                        ('direct_regressions.rs', 'direct/tests.rs'),
@@ -34,7 +35,7 @@ s = p.read_text(encoding='utf-8')
 old = 'println!("vectorcraft {}", env!("CARGO_PKG_VERSION"));'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.22 executable version identity anchor')
-s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.22.0 (Leo Design Core Bridge 0.14.5; Snapping Engine 1.7)\\n");')
+s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.22.0 (Leo Design Core Bridge 0.14.6; Snapping Engine 1.7)\\n");')
 p.write_text(s, encoding='utf-8', newline='\n')
 
 p = Path(sys.argv[1]) / 'crates/ui-egui/src/dialogs/about.rs'
@@ -42,5 +43,5 @@ s = p.read_text(encoding='utf-8')
 old = '    crate::community::links(app, ui);'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.22 About build identity anchor')
-s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.14.5 / Snapping Engine 1.7");\n' + old)
+s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.14.6 / Snapping Engine 1.7");\n' + old)
 p.write_text(s, encoding='utf-8', newline='\n')
