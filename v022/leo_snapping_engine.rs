@@ -1,4 +1,4 @@
-//! Leo Design Snapping Engine v1.6: finite geometry and indexed straight-edge extensions.
+//! Leo Design Snapping Engine v1.7: finite geometry and indexed straight-edge extensions.
 //! Node drags use exact anchors and finite path geometry; object moves add selected bounds,
 //! multi-object/group source anchors, alignment axes and artboard edges. Capture is in SCREEN px.
 use super::*;

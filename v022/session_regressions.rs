@@ -15,6 +15,29 @@ mod leo_v022_session_tests {
     }
 
     #[test]
+    fn leo_v022_r_rotation_fixed_pivot_commit_undo_redo_and_alt_copy() {
+        let mut s=Session::new();s.execute("file.new",&json!({"width":1200,"height":1200})).unwrap();
+        let source=NodeId(s.execute("path.create",&json!({"d":"M200 600L600 600L600 700L200 700Z"})).unwrap()["id"].as_u64().unwrap());
+        let target=NodeId(s.execute("shape.line",&json!({"x1":600,"y1":600,"x2":200,"y2":400})).unwrap()["id"].as_u64().unwrap());
+        let original=s.doc().unwrap().doc.node(source).unwrap().clone();let origin=Point::new(600.0,600.0);
+        let want=0.5f64.atan();let raw=want+0.01;let p=origin+(vectorcraft_geom::Affine::rotate(raw)*Point::new(-400.0,0.0)).to_vec2();
+        let expected=origin+(vectorcraft_geom::Affine::rotate(want)*Point::new(-400.0,0.0)).to_vec2();let view=ViewInfo::default();
+        for alt in [false,true] {
+            s.execute("select.set",&json!({"ids":[source.0]})).unwrap();s.select_tool("rotate",view).unwrap();
+            for kind in [PointerKind::Down,PointerKind::Up] {s.pointer(&PointerEvent::new(kind,origin.x,origin.y),view).unwrap();}
+            let mods=Mods {alt,..Mods::default()};
+            for (kind,p) in [(PointerKind::Down,Point::new(200.0,600.0)),(PointerKind::Drag,p),(PointerKind::Up,p)] {s.pointer(&PointerEvent::new(kind,p.x,p.y).with_mods(mods),view).unwrap();}
+            let moved=s.doc().unwrap().selection.objects[0];
+            assert_eq!(moved!=source,alt);assert!(endpoint(&s,moved,0).distance(expected)<1e-7);assert!(endpoint(&s,moved,1).distance(origin)<1e-7);
+            if alt {assert_eq!(s.doc().unwrap().doc.node(source).unwrap(),&original);}
+            assert_eq!(endpoint(&s,target,0),origin);
+            s.execute("edit.undo",&json!({})).unwrap();assert_eq!(s.doc().unwrap().doc.node(source).unwrap(),&original);
+            s.execute("edit.redo",&json!({})).unwrap();assert!(endpoint(&s,moved,0).distance(expected)<1e-7);
+            s.execute("edit.undo",&json!({})).unwrap();
+        }
+    }
+
+    #[test]
     fn leo_v022_resize_side_handle_preview_commit_undo_redo_keeps_opposite_edge() {
         let mut s=Session::new();s.execute("file.new",&json!({"width":1400,"height":1200})).unwrap();
         let source=NodeId(s.execute("shape.rectangle",&json!({"x":400,"y":300,"width":300,"height":200})).unwrap()["id"].as_u64().unwrap());

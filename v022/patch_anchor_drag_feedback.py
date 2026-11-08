@@ -23,13 +23,29 @@ edit("guides/targets.rs",
      "use super::snap::",
      '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex, LeoScaleLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
 (root / "guides/leo_snapping_engine.rs").write_text(
-    Path(__file__).with_name("leo_snapping_engine.rs").read_text(encoding="utf-8"),
+    Path(__file__).with_name("leo_snapping_engine.rs").read_text(encoding="utf-8")+"\n"+Path(__file__).with_name("rotation_snapping.rs").read_text(encoding="utf-8"),
     encoding="utf-8", newline="\n"
 )
 
 edit("guides.rs",
      "pub use targets::Targets;",
      "pub use targets::Targets;\npub(crate) use targets::ObjectMoveSnap;")
+edit("guides/targets.rs","pub(crate) use leo_snapping_engine::ObjectMoveSnap;","pub(crate) use leo_snapping_engine::{ObjectMoveSnap,LeoRotationSnap};")
+edit("guides.rs","pub(crate) use targets::ObjectMoveSnap;","pub(crate) use targets::{ObjectMoveSnap,LeoRotationSnap};")
+edit("xform/transform.rs","use crate::guides::{PointSnap, Targets, snap_pick};","use crate::guides::{PointSnap, Targets, snap_pick, LeoRotationSnap};")
+edit("xform/transform.rs","    snap: Option<PointSnap>,","    snap: Option<PointSnap>,\n    rotation: Option<LeoRotationSnap>,")
+edit("xform/transform.rs","hover: vec![], snap: None }","hover: vec![], snap: None, rotation: None }")
+edit("xform/transform.rs","        self.snap = None;","        self.snap = None;\n        self.rotation = None;")
+edit("xform/transform.rs","                    self.snap = Some(PointSnap::new(cx, || Targets::collect(cx.doc, &cx.selection.objects, None)));","                    self.snap = Some(PointSnap::new(cx, || Targets::collect(cx.doc, &cx.selection.objects, None)));\n                    self.rotation=if self.kind==TransformKind::Rotate {LeoRotationSnap::new(cx,d.origin)} else {None};")
+edit("xform/transform.rs","                let (p, guides) = self.snap.as_ref().map_or((p, vec![]), |s| s.snap(cx, p));","                let (p, guides) = if self.rotation.is_some() {(p,vec![])} else {self.snap.as_ref().map_or((p, vec![]), |s| s.snap(cx, p))};")
+edit("xform/transform.rs","                let (m, text) = self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds);","""                let (mut m, mut text) = self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds);
+                if let Some(rotation)=&self.rotation {
+                    let raw=(p-d.origin).atan2()-(d.pick-d.origin).atan2();
+                    let c=m.as_coeffs();text=format!("{:.1}°",vectorcraft_geom::normalize_deg(-c[1].atan2(c[0]).to_degrees()));
+                    if let Some((matrix,angle,guides))=rotation.snap(cx,raw,p,ev.mods.shift) {
+                        m=matrix;text=format!("{:.1}°",vectorcraft_geom::normalize_deg(-angle.to_degrees()));self.hover=guides;
+                    }
+                }""")
 
 edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
     pub(crate) fn leo_for_scale(cx: &ToolContext) -> Self {
@@ -388,13 +404,16 @@ ui_path=Path(sys.argv[1]) / "crates/ui-egui/src/canvas/overlays.rs"
 ui_source=ui_path.read_text(encoding="utf-8")
 ui_anchor='                let sp = xf.to_screen(*pt) + vec2(8.0, -14.0);'
 if ui_source.count(ui_anchor)!=1: raise SystemExit("FAIL extension label background anchor")
-ui_source=ui_source.replace(ui_anchor,ui_anchor+'\n                if text == "延长线吸附" {\n                    let galley=p.layout_no_wrap(text.to_owned(),egui::FontId::proportional(11.0),c32(*color));\n                    let backdrop=egui::Rect::from_min_size(sp-vec2(3.0,2.0),galley.size()+vec2(6.0,4.0));\n                    p.rect_filled(backdrop,CornerRadius::same(3),Color32::from_rgba_unmultiplied(0x20,0x24,0x2b,235));\n                }\n')
+ui_source=ui_source.replace(ui_anchor,ui_anchor+'\n                if text == "延长线吸附" || text.starts_with("旋转吸附") {\n                    let galley=p.layout_no_wrap(text.to_owned(),egui::FontId::proportional(11.0),c32(*color));\n                    let backdrop=egui::Rect::from_min_size(sp-vec2(3.0,2.0),galley.size()+vec2(6.0,4.0));\n                    p.rect_filled(backdrop,CornerRadius::same(3),Color32::from_rgba_unmultiplied(0x20,0x24,0x2b,235));\n                }\n')
 ui_path.write_text(ui_source,encoding="utf-8",newline="\n")
 
-print("PASS Leo Snapping Engine 1.6: finite geometry, indexed extensions and yellow feedback")
+print("PASS Leo Snapping Engine 1.7: finite geometry, indexed extensions and yellow feedback")
 
 # Resize now shares Leo's fixed 8 screen-pixel acquisition contract. The native
 # readout-preference checks still run, with the superseded 0/4px pull updated.
 edit("select/tests.rs",
      "for (tol, want) in [(4.0, 94.0), (8.0, 100.0), (0.0, 94.0)] {",
      "for (tol, want) in [(4.0, 100.0), (8.0, 100.0), (0.0, 100.0)] { // Leo: fixed 8 screen pixels")
+
+with (root / "xform/transform.rs").open("a",encoding="utf-8") as f:
+    f.write(Path(__file__).with_name("rotation_tool_regressions.rs").read_text(encoding="utf-8"))
