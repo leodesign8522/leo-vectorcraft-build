@@ -28,8 +28,12 @@ for rel in ['crates/tools/src/select.rs', 'crates/engine/src/cmd/object/align.rs
     p = root / rel
     s = p.read_text(encoding='utf-8')
     # These two files measure selection controls, not rendering/layout geometry.
-    s = s.replace('preview::bounds_of(', 'preview::leo_selection_bounds(')
-    s = s.replace('preview::oriented_bounds(', 'preview::leo_selection_box(')
+    if rel.endswith('align.rs'):
+        s = s.replace('preview::bounds_of(&self.doc()', 'preview::leo_selection_bounds(&self.doc()')
+        s = s.replace('preview::oriented_bounds(&self.doc()', 'preview::leo_selection_box(&self.doc()')
+    else:
+        s = s.replace('preview::bounds_of(', 'preview::leo_selection_bounds(')
+        s = s.replace('preview::oriented_bounds(', 'preview::leo_selection_box(')
     p.write_text(s, encoding='utf-8', newline='\n')
 
 edit('crates/tools/src/select.rs',

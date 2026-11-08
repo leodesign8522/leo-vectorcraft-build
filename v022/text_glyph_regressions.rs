@@ -9,7 +9,7 @@ mod leo_glyph_bounds_tests {
     fn fixture(text: &str, area: bool) -> (Session, NodeId) {
         let mut s = Session::new();
         s.execute("file.new", &json!({"width":1200,"height":1000})).unwrap();
-        let mut p = json!({"x":150,"y":180,"text":text,"size":80,"fontFamily":"Arial"});
+        let mut p = json!({"x":150,"y":180,"text":text,"size":80,"font":"Arial"});
         if area { p["area"] = json!({"width":560,"height":650}); }
         let id = NodeId(s.execute("text.create", &p).unwrap()["id"].as_u64().unwrap());
         s.execute("select.set", &json!({"ids":[id.0]})).unwrap();
@@ -91,6 +91,23 @@ mod leo_glyph_bounds_tests {
             let (mut s,id)=fixture(content,true);let before=s.transform_box(&[id]);
             toggle(&mut s,true);assert_eq!(s.transform_box(&[id]),before);
         }
+    }
+
+    #[test]
+    fn leo_glyph_bounds_editing_updates_controls_and_numeric_scale_keeps_frame() {
+        let (mut s,id)=fixture("a",true);toggle(&mut s,true);
+        let before=s.transform_box(&[id]).unwrap();
+        s.execute("text.setText",&json!({"id":id.0,"text":"MMMMMM\nAgjp"})).unwrap();
+        let t=text(&s,id).clone();let bx=s.transform_box(&[id]).unwrap();
+        assert!(bx.rect.width()>before.rect.width());
+        let lay=vectorcraft_text::layout(vectorcraft_text::FontDb::global(),&t);
+        close(s.transform_bounds(&[id]).unwrap(),t.xf.transform_rect_bbox(lay.ink_bounds().unwrap()));
+        s.execute("object.setBounds",&json!({"width":bx.rect.width()*1.5,"height":bx.rect.height()*1.5,"reference":0})).unwrap();
+        assert_eq!(text(&s,id).kind,t.kind);assert_eq!(text(&s,id).runs,t.runs);
+        let after=s.transform_box(&[id]).unwrap();
+        assert!((after.rect.width()/bx.rect.width()-1.5).abs()<1e-6);
+        assert!((after.rect.height()/bx.rect.height()-1.5).abs()<1e-6);
+        s.execute("edit.undo",&json!({})).unwrap();assert_eq!(text(&s,id),&t);
     }
 
     #[test]
