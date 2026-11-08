@@ -19,6 +19,7 @@ subprocess.run([sys.executable, str(root / 'scripts/patch_color_panel_lock.py'),
 subprocess.run([sys.executable, str(dest / 'patch_anchor_drag_feedback.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(dest / 'patch_text_glyph_bounds.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(dest / 'patch_text_modes_grid.py'), sys.argv[1]], check=True)
+subprocess.run([sys.executable, str(dest / 'patch_view_navigation.py'), sys.argv[1]], check=True)
 for source, target in [('geometry_regressions.rs', 'guides/leo_snapping_engine.rs'),
                        ('rotation_regressions.rs', 'guides/leo_snapping_engine.rs'),
                        ('direct_regressions.rs', 'direct/tests.rs'),

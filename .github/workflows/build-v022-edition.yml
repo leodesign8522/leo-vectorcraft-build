@@ -158,7 +158,7 @@ jobs:
         run: |
           cargo test --locked -p vectorcraft-engine leo_text_modes_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Text modes/defaults/grid regressions failed" }
-          cargo test --locked -p vectorcraft-ui-egui leo_text_mode_ui_tests -- --nocapture
+          cargo test --locked -p vectorcraft-ui-egui leo_text_mode_ui -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Text mode UI state/migration regressions failed" }
           cargo test --locked -p vectorcraft-engine leo_glyph_bounds_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Text glyph selection bounds regressions failed" }
@@ -240,7 +240,7 @@ jobs:
           ${{ inputs.label }} / VectorCraft v0.22.0
 
           Leo Design Core Bridge v0.14.8 / 官方 VectorCraft v0.22.0
-          新增：I 吸管复制文字框高度模式和字形选框开关；高度按钮显示当前/混合状态；新建文字默认启用两种贴合。网格吸附开启时暂停智能几何吸附。
+          新增：I 吸管复制文字框高度模式和字形选框开关；高度按钮显示当前/混合状态；新建文字默认启用两种贴合。网格吸附开启时暂停智能几何吸附。Shift+空格不再旋转视图，保留空格平移。
           保留修复：开启“贴合字形选框”后，居中和其他对象对齐统一按字形边界计算。
           保留：字符面板“贴合字形选框”按钮，只收紧选择框；保留文字位置、换行和可编辑状态。再次点击恢复。
           新增：R 旋转工具按当前视野内其他对象的真实直边方向吸附，自定义中心不动；共线/平行分别提示，捕获 8px、释放 12.8px，保留 Shift 固定角度与 Alt 复制。
