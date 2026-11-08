@@ -57,6 +57,8 @@ fn check_text(n: &Node) -> Result<(), String> {
 }
 
 fn prepare(doc: &Document, token: &str) -> Result<Prepared, String> {
+    let assigned_profile=match doc.color_mode {vectorcraft_doc::ColorMode::Cmyk=>&doc.color_profiles.cmyk,_=>&doc.color_profiles.rgb};
+    if assigned_profile.is_some() { return Err("文档指定了 ICC 配置文件；当前可编辑 AI 导出支持 RGB/CMYK 模式和数值，但尚不能保证指定 ICC 的继承。请保留原文件，先在副本中改用工作空间后再导出。".into()); }
     if !doc.text_threads.is_empty() { return Err("串接文字框暂不支持活文字 AI 导出，请先在副本中拆分串接。".into()); }
     let mut texts=vec![];let mut errors=vec![];
     doc.walk(|n| if matches!(n.kind, NodeKind::Text(_)) {

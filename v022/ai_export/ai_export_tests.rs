@@ -10,7 +10,7 @@ fn fixture(mode:&str)->(Document,NodeId,NodeId){
     s.execute("paint.setFill",&json!({"color":color,"keepModel":true})).unwrap();
     s.execute("layer.new",&json!({"name":"Editable text"})).unwrap();
     let text=NodeId(s.execute("text.create",&json!({"x":60,"y":210,"text":"中文整段文字\nSecond paragraph","size":24,"area":{"width":210,"height":150,"fit":"none"},"color":color,"keepModel":true})).unwrap()["id"].as_u64().unwrap());
-    (s.doc().unwrap().doc.clone(),shape,text)
+    (s.doc().unwrap().doc.as_ref().clone(),shape,text)
 }
 
 #[test]
@@ -56,4 +56,16 @@ fn leo_ai_export_tests_mixed_runs_and_nested_parent_order_are_kept_in_manifest()
 fn leo_ai_export_tests_empty_text_list_still_exports_geometry(){
     let (mut doc,shape,text)=fixture("rgb");doc.remove(text).unwrap();
     let p=prepare(&doc,"paths").unwrap();assert!(p.texts.is_empty());assert_eq!(p.doc.node(shape),doc.node(shape));
+}
+
+#[test]
+fn leo_ai_export_tests_explicit_icc_is_not_silently_replaced(){
+    for mode in ["rgb","cmyk"] {
+        let (mut doc,_,_)=fixture(mode);
+        if mode=="cmyk" {doc.color_profiles.cmyk=Some("Custom CMYK".into());}
+        else {doc.color_profiles.rgb=Some("Custom RGB".into());}
+        let before=serde_json::to_value(&doc).unwrap();
+        assert!(prepare(&doc,"profile").err().unwrap().contains("ICC"));
+        assert_eq!(serde_json::to_value(&doc).unwrap(),before);
+    }
 }
