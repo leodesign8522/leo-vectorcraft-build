@@ -32,6 +32,14 @@ with NativeControl(exe) as a:
         assert a.call('document.inspect')['selection']==selection,'export changed selection'
         assert not list(root.glob('.leo-ai-export-*')),'owned temporary data was not cleaned'
         a.call('ui.dialog.confirm')
+    # Empty frames must remain empty/editable, retaining their insertion fonts.
+    cmd('file.new',width=300,height=250)
+    cmd('text.create',x=30,y=80,text='',font='Arial',size=24)
+    cmd('text.create',x=30,y=110,text='',font='Microsoft YaHei',size=24,area={'width':200,'height':100,'fit':'none'})
+    empty=root/'EMPTY_EDITABLE.ai'
+    a.call('ui.menu.invoke',{'command':'file.leoExportEditableAi','params':{'path':str(empty),'wait':True}})
+    assert empty.exists() and empty.read_bytes().startswith(b'%PDF-')
+    a.call('ui.dialog.confirm')
     # A missing font must fail without replacing an existing destination file.
     cmd('file.new',width=300,height=200)
     cmd('text.create',x=30,y=80,text='Missing font',font='LEO_MISSING_FONT_FOR_REGRESSION_0150',size=24)

@@ -42,6 +42,12 @@
    results.push(mode+': PASS / editable point + area text / automatic reflow / exact frame / layers + group / exact color values / edit-save-reopen');
    d.close(SaveOptions.DONOTSAVECHANGES);d=null;
   }
+  d=app.open(new File(root+'EMPTY_EDITABLE.ai'));ok(d.textFrames.length===2,'empty text frames lost');
+  for(var e=0;e<d.textFrames.length;e++){
+   var empty=d.textFrames[e];ok(empty.contents==='','temporary placeholder leaked');empty.contents='Now editable';
+   ok(empty.textRange.characterAttributes.textFont.name===(empty.kind===TextType.POINTTEXT?'ArialMT':'MicrosoftYaHei'),'empty frame insertion font lost');
+  }
+  d.close(SaveOptions.DONOTSAVECHANGES);d=null;results.push('empty frames: PASS / no placeholder / editable insertion fonts');
   return results.join('\n');
  }finally{if(d)d.close(SaveOptions.DONOTSAVECHANGES);app.userInteractionLevel=level;if(old)old.activate();}
 })();

@@ -96,7 +96,10 @@
             tf.flowLinksHorizontally=area.flow==='rows';tf.spacing=(area.inset||0)/scale;
         } else throw Error('当前活文字导出暂不支持路径文字');
         tf.move(marker,ElementPlacement.PLACEBEFORE);
-        for(i=0;i<t.runs.length;i++)content+=t.runs[i].text.replace(/\n/g,'\r');tf.contents=content;
+        for(i=0;i<t.runs.length;i++)content+=t.runs[i].text.replace(/\n/g,'\r');
+        // Zero-length ranges reject leading/paragraph attributes. Seed a glyph
+        // in this private document, apply the insertion style, then remove it.
+        var empty=content.length===0;tf.contents=empty?'A':content;
         if(t.runs.length)character(tf.textRange,t.runs[0].style,doc,scale);
         if(t.runs.length>1){
             var ends=[],end=0;for(i=0;i<t.runs.length;i++){end+=t.runs[i].text.length;ends.push(end);}
@@ -111,6 +114,7 @@
         var x=t.xf,m=app.getIdentityMatrix(),anchor=marker.geometricBounds;
         m.mValueA=x[0];m.mValueB=-x[1];m.mValueC=-x[2];m.mValueD=x[3];m.mValueTX=anchor[0];m.mValueTY=anchor[1];
         tf.transform(m,true,true,true,true,100,Transformation.DOCUMENTORIGIN);
+        if(empty)tf.contents='';
         tf.name=node.name||('Text '+node.id);tf.opacity=(node.opacity===undefined?1:node.opacity)*100;
         tf.hidden=node.visible===false;tf.locked=!!node.locked;marker.remove();return tf;
     }
@@ -177,7 +181,7 @@
         for(n=0;n<manifest.texts.length;n++){
             var rec=manifest.texts[n],marker=markers['$'+rec.marker];if(!marker)throw Error('文字位置标记缺失：'+rec.marker);
             unlock(marker.parent);marker.locked=false;marker.hidden=false;var tf=createText(doc,marker,rec,scale);
-            report.texts.push({id:rec.node.id,name:tf.name,kind:String(tf.kind),contents:tf.contents,font:tf.textRange.characterAttributes.textFont.name,paragraphs:tf.paragraphs.length,lines:tf.lines.length,layer:tf.layer.name});
+            report.texts.push({id:rec.node.id,name:tf.name,kind:String(tf.kind),contents:tf.contents,font:tf.contents.length?tf.textRange.characterAttributes.textFont.name:null,paragraphs:tf.contents.length?tf.paragraphs.length:0,lines:tf.contents.length?tf.lines.length:0,layer:tf.layer.name});
         }
         for(n=0;n<manifest.texts.length;n++){try{doc.spots.getByName(manifest.texts[n].marker).remove();}catch(ignore){}}
         for(n=unlocked.length-1;n>=0;n--){var state=unlocked[n];if(state.layer)state.item.visible=!state.hidden;else state.item.hidden=state.hidden;state.item.locked=state.locked;}
