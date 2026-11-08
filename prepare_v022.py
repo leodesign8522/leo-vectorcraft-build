@@ -20,6 +20,7 @@ subprocess.run([sys.executable, str(dest / 'patch_anchor_drag_feedback.py'), sys
 subprocess.run([sys.executable, str(dest / 'patch_text_glyph_bounds.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(dest / 'patch_text_modes_grid.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(dest / 'patch_view_navigation.py'), sys.argv[1]], check=True)
+subprocess.run([sys.executable, str(dest / 'patch_direct_whole_selection.py'), sys.argv[1]], check=True)
 for source, target in [('geometry_regressions.rs', 'guides/leo_snapping_engine.rs'),
                        ('rotation_regressions.rs', 'guides/leo_snapping_engine.rs'),
                        ('direct_regressions.rs', 'direct/tests.rs'),
@@ -37,7 +38,7 @@ s = p.read_text(encoding='utf-8')
 old = 'println!("vectorcraft {}", env!("CARGO_PKG_VERSION"));'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.22 executable version identity anchor')
-s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.22.0 (Leo Design Core Bridge 0.14.8; Snapping Engine 1.8)\\n");')
+s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.22.0 (Leo Design Core Bridge 0.14.9; Snapping Engine 1.9)\\n");')
 p.write_text(s, encoding='utf-8', newline='\n')
 
 p = Path(sys.argv[1]) / 'crates/ui-egui/src/dialogs/about.rs'
@@ -45,5 +46,5 @@ s = p.read_text(encoding='utf-8')
 old = '    crate::community::links(app, ui);'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.22 About build identity anchor')
-s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.14.8 / Snapping Engine 1.8");\n' + old)
+s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.14.9 / Snapping Engine 1.9");\n' + old)
 p.write_text(s, encoding='utf-8', newline='\n')

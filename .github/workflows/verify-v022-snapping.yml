@@ -10,6 +10,7 @@ on:
       - "v022/rotation_*.rs"
       - "v022/text_glyph_*.rs"
       - "v022/text_mode_*.rs"
+      - "v022/whole_selection_regressions.rs"
       - "v022/geometry_regressions.rs"
       - "v022/direct_regressions.rs"
       - "v022/select_regressions.rs"
@@ -79,6 +80,8 @@ jobs:
           cargo test --locked -p vectorcraft-engine leo_glyph_bounds_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Text glyph bounds regressions failed" }
 
+          cargo test --locked -p vectorcraft-engine leo_whole_selection_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Whole selected group Direct Selection regression failed" }
           cargo test --locked -p vectorcraft-engine leo_text_modes_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Text modes/defaults/grid regressions failed" }
 

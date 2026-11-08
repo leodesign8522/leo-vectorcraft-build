@@ -9,40 +9,53 @@ def edit(rel,old,new):
     p.write_text(s.replace(old,new),encoding='utf-8',newline='\n')
 edit('crates/ui-egui/src/canvas/input.rs',
      '    // Held, Space is the Hand tool for the moment, Space+Shift is the Rotate View tool and',
-     '    // Held, Space (also with Shift) is the Hand tool for the moment, and')
+     '    // Held, Space alone is the Hand tool; Shift+Space is disabled, and')
 edit('crates/ui-egui/src/canvas/input.rs',
      'let rotate_mode = if space { m.shift && !m.command } else { tool == "rotateView" };',
      'let rotate_mode = !space && tool == "rotateView";')
 edit('crates/ui-egui/src/canvas/input.rs',
      'let pan_mode = if space { !m.command && !m.shift } else { tool == "hand" };',
-     'let pan_mode = if space { !m.command } else { tool == "hand" };')
+     'let pan_mode = if space { !m.command && !m.shift } else { tool == "hand" };')
 edit('crates/ui-egui/src/canvas.rs',
      '(!zoom_drag && if space { m.shift && !m.command } else { app.session.tool_id() == "rotateView" })',
      '(!zoom_drag && !space && app.session.tool_id() == "rotateView")')
 rel='crates/ui-egui/src/canvas/tests.rs'
-edit(rel,'fn space_shift_drag_rotates_the_view_whatever_the_tool()', 'fn leo_text_mode_ui_shift_space_pans_without_rotating()')
+edit(rel,'fn space_shift_drag_rotates_the_view_whatever_the_tool()', 'fn leo_text_mode_ui_shift_space_does_nothing()')
 edit(rel,'''    assert!((after.rotation - 90.0).abs() < 1e-3, "{after:?}");
     assert_eq!((after.center, after.zoom), (before.center, before.zoom), "the view turns about its center");''',
      '''    assert_eq!((after.rotation, after.zoom), (before.rotation, before.zoom), "Shift+Space must not rotate");
-    assert_ne!(after.center, before.center, "Shift+Space keeps Space panning");''')
+    assert_eq!(after.center, before.center, "Shift+Space must not pan");''')
 edit(rel,'    // Shift does not round the angle: 90° and 20° more make 110°, not 105°.',
      '    // Another Shift+Space drag must still keep the angle unchanged.')
 edit(rel,'    assert!((app.view().unwrap().rotation - 110.0).abs() < 1e-3, "{:?}", app.view());',
      '    assert_eq!(app.view().unwrap().rotation, before.rotation);')
 edit(rel,'fn the_rotate_cursor_shows_for_space_shift_and_the_rotate_view_tool()',
-     'fn leo_text_mode_ui_shift_space_hand_and_explicit_rotate_cursor()')
+     'fn leo_text_mode_ui_shift_space_no_navigation_cursor()')
 edit(rel,'    assert_eq!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::SHIFT), space(true, Modifiers::SHIFT)]), CursorIcon::Alias);',
-     '    assert_eq!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::SHIFT), space(true, Modifiers::SHIFT)]), CursorIcon::Grab);')
+     '    assert!(!matches!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::SHIFT), space(true, Modifiers::SHIFT)]), CursorIcon::Alias | CursorIcon::Grab | CursorIcon::Grabbing | CursorIcon::ZoomIn));')
 edit(rel,'    // Shift let go during the drag keeps the rotate cursor; after it, Space shows the hand.',
-     '    // Shift let go during the pan keeps the grabbed hand; after it, Space shows the hand.')
+     '    // Releasing Shift restores Space alone and its hand cursor.')
 edit(rel,'    assert_eq!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::NONE), Event::PointerMoved(c + vec2(20.0, 30.0))]), CursorIcon::Alias);',
-     '    assert_eq!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::NONE), Event::PointerMoved(c + vec2(20.0, 30.0))]), CursorIcon::Grabbing);')
+     '    assert_eq!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::NONE), Event::PointerMoved(c + vec2(20.0, 30.0))]), CursorIcon::Grab);')
 edit(rel,'fn a_rotate_view_drag_shows_a_dial_with_the_angle()',
      'fn leo_text_mode_ui_explicit_rotate_dial_but_no_shift_space_dial()')
 edit(rel,'    // A Space+Shift drag with another tool shows it too: 30° and 90° more make 120°.',
-     '    // Space+Shift now pans without a dial or an angle change.')
+     '    // Space+Shift is disabled without a dial or an angle change.')
 edit(rel,'    assert_eq!(dial(&mut app), (Some(c), Some(120), Some("120°".to_string())));',
      '    assert_eq!(dial(&mut app), (None, None, None));')
 edit(rel,'    assert!((app.view().unwrap().rotation - 120.0).abs() < 1e-2, "{:?}", app.view());',
      '    assert!((app.view().unwrap().rotation - 30.0).abs() < 1e-2, "{:?}", app.view());')
 print('Disabled Shift+Space view rotation; preserved Space pan and explicit Rotate View')
+
+edit('crates/ui-egui/src/canvas/input.rs',
+     '    let tool = app.session.tool_id();',
+     '    if space && m.shift { return; }\n    let tool = app.session.tool_id();')
+edit('crates/ui-egui/src/canvas.rs',
+     'let view_cursor = if panning {',
+     'let view_cursor = if space && m.shift { None } else if panning {')
+edit(rel, '    // Space alone still pans, and Cmd+Shift+Space still zooms.',
+     '    // Space alone still pans; Cmd+Shift+Space is also disabled.')
+edit(rel, '    assert_eq!(app.view().unwrap().zoom, crate::state::next_zoom(v.zoom, true), "Cmd+Shift+Space click zooms in");',
+     '    assert_eq!(app.view().unwrap().zoom, v.zoom, "Shift+Space must not zoom");')
+edit(rel, '    assert_eq!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::COMMAND | Modifiers::SHIFT)]), CursorIcon::ZoomIn);',
+     '    assert_ne!(shown(&mut app, vec![Event::ModifiersChanged(Modifiers::COMMAND | Modifiers::SHIFT)]), CursorIcon::ZoomIn);')
