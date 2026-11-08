@@ -1,3 +1,10 @@
+# Core Bridge 0.14.9 / A 整组拖动与 Shift＋空格停用（已验证）
+
+- 整组选中后按 A 直接拖动子路径节点、填充或曲线，保持整组/嵌套组结构。单击后单点编辑、Alt 逐层选组及复制保留。
+- Shift＋空格完全停用视图导航；单独空格保留原生平移。
+- 3 项新引擎、5 项界面回归及实际 A 快捷键 30 种情况通过；保留功能完整回归、Windows 构建和安装校验通过。
+- [验证记录与安装包](v022/VERIFIED_RELEASE.md)。请启动 0.14.9 新快捷方式。
+
 # Core Bridge 0.14.8 / 文字模式吸管与状态、默认开启、网格优先（已验证）
 
 - I 吸管复制文字框高度模式与贴合字形选框开关，提供独立采样选项；保留目标内容、位置和宽度。
@@ -5,7 +12,7 @@
 - 新建文字默认贴合字形，新建段落默认自动高度；旧文件模式不变。
 - 网格开启时暂停智能几何吸附，关闭后恢复原偏好；Shift＋空格不再旋转视图，保留平移。
 - 新增引擎 6 项、界面 5 项及原字形/吸附回归通过；实际 I、旧文件、网格 8 种及保留功能验证通过。Windows 构建和安装校验通过。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42476635541/artifacts/13616951221)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42476635541/artifacts/13616951221)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_8.md)。
 - 从 **Leo Design VectorCraft 0.22 Bridge 0.14.8** 新快捷方式启动。
 
 # 历史交付 Core Bridge 0.14.7 / 字形边界居中对齐（已验证）

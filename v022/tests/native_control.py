@@ -28,7 +28,7 @@ class NativeControl:
     def __exit__(self,*exc):
         try:
             self.cmd('file.closeAll')
-            for _ in range(20):self.call('ui.dialog.set',{'field':'discard','value':True});self.call('ui.dialog.confirm')
+            for _ in range(128):self.call('ui.dialog.set',{'field':'discard','value':True});self.call('ui.dialog.confirm')
         except Exception:pass
         try:self.call('app.quit');self.proc.wait(timeout=10)
         except Exception:pass

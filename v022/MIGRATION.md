@@ -1,3 +1,7 @@
+# Core Bridge 0.14.9 / VectorCraft 0.22.0
+
+Whole selected containers now remain selected throughout Direct Selection drags from descendant anchors, strokes and fills. Click-only release still drills down; Alt ancestor cycling and copying stay native. Shift+Space is disabled at canvas pointer-down, with no navigation cursor; Space alone still pans. Three engine regressions, five UI state/navigation tests, 30 actual A-key group cases and retained suites pass. See [verification](VERIFIED_RELEASE.md).
+
 # Core Bridge 0.14.8 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
