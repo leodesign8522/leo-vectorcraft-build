@@ -123,11 +123,15 @@
             var original=src.artboards[index],bounds=original.artboardRect;
             boards.push({name:String(original.name),rect:[bounds[0],bounds[1],bounds[2],bounds[3]]});
         }
+        var sourceRuler=src.rulerOrigin,ruler=[sourceRuler[0],sourceRuler[1]];
         var scale=Number(src.scaleFactor)||1,b=boards[0].rect;
         var width=(b[2]-b[0])*scale,height=(b[1]-b[3])*scale;
         if(scale>1)width=Math.max(width,16384);
         var dst=app.documents.add(src.documentColorSpace,width,height),initial=dst.layers[0];
         try{
+            // Cross-document duplication otherwise shifts all artwork by the
+            // page height when imported and script-created ruler origins differ.
+            dst.rulerOrigin=ruler;
             if((Number(dst.scaleFactor)||1)!==scale)throw Error('Illustrator 大画布比例不一致，已停止导出');
             dst.artboards[0].artboardRect=b;
             for(var i=1;i<boards.length;i++)dst.artboards.add(boards[i].rect);
@@ -156,7 +160,7 @@
         }catch(e){dst.close(SaveOptions.DONOTSAVECHANGES);throw e;}
     }
     var manifest=read(LEO_BUNDLE_PATH),previous=app.documents.length?app.activeDocument:null,previousCount=app.documents.length;
-    var interaction=app.userInteractionLevel,doc=null,sourceDoc=null,unlocked=[],report={pass:false,version:app.version,texts:[],beforeDocuments:previousCount};
+    var interaction=app.userInteractionLevel,coordinates=app.coordinateSystem,doc=null,sourceDoc=null,unlocked=[],report={pass:false,version:app.version,texts:[],beforeDocuments:previousCount};
     function unlock(parent){
         if(!parent || parent.typename==='Document')return;
         for(var i=0;i<unlocked.length;i++)if(unlocked[i].item===parent)return;
@@ -166,6 +170,7 @@
     }
     try{
         app.userInteractionLevel=UserInteractionLevel.DONTDISPLAYALERTS;
+        app.coordinateSystem=CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
         for(var n=0;n<manifest.texts.length;n++)for(var r=0;r<manifest.texts[n].node.kind.runs.length;r++)font(manifest.texts[n].node.kind.runs[r].style);
         sourceDoc=app.open(new File(manifest.inputAi));
         doc=freshDocument(sourceDoc);sourceDoc.close(SaveOptions.DONOTSAVECHANGES);sourceDoc=null;
@@ -196,7 +201,7 @@
     finally{
         if(doc)doc.close(SaveOptions.DONOTSAVECHANGES);
         if(sourceDoc)sourceDoc.close(SaveOptions.DONOTSAVECHANGES);
-        app.userInteractionLevel=interaction;if(previous)previous.activate();report.afterDocuments=app.documents.length;
+        app.coordinateSystem=coordinates;app.userInteractionLevel=interaction;if(previous)previous.activate();report.afterDocuments=app.documents.length;
         if(manifest.reportPath)write(manifest.reportPath,report);
     }
     return json(report);

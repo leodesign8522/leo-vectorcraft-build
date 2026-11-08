@@ -1,11 +1,12 @@
 /* Real Illustrator assertions; opens/closes only this test's exported fixtures. */
 (function(){
  var root=LEO_RUNTIME_ROOT.replace(/\\/g,'/')+'/';
- var old=app.documents.length?app.activeDocument:null,level=app.userInteractionLevel,d=null,results=[];
+ var old=app.documents.length?app.activeDocument:null,level=app.userInteractionLevel,coordinates=app.coordinateSystem,d=null,results=[];
  function ok(value,msg){if(!value)throw Error(msg);}
  function near(a,b){return Math.abs(a-b)<0.001;}
  try{
   app.userInteractionLevel=UserInteractionLevel.DONTDISPLAYALERTS;
+  app.coordinateSystem=CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
   for(var m=0;m<2;m++){
    var mode=m?'cmyk':'rgb';d=app.open(new File(root+mode+'_EDITABLE.ai'));
    ok(d.documentColorSpace===(m?DocumentColorSpace.CMYK:DocumentColorSpace.RGB),'mode mismatch');
@@ -19,9 +20,10 @@
    ok(point.contents==='Editable ABC 123','point text changed');
    ok(area.contents==='中文段落文字自动换行测试，保留文字框。\r第二段中文文字。','area text changed');
    ok(near(area.textPath.width,210)&&near(area.textPath.height,150),'frame dimensions changed');
-   var first=d.artboards[0].artboardRect,anchor=point.anchor,frame=area.textPath.geometricBounds;
+   var first=d.artboards[0].artboardRect,anchor=point.anchor,frameLeft=Infinity,frameTop=-Infinity;
+   for(var fp=0;fp<area.textPath.pathPoints.length;fp++){var xy=area.textPath.pathPoints[fp].anchor;frameLeft=Math.min(frameLeft,xy[0]);frameTop=Math.max(frameTop,xy[1]);}
    ok(near(anchor[0]-first[0],60)&&near(first[1]-anchor[1],230),'point text position changed');
-   ok(near(frame[0]-first[0],60)&&near(first[1]-frame[1],300),'area frame position changed');
+   ok(near(frameLeft-first[0],60)&&near(first[1]-frameTop,300),'area frame position changed');
    ok(point.textRange.characterAttributes.textFont.name==='ArialMT','point font changed');
    ok(area.textRange.characterAttributes.textFont.name==='MicrosoftYaHei','area font changed');
    var c=area.textRange.characterAttributes.fillColor;
@@ -30,7 +32,11 @@
     else ok(c.typename==='RGBColor'&&near(c.red,51)&&near(c.green,102)&&near(c.blue,153),'RGB values changed');
    }
    checkColor(c);checkColor(point.textRange.characterAttributes.fillColor);
-   var colored=0;for(var p=0;p<d.pathItems.length;p++)if(d.pathItems[p].filled){checkColor(d.pathItems[p].fillColor);colored++;}
+   var colored=0;for(var p=0;p<d.pathItems.length;p++)if(d.pathItems[p].filled){
+    var item=d.pathItems[p],b=item.geometricBounds;checkColor(item.fillColor);colored++;
+    var left=b[0]-first[0],top=first[1]-b[1],width=b[2]-b[0],height=b[1]-b[3];
+    ok((near(left,60)&&near(top,60)&&near(width,180)&&near(height,100))||(near(left,300)&&near(top,60)&&near(width,100)&&near(height,100)),'geometry moved relative to artboard');
+   }
    ok(colored===2,'geometry missing');
    for(var s=0;s<d.spots.length;s++)ok(d.spots[s].name.indexOf('LEO_AI_TEXT_')!==0,'marker spot remained');
    var lines=area.lines.length;area.textPath.width=150;ok(area.lines.length>lines,'area text does not reflow');
@@ -49,5 +55,5 @@
   }
   d.close(SaveOptions.DONOTSAVECHANGES);d=null;results.push('empty frames: PASS / no placeholder / editable insertion fonts');
   return results.join('\n');
- }finally{if(d)d.close(SaveOptions.DONOTSAVECHANGES);app.userInteractionLevel=level;if(old)old.activate();}
+ }finally{if(d)d.close(SaveOptions.DONOTSAVECHANGES);app.coordinateSystem=coordinates;app.userInteractionLevel=level;if(old)old.activate();}
 })();
