@@ -1,10 +1,18 @@
-# Core Bridge 0.14.6 / 贴合字形选框（已验证）
+# Core Bridge 0.14.7 / 字形边界居中对齐（已验证）
+
+- 修复 0.14.6 贴合选框后，对齐仍按旧字体框测量的问题；开启贴合后，居中与其他对象对齐共用实际字形边界。
+- 覆盖水平/垂直/同时居中、画板、选择范围、关键对象及普通组内文字；文字整段平移，不改变字号和换行，关键对象保持不动。
+- 11 项文字回归、保留吸附回归、Windows 构建与安装校验通过；实际 UI 命令六种案例由独立字形轮廓验证通过，旧版相同六种案例均检出偏差。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42465551859/artifacts/13611954216)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- 从 **Leo Design VectorCraft 0.22 Bridge 0.14.7** 新快捷方式启动，文字先开启“贴合字形选框”，再运行居中对齐。
+
+# 历史交付 Core Bridge 0.14.6 / 贴合字形选框（已验证）
 
 - 字符面板和 Type 菜单增加“贴合字形选框”开关；再次点击恢复原框。
 - 原文字位置、字号、段落框和换行不变，继续可编辑；只改变选择/变换控件的测量方式。
 - 覆盖点文字、多行段落、中文、旋转、空白回退、普通编组、预览边界、保存重开和撤销重做；贴合模式 V 手柄缩放文字而不重新换行。
 - 8 项文字回归、原有吸附回归、完整 Windows x64 构建及安装校验通过；本机五种合成文字渲染前后完全一致，实际字符按钮及保留旋转/缩放/延长线验证通过。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42460703778/artifacts/13610064059)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42460703778/artifacts/13610064059)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_6.md)。
 - 从 **Leo Design VectorCraft 0.22 Bridge 0.14.6** 新快捷方式启动，选中文字 → 字符 / Character → **贴合字形选框**。
 
 # 历史交付 Core Bridge 0.14.5 / Snapping Engine 1.7 R 旋转边方向吸附（已验证）

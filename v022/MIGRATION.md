@@ -1,7 +1,13 @@
-# Core Bridge 0.14.6 / VectorCraft 0.22.0
+# Core Bridge 0.14.7 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
+
+## 0.14.7 alignment follows enabled glyph controls
+
+The 0.14.6 controls used glyph ink while Align's separate Measure still used metric/frame bounds. Route enabled text (including ordinary grouped text) through the same ink measurement in Measure.of and its aggregate path. This fixes horizontal, vertical and combined centres, including selection, artboard and key-object references, and makes shared edge/distribution measurements consistent. Legacy global glyph alignment preferences and disabled text retain existing behaviour. Alignment translates whole text without reflow.
+
+Eleven text regressions pass. Six actual Align UI-command cases are checked against temporary native outline geometry and undo restores editable text; all six fail on the 0.14.6 negative control and pass on 0.14.7. Retained text/render/save/reopen, rotation and resize runtime checks pass. Windows x64 build, preserved features and installer identity/hash validation pass. See [verification](VERIFIED_RELEASE.md).
 
 ## 0.14.6 non-destructive glyph selection controls
 
