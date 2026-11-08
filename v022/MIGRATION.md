@@ -1,7 +1,15 @@
-# Core Bridge 0.14.4 / VectorCraft 0.22.0
+# Core Bridge 0.14.5 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
+
+## 0.14.5 R-tool fixed-pivot edge directions
+
+R rotation previously snapped the mouse in XY, then inferred an angle; that did not solve edge-to-edge direction alignment. A separate immutable rotation snapshot now gathers the selected straight edges and stationary foreign straight edges, sorted by undirected angle. Acquisition queries wrapped angular intervals and filters real reference segments against the current screen; selected groups and hidden sources are excluded. Rotation stays about the user's pivot, with no translation or deformation. Equal supporting lines and parallel directions have distinct yellow Chinese labels. Full-anchor selections are supported; partial-anchor transforms and V bounding-box rotation retain their native behaviour.
+
+Capture/release use 8/12.8 screen pixels converted via the maximum collected edge-endpoint/pointer radius, with exact chord travel rather than a fixed angular tolerance. A held angle survives camera movement until release. Shift keeps native 45-degree quantisation, Alt keeps copy-on-release, and captured angle readouts are normalised. Dashed feedback is bounded to real segment lengths or 512 screen pixels. Target collection has no 20k cutoff.
+
+The 53 engine, 17 object, 77 Direct Selection, 83 Selection and 14 native transform-tool filtered tests pass, as do eight real Session cases (filters overlap). Windows compilation and installer version/hash smoke checks pass. Actual application-control checks cover nine grid/pixel/modifier combinations, collinearity, parallelism, a fixed custom pivot, full anchor selection, group rigidity, 8/12.8px hysteresis and Commit/Undo/Redo. A 0.14.4 negative control fails six ordinary/Alt edge-direction cases while its three Shift cases already pass. Retained resize/node/object/extension tests and the private local recovery-copy checks pass. See [verification and exact hashes](VERIFIED_RELEASE.md).
 
 ## 0.14.4 bounding-box resize geometry
 
