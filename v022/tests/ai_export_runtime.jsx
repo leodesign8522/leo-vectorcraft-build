@@ -19,6 +19,9 @@
    ok(point.contents==='Editable ABC 123','point text changed');
    ok(area.contents==='中文段落文字自动换行测试，保留文字框。\r第二段中文文字。','area text changed');
    ok(near(area.textPath.width,210)&&near(area.textPath.height,150),'frame dimensions changed');
+   var first=d.artboards[0].artboardRect,anchor=point.anchor,frame=area.textPath.geometricBounds;
+   ok(near(anchor[0]-first[0],60)&&near(first[1]-anchor[1],230),'point text position changed');
+   ok(near(frame[0]-first[0],60)&&near(first[1]-frame[1],300),'area frame position changed');
    ok(point.textRange.characterAttributes.textFont.name==='ArialMT','point font changed');
    ok(area.textRange.characterAttributes.textFont.name==='MicrosoftYaHei','area font changed');
    var c=area.textRange.characterAttributes.fillColor;

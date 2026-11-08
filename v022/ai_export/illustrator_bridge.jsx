@@ -115,14 +115,19 @@
         tf.hidden=node.visible===false;tf.locked=!!node.locked;marker.remove();return tf;
     }
     function freshDocument(src){
-        var scale=Number(src.scaleFactor)||1,b=src.artboards[0].artboardRect;
+        var boards=[];for(var index=0;index<src.artboards.length;index++){
+            var original=src.artboards[index],bounds=original.artboardRect;
+            boards.push({name:String(original.name),rect:[bounds[0],bounds[1],bounds[2],bounds[3]]});
+        }
+        var scale=Number(src.scaleFactor)||1,b=boards[0].rect;
         var width=(b[2]-b[0])*scale,height=(b[1]-b[3])*scale;
         if(scale>1)width=Math.max(width,16384);
         var dst=app.documents.add(src.documentColorSpace,width,height),initial=dst.layers[0];
         try{
             if((Number(dst.scaleFactor)||1)!==scale)throw Error('Illustrator 大画布比例不一致，已停止导出');
-            dst.artboards[0].artboardRect=b;dst.artboards[0].name=src.artboards[0].name;
-            for(var i=1;i<src.artboards.length;i++){var ab=dst.artboards.add(src.artboards[i].artboardRect);ab.name=src.artboards[i].name;}
+            dst.artboards[0].artboardRect=b;
+            for(var i=1;i<boards.length;i++)dst.artboards.add(boards[i].rect);
+            for(i=0;i<boards.length;i++)dst.artboards[i].name=boards[i].name;
             // Preserve spot/process definitions before cross-document duplication.
             for(i=0;i<src.spots.length;i++){
                 var spot=src.spots[i];if(spot.name==='[Registration]' || spot.colorType===ColorModel.REGISTRATION)continue;
