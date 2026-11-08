@@ -18,6 +18,7 @@ fn check_text(n: &Node) -> Result<(), String> {
     let fail = |why: &str| format!("文字对象 {}：{why}。请先简化该对象，或使用普通 AI 导出并接受转轮廓。", n.id.0);
     if !matches!(t.kind, TextKind::Point | TextKind::Area { .. }) { return Err(fail("暂不支持将路径文字写为活文字")); }
     if !t.ruby.is_empty() || !t.wrap.is_empty() { return Err(fail("暂不支持注音或对象绕排")); }
+    if n.blend!=Default::default() { return Err(fail("暂不支持文字自身的特殊混合模式")); }
     if !n.appearance.items.is_empty() || !n.appearance.effects.is_empty() || n.extras().mask.is_some() { return Err(fail("文字带有额外外观或蒙版")); }
     if let TextKind::Area { frame } = &t.kind {
         if frame.subpaths.len()!=1 || !frame.subpaths[0].closed { return Err(fail("文字框需要单一闭合路径")); }
@@ -81,7 +82,7 @@ fn prepare(doc: &Document, token: &str) -> Result<Prepared, String> {
         let mut has_text=false;for art in &pattern.art {art.walk(&mut |n|has_text|=matches!(n.kind,NodeKind::Text(_)));}
         if has_text {return Err("图案色板中含有文字，请先在副本中展开图案后导出可编辑 AI。".into());}
     }
-    let mut marked=doc.without_edit_modes();
+    let mut marked=doc.without_edit_modes().into_owned();
     for entry in &texts {
         let id=vectorcraft_doc::NodeId(entry["node"]["id"].as_u64().ok_or("文字 ID 无效")?);
         let original=doc.node(id).ok_or("文字对象缺失")?;

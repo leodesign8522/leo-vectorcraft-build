@@ -53,7 +53,10 @@
         else if(c.model==='lab'){v=new LabColor();v.l=c.l;v.a=c.a;v.b=c.b;}
         else throw Error('Unsupported text colour model');return v;
     }
-    function character(a,s,doc,scale,range){
+    function character(range,s,doc,scale){
+        // Acquiring textRange twice can invalidate an earlier CharacterAttributes
+        // proxy in Illustrator. Obtain it once from the final range reference.
+        var a=range.characterAttributes;
         a.textFont=font(s);a.size=s.size/scale;a.tracking=s.tracking||0;
         a.horizontalScale=s.h_scale===undefined?100:s.h_scale;a.verticalScale=s.v_scale===undefined?100:s.v_scale;
         a.baselineShift=(s.baseline_shift||0)/scale;a.rotation=-(s.rotation||0);
@@ -61,7 +64,7 @@
         a.fillColor=color(s.fill,doc);a.strokeColor=color(s.stroke,doc);a.strokeWeight=(s.stroke_width||0)/scale;
         a.underline=!!s.underline;a.strikeThrough=!!s.strikethrough;
         a.noBreak=!!s.no_break;a.overprintFill=!!s.overprint_fill;a.overprintStroke=!!s.overprint_stroke;
-        if(s.opticalKerning)a.kerningMethod=AutoKernType.OPTICAL;
+        if(s.optical_kerning)a.kerningMethod=AutoKernType.OPTICAL;
         if(s.kerning!==undefined && s.kerning!==null && range)range.kerning=s.kerning;
         if(s.all_caps)a.capitalization=FontCapsOption.ALLCAPS;
     }
@@ -94,13 +97,13 @@
         } else throw Error('当前活文字导出暂不支持路径文字');
         tf.move(marker,ElementPlacement.PLACEBEFORE);
         for(i=0;i<t.runs.length;i++)content+=t.runs[i].text.replace(/\n/g,'\r');tf.contents=content;
-        if(t.runs.length)character(tf.textRange.characterAttributes,t.runs[0].style,doc,scale,tf.textRange);
+        if(t.runs.length)character(tf.textRange,t.runs[0].style,doc,scale);
         if(t.runs.length>1){
             var ends=[],end=0;for(i=0;i<t.runs.length;i++){end+=t.runs[i].text.length;ends.push(end);}
             var at=0,run=0;
             for(i=0;i<tf.characters.length;i++){
                 while(run+1<t.runs.length && at>=ends[run])run++;
-                if(run>0)character(tf.characters[i].characterAttributes,t.runs[run].style,doc,scale,tf.characters[i]);
+                if(run>0)character(tf.characters[i],t.runs[run].style,doc,scale);
                 at+=tf.characters[i].contents.length;
             }
         }
