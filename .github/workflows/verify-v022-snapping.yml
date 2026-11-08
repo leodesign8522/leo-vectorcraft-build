@@ -15,6 +15,7 @@ on:
       - "v022/direct_regressions.rs"
       - "v022/select_regressions.rs"
       - "v022/patch_*.py"
+      - "v022/ai_export/**"
       - "prepare_v022.py"
 
 permissions:

@@ -108,6 +108,12 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test editable AI export snapshot preflight and color preservation
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_ai_export_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Editable AI export regressions failed" }
       - name: Test Leo Snapping Engine node and object movement geometry, hysteresis and zoom
         shell: pwsh
         working-directory: vectorcraft
@@ -241,8 +247,9 @@ jobs:
           @'
           ${{ inputs.label }} / VectorCraft v0.22.0
 
-          Leo Design Core Bridge v0.14.9 / 官方 VectorCraft v0.22.0
-          修复：整组选中后按 A，从子路径节点或填充拖动保持整组移动；单击仍可进入单点编辑。Shift+空格完全停用，单独空格保留原生平移。
+          Leo Design Core Bridge v0.15.0 / 官方 VectorCraft v0.22.0
+          新增：文件 → 导出 → 导出可编辑 AI（通过 Illustrator），保留点文字、整段区域文字框、RGB/CMYK 模式和色值、图层、编组及画板；需要本机 Illustrator 及相应字体。复杂未支持文字属性会明确拒绝，原生 AI 导出保留。
+          保留修复：整组选中后按 A，从子路径节点或填充拖动保持整组移动；单击仍可进入单点编辑。Shift+空格完全停用，单独空格保留原生平移。
           保留：I 吸管复制文字框高度模式和字形选框开关；高度按钮显示当前/混合状态；新建文字默认启用两种贴合。网格吸附开启时暂停智能几何吸附。Shift+空格停用，单独空格保留平移。
           保留修复：开启“贴合字形选框”后，居中和其他对象对齐统一按字形边界计算。
           保留：字符面板“贴合字形选框”按钮，只收紧选择框；保留文字位置、换行和可编辑状态。再次点击恢复。
@@ -261,13 +268,13 @@ jobs:
           已删除 54 Leo 快捷键备份菜单；官方快捷键功能和工作区导入导出保留。
           饼菜单继续停用。
           便携版：解压到新文件夹，运行 vectorcraft.exe。
-          安装版：独立安装，不覆盖官方版本。请从 Leo Design VectorCraft 0.22 Bridge 0.14.9 快捷方式启动。
+          安装版：独立安装，不覆盖官方版本。请从 Leo Design VectorCraft 0.22 Bridge 0.15.0 快捷方式启动。
           保留官方程序与旧版安装目录，可随时回退。
           自动测试不等于用户 Windows 实机手感验收。
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Artifact upload requires the release build and every configured regression to pass.
-          Core Bridge v0.14.9 fixes alignment to measure enabled glyph bounds, including horizontal/vertical/both centers and key objects.
+          Core Bridge v0.15.0 fixes alignment to measure enabled glyph bounds, including horizontal/vertical/both centers and key objects.
           Includes Character > 贴合字形选框: tight glyph selection controls without changing editable text, position or wrapping. Click again to restore the metric frame.
           Includes Leo Snapping Engine v1.9: unified node and object movement geometry, finite path/Bezier and artboard edges, bounds alignment, group/multi-object movement, Alt-copy, 8px capture and 12.8px release.
           Native Actions, custom chords, editable AI import, font matching, selected-segment copy,
@@ -286,7 +293,7 @@ jobs:
           $versionFile = Join-Path (Resolve-Path dist).Path "VERSION.txt"
           $versionProcess = Start-Process -FilePath (Resolve-Path dist/vectorcraft.exe).Path -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
           $version = [string](Get-Content $versionFile -Raw)
-          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.14.9; Snapping Engine 1.9") { throw "EXE build identity smoke test failed" }
+          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.15.0; Snapping Engine 1.9") { throw "EXE build identity smoke test failed" }
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
@@ -334,7 +341,7 @@ jobs:
           $versionFile = Join-Path $installDir "installed-version.txt"
           $versionProcess = Start-Process -FilePath $installed -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
           $version = [string](Get-Content $versionFile -Raw)
-          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.14.9") { throw "Installed EXE identity check failed" }
+          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.15.0") { throw "Installed EXE identity check failed" }
           Get-FileHash $installer -Algorithm SHA256 | Format-List | Out-String | Set-Content overlay-output/SHA256.txt
           Copy-Item overlay-source/BUILD_COMMIT.txt overlay-output/
           Copy-Item overlay-source/UPSTREAM_COMMIT.txt overlay-output/
