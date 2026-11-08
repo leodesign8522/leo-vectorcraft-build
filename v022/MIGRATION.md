@@ -1,7 +1,15 @@
-# Core Bridge 0.14.7 / VectorCraft 0.22.0
+# Core Bridge 0.14.8 / VectorCraft 0.22.0
 
 Upstream tag: `v0.22.0`, commit `654749c16eb20b6d3182a96defb66e11d1a9649a`.
 Recipe base: `leo-v021-migration`, commit `b971ec99aaf99613b1c7ec77a6a0f96891dea636`.
+
+## 0.14.8 text mode sampling, state/defaults, grid priority and navigation
+
+Eyedropper adds default-enabled independent pick/apply flags for text frame mode and glyph controls. Whole text targets take applicable modes without source geometry/content; range and append behaviour stays scoped. Paragraph mode controls show selected/checkmarked current state or mixed state across ordinary groups. New text factories enable glyph controls; new area text defaults to Auto Height, with a one-time UI preference migration that preserves opaque settings and subsequent user changes. Legacy object deserialization remains unchanged.
+
+Grid masks smart geometry in engine ToolContext and guards existing node/resize/move/R capture snapshots, releasing locks when grid is enabled. Native grid fallback keeps constraints; pixel-only geometry behaviour is retained. The saved Smart Guides preference is not overwritten. Shift+Space no longer starts Rotate View or shows its cursor/dial, and pans like Space; explicit Rotate View and Cmd+Space remain.
+
+Six new engine tests, eleven retained glyph tests, five real egui state/migration/navigation tests and retained suites pass. Native runtime checks cover actual I sampling, old-file compatibility, eight grid/Smart combinations and capture toggling, plus prior text, alignment, rotation, resize and extension cases. Windows x64 build and installer identity/hash verification pass. See [verification](VERIFIED_RELEASE.md).
 
 ## 0.14.7 alignment follows enabled glyph controls
 

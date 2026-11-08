@@ -1,9 +1,19 @@
-# Core Bridge 0.14.7 / 字形边界居中对齐（已验证）
+# Core Bridge 0.14.8 / 文字模式吸管与状态、默认开启、网格优先（已验证）
+
+- I 吸管复制文字框高度模式与贴合字形选框开关，提供独立采样选项；保留目标内容、位置和宽度。
+- 自动/固定高度按钮显示勾选、高亮和当前模式，多选不一致显示混合状态。
+- 新建文字默认贴合字形，新建段落默认自动高度；旧文件模式不变。
+- 网格开启时暂停智能几何吸附，关闭后恢复原偏好；Shift＋空格不再旋转视图，保留平移。
+- 新增引擎 6 项、界面 5 项及原字形/吸附回归通过；实际 I、旧文件、网格 8 种及保留功能验证通过。Windows 构建和安装校验通过。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42476635541/artifacts/13616951221)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- 从 **Leo Design VectorCraft 0.22 Bridge 0.14.8** 新快捷方式启动。
+
+# 历史交付 Core Bridge 0.14.7 / 字形边界居中对齐（已验证）
 
 - 修复 0.14.6 贴合选框后，对齐仍按旧字体框测量的问题；开启贴合后，居中与其他对象对齐共用实际字形边界。
 - 覆盖水平/垂直/同时居中、画板、选择范围、关键对象及普通组内文字；文字整段平移，不改变字号和换行，关键对象保持不动。
 - 11 项文字回归、保留吸附回归、Windows 构建与安装校验通过；实际 UI 命令六种案例由独立字形轮廓验证通过，旧版相同六种案例均检出偏差。
-- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42465551859/artifacts/13611954216)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE.md)。
+- [安装器 ZIP](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42465551859/artifacts/13611954216)；[验证记录与 SHA-256](v022/VERIFIED_RELEASE_0_14_7.md)。
 - 从 **Leo Design VectorCraft 0.22 Bridge 0.14.7** 新快捷方式启动，文字先开启“贴合字形选框”，再运行居中对齐。
 
 # 历史交付 Core Bridge 0.14.6 / 贴合字形选框（已验证）
