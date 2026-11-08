@@ -44,7 +44,7 @@ mod leo_v022_session_tests {
         let target=NodeId(s.execute("shape.line",&json!({"x1":203.25,"y1":100,"x2":203.25,"y2":800})).unwrap()["id"].as_u64().unwrap());
         s.execute("select.set",&json!({"ids":[source.0]})).unwrap();
         let before=bounds(&s,source);let fixed=bounds(&s,target);
-        let view=ViewInfo {snap_to_grid:true,..ViewInfo::default()};s.select_tool("selection",view).unwrap();
+        let view=ViewInfo {snap_to_grid:false,..ViewInfo::default()};s.select_tool("selection",view).unwrap();
         s.pointer(&PointerEvent::new(PointerKind::Down,400.0,400.0),view).unwrap();
         for x in [207.25,213.25] {
             s.pointer(&PointerEvent::new(PointerKind::Drag,x,400.0),view).unwrap();
@@ -61,7 +61,7 @@ mod leo_v022_session_tests {
         let mut s=Session::new();s.execute("file.new",&json!({"width":1200,"height":1200})).unwrap();
         let source=NodeId(s.execute("shape.line",&json!({"x1":600,"y1":600,"x2":500,"y2":400})).unwrap()["id"].as_u64().unwrap());
         let target=NodeId(s.execute("shape.line",&json!({"x1":300,"y1":100,"x2":300,"y2":200})).unwrap()["id"].as_u64().unwrap());
-        let view=ViewInfo {snap_to_grid:true,..ViewInfo::default()};s.select_tool("directSelection",view).unwrap();
+        let view=ViewInfo {snap_to_grid:false,..ViewInfo::default()};s.select_tool("directSelection",view).unwrap();
         for y in [50.0,350.0] {
             s.execute("select.anchors",&json!({"id":source.0,"anchors":[[0,1]],"mode":"set"})).unwrap();
             for (kind,x,y) in [(PointerKind::Down,500.0,400.0),(PointerKind::Drag,304.0,y),(PointerKind::Up,304.0,y)] {
@@ -82,7 +82,7 @@ mod leo_v022_session_tests {
         let mut s=Session::new();
         s.execute("file.new",&json!({"width":1000,"height":1000})).unwrap();
         let id=NodeId(s.execute("path.create",&json!({"d":"M300 300 L600 330 L600 500 L460 420 Z"})).unwrap()["id"].as_u64().unwrap());
-        let view=ViewInfo {snap_to_grid:true,..ViewInfo::default()};
+        let view=ViewInfo {snap_to_grid:false,..ViewInfo::default()};
         s.select_tool("directSelection",view).unwrap();
         for (pointer,expected) in [((541.5,478.0),(540.0,480.0)),((381.5,358.0),(380.0,360.0)),((221.5,238.0),(220.0,240.0))] {
             s.execute("select.anchors",&json!({"id":id.0,"anchors":[[0,3]],"mode":"set"})).unwrap();
@@ -138,7 +138,7 @@ mod leo_v022_session_tests {
             s.execute("file.new", &json!({"width":500,"height":500})).unwrap();
             let source = NodeId(s.execute("shape.line", &json!({"x1":300,"y1":340,"x2":380,"y2":340})).unwrap()["id"].as_u64().unwrap());
             s.execute("shape.line", &json!({"x1":390,"y1":300,"x2":410,"y2":360})).unwrap();
-            let view = ViewInfo { snap_to_grid: true, ..ViewInfo::default() };
+            let view = ViewInfo { snap_to_grid: false, ..ViewInfo::default() };
             s.select_tool("directSelection", view).unwrap();
             if whole {
                 s.execute("select.set", &json!({"ids":[source.0]})).unwrap();

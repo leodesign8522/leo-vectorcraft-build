@@ -44,9 +44,10 @@ try:
         ('中文字体\n贴合选框\nAgjp',True,False), ('Agjp',False,True), ('   \n  ',True,False)]):
         command('file.new', width=1200, height=1000)
         p = {'x':180,'y':200,'text':text,'size':100}
-        if area: p['area'] = {'width':650,'height':650}
+        if area: p['area'] = {'width':650,'height':650,'fit':'none'}
         id = command('text.create', **p)['id']
         command('select.set', ids=[id])
+        command('type.glyphSelectionBounds', on=False)
         if rotated: command('object.transform', matrix=[.8,.6,-.6,.8,180,-50])
         command('view.setZoom', zoom=75, center=[500,450])
         call('ui.tool.select', {'tool':'selection'})

@@ -122,7 +122,7 @@ fn leo_snapping_engine_dense_document_tail_node_drag_with_and_without_shift() {
 }
 
 #[test]
-fn leo_snapping_engine_shift_node_drag_uses_real_path_with_grid_and_pixel_options() {
+fn leo_snapping_engine_shift_node_drag_uses_real_path_with_pixel_option() {
     use vectorcraft_geom::shapes;
     let (mut d, _) = doc_with_rect();
     let layer = d.layers[0].id;
@@ -135,7 +135,7 @@ fn leo_snapping_engine_shift_node_drag_uses_real_path_with_grid_and_pixel_option
         vectorcraft_doc::Appearance::default_art())).unwrap();
     let selected = anchors_of(source, &[(0, 1)]);
     let p = paint();
-    let c = ToolContext { snap_to_grid: true, snap_to_pixel: true, ..cx(&d, &selected, &p) };
+    let c = ToolContext { snap_to_grid: false, snap_to_pixel: true, ..cx(&d, &selected, &p) };
     let mut tool = DirectSelectionTool::new(false);
     let (v, labels) = drag(&mut tool, &c, (380.0, 340.0), (402.0, 340.0), Mods { shift: true, ..Mods::default() });
     assert!((v["dx"].as_f64().unwrap() - 23.333333333333).abs() < 1e-6, "{v}");

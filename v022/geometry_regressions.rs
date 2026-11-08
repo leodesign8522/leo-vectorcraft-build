@@ -28,6 +28,7 @@ mod leo_v022_geometry_tests {
             for (h,want,offset) in [(Handle::Left,Point::new(200.0,400.0),Vec2::new(4.0/zoom,0.0)),(Handle::Right,Point::new(900.0,400.0),Vec2::new(-4.0/zoom,0.0)),(Handle::Top,Point::new(550.0,150.0),Vec2::new(0.0,4.0/zoom)),(Handle::Bottom,Point::new(550.0,700.0),Vec2::new(0.0,-4.0/zoom))] {
                 let t=Targets::leo_scale_targets(&cx);
                 let a=crate::bbox::scale_for_drag(bx.rect,h,want+offset,false,false);
+                if grid { assert!(t.leo_resize(&cx,&bx,h,a,false,false).is_none(), "grid bypasses geometry");continue; }
                 let (a,g)=t.leo_resize(&cx,&bx,h,a,false,false).unwrap();
                 assert!((a*h.pos(bx.rect)).distance(want)<1e-7,"{h:?}, zoom={zoom}, grid={grid}, pixel={pixel}");
                 assert!((a*h.opposite().pos(bx.rect)).distance(h.opposite().pos(bx.rect))<1e-7);

@@ -8,11 +8,13 @@ mod leo_glyph_bounds_tests {
 
     fn fixture(text: &str, area: bool) -> (Session, NodeId) {
         let mut s = Session::new();
+        s.prefs.auto_size_area_type = false; // Explicit legacy baseline; defaults have their own regressions.
         s.execute("file.new", &json!({"width":1200,"height":1000})).unwrap();
         let mut p = json!({"x":150,"y":180,"text":text,"size":80,"font":"Arial"});
         if area { p["area"] = json!({"width":560,"height":650}); }
         let id = NodeId(s.execute("text.create", &p).unwrap()["id"].as_u64().unwrap());
         s.execute("select.set", &json!({"ids":[id.0]})).unwrap();
+        s.execute("type.glyphSelectionBounds", &json!({"on":false})).unwrap();
         (s,id)
     }
     fn text(s: &Session, id: NodeId) -> &TextObject {

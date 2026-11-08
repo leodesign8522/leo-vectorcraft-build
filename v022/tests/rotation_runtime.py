@@ -55,7 +55,7 @@ try:
   events([('down',o),('up',o)])
   events([('down',start)],mods)
  records=[]
- for mode in ['none','grid','pixel']:
+ for mode in ['none','pixel']:
   flags=call('ui.inspect')['ui']['view']
   for key,cmd,wanted in [('snap_to_grid','view.snapToGrid',mode=='grid'),('snap_to_pixel','view.snapToPixel',mode=='pixel')]:
    if flags[key]!=wanted:command(cmd)

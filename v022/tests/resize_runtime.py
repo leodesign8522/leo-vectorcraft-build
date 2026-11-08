@@ -43,7 +43,7 @@ try:
  def bounds():return command('document.node',id=source,summary=True)['bounds']
  cases=[('left',[400,400],[204,400],{'x':200,'y':300,'width':500,'height':200}),('right',[700,400],[896,400],{'x':400,'y':300,'width':500,'height':200}),('top',[550,300],[550,154],{'x':400,'y':150,'width':300,'height':350}),('bottom',[550,500],[550,696],{'x':400,'y':300,'width':300,'height':400})]
  records=[]
- for mode in ['none','grid','pixel']:
+ for mode in ['none','pixel']:
   flags=call('ui.inspect')['ui']['view']
   for key,cmd,wanted in [('snap_to_grid','view.snapToGrid',mode=='grid'),('snap_to_pixel','view.snapToPixel',mode=='pixel')]:
    if flags[key]!=wanted:command(cmd)
