@@ -18,10 +18,12 @@ def edit(rel, old, new, expected=1):
 
 edit("guides/targets.rs",
      "pub struct Targets {",
-     "pub struct Targets {\n    pub(super) leo_scale: std::cell::RefCell<Option<LeoScaleLock>>,\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_extension: std::cell::Cell<Option<LeoExtension>>,\n    pub(super) leo_extension_index: Option<LeoExtensionIndex>,\n    pub(super) leo_scene: Option<LeoScene>,")
+     "pub struct Targets {\n    pub(super) leo_scale: std::cell::RefCell<Option<LeoScaleLock>>,\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,
+    pub(super) leo_intersection: std::cell::Cell<Option<LeoIntersectionLock>>,
+    pub(super) leo_drag_origin: Option<Point>,\n    pub(super) leo_extension: std::cell::Cell<Option<LeoExtension>>,\n    pub(super) leo_extension_index: Option<LeoExtensionIndex>,\n    pub(super) leo_scene: Option<LeoScene>,")
 edit("guides/targets.rs",
      "use super::snap::",
-     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex, LeoScaleLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
+     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex, LeoScaleLock, LeoIntersectionLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
 (root / "guides/leo_snapping_engine.rs").write_text(
     Path(__file__).with_name("leo_snapping_engine.rs").read_text(encoding="utf-8")+"\n"+Path(__file__).with_name("rotation_snapping.rs").read_text(encoding="utf-8"),
     encoding="utf-8", newline="\n"
@@ -62,13 +64,21 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
     }
 
     pub(crate) fn leo_captured(&self) -> bool {
-        self.targets.as_ref().is_some_and(|(targets, _)| targets.leo_snap.get().is_some() || targets.leo_extension.get().is_some())
+        self.targets.as_ref().is_some_and(|(targets, _)| targets.leo_snap.get().is_some() || targets.leo_extension.get().is_some() || targets.leo_intersection.get().is_some())
     }
 
     pub(crate) fn direct_anchor_drag(&self, cx: &ToolContext, p: Point, from: Option<&Leave>, shift: bool) -> (Point, Vec<Overlay>) {
         let constrained = if shift { from.and_then(|f| f.constrained(p)) } else { None };
         let p = constrained.unwrap_or(p);
         if let Some((targets, _)) = &self.targets {
+            // A real finite path crossing wins over nearest-path projection.
+            if cx.smart_guides {
+                if let Some(hit) = targets.leo_snap_guide_intersection(p, from, shift, cx.tol(8.0), cx.tol(12.8)) {
+                    return hit;
+                }
+            } else {
+                targets.leo_intersection.set(None);
+            }
             if !shift && let Some(f) = from.filter(|f| f.contact)
                 && let Some(hit) = targets.leo_snap_contact(p, f.at, cx.tol(8.0)) {
                 targets.leo_extension.set(None);

@@ -9,6 +9,7 @@ pub(super) const RELEASE_MULTIPLIER: f64 = 1.6;
 const ANCHOR_HIT: [u8; 3] = [0x35, 0xc2, 0xfa];
 const PATH_HIT: [u8; 3] = [0xff, 0xb3, 0x3d];
 const EXTENSION_HIT: [u8; 3] = [0xff, 0xd6, 0x00];
+const INTERSECTION_HIT: [u8; 3] = [0xb0, 0x4d, 0xff];
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::guides) struct LeoExtension {
@@ -140,6 +141,12 @@ impl LeoExtensionIndex {
 pub(in crate::guides) enum SnapLock {
     Anchor(Point),
     Segment(PathSeg),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(in crate::guides) struct LeoIntersectionLock {
+    point: Point,
+    shift: bool,
 }
 
 /// Immutable path references from the drag-start scene. Query all intersecting
@@ -416,6 +423,7 @@ impl Targets {
     pub(in crate::guides) fn clear_leo_snap(&self) {
         self.leo_snap.set(None);
         self.leo_extension.set(None);
+        self.leo_intersection.set(None);
     }
 
     /// Freeze the edited anchor's straight neighbours and an indexed snapshot
@@ -430,6 +438,7 @@ impl Targets {
         let n = sp.anchors.len();
         if n < 2 || ai >= n { return; }
         if let Some(origin)=sp.anchors.get(ai).map(|a| a.p).filter(|p| p.is_finite()) {
+            self.leo_drag_origin=Some(origin);
             self.leo_extension_index=self.leo_scene.as_ref().map(|scene| LeoExtensionIndex::new(scene,origin));
         }
         let previous = if ai > 0 { Some(ai - 1) } else if sp.closed { Some(n - 1) } else { None };
@@ -487,6 +496,81 @@ impl Targets {
         }
         if self.style.labels { guides.push(Overlay::Label { p:q,text:"延长线吸附".into(),color:EXTENSION_HIT }); }
         Some((q,guides))
+    }
+
+
+    /// Snap the dragged anchor to the *actual* intersection of a visible smart
+    /// direction and finite path geometry. Neither a guide projection nor a
+    /// nearest-path projection is allowed to masquerade as an intersection.
+    pub(in crate::guides) fn leo_snap_guide_intersection(
+        &self, p: Point, from: Option<&super::super::snap::Leave>, shift: bool,
+        acquire: f64, release: f64,
+    ) -> Option<(Point, Vec<Overlay>)> {
+        if !p.is_finite() || !acquire.is_finite() || !release.is_finite()
+            || acquire <= 0.0 || release < acquire {
+            self.leo_intersection.set(None);
+            return None;
+        }
+        // A locked intersection is a fixed point, unlike a locked path whose
+        // nearest point slides continuously. Shift changes release that lock.
+        if let Some(lock) = self.leo_intersection.get() {
+            if lock.shift == shift && lock.point.distance(p) <= release {
+                return Some((lock.point, intersection_guides(self, lock.point, acquire)));
+            }
+        }
+        self.leo_intersection.set(None);
+
+        let mut lines: Vec<(Point, Vec2)> = vec![];
+        if shift {
+            // Shift's existing 0/45/90-degree constrained result is supplied
+            // by Leave::constrained before this call. Do not change its angle.
+            if let Some(f) = from {
+                let d = p - f.at;
+                if d.hypot() > 1e-9 { lines.push((f.at, d)); }
+            }
+        } else {
+            // Direct Selection's drag-start node is a stable H/V reference.
+            // The guide must be within 8 screen px of the raw pointer.
+            if let Some(at) = self.leo_drag_origin {
+                lines.push((at, Vec2::new(1.0, 0.0)));
+                lines.push((at, Vec2::new(0.0, 1.0)));
+            }
+            // Also accept genuine construction guides and fixed adjacent
+            // straight-line extensions already supported by this engine.
+            if let Some(f) = from {
+                if let Some((dir, _)) = f.construction(p, acquire) {
+                    lines.push((f.at, dir));
+                }
+            }
+            lines.extend(self.extensions.iter().copied());
+            if let Some(extension) = self.leo_extension.get() {
+                lines.push((extension.at, extension.dir));
+            }
+        }
+        if lines.is_empty() { return None; }
+
+        let nearby = self.leo_near(Rect::from_points(p, p).inflate(release, release));
+        let geometry = nearby.as_ref().unwrap_or(self);
+        let mut best: Option<(Point, f64)> = None;
+        for (at, dir) in lines {
+            for q in guide_path_intersections(geometry, p, at, dir, acquire) {
+                let distance = q.distance(p);
+                if best.is_none_or(|(_, old)| distance < old) {
+                    best = Some((q, distance));
+                }
+            }
+        }
+        let (q, distance) = best?;
+        // An actual stationary anchor has higher priority when it is at least
+        // as close. Only real finite path crossings get the intersection label.
+        if geometry.leo_nearest_anchor(p, acquire)
+            .is_some_and(|anchor| anchor.distance(p) <= distance + 1e-7) {
+            return None;
+        }
+        self.leo_intersection.set(Some(LeoIntersectionLock {point:q, shift}));
+        self.leo_snap.set(None);
+        self.leo_extension.set(None);
+        Some((q, intersection_guides(self, q, acquire)))
     }
 
     /// Explicit native geometric-guide options still land on real finite geometry.
@@ -620,6 +704,56 @@ fn along_segment(segment: PathSeg, p: Point, dir: Vec2, reach: f64) -> Option<Po
     segment.intersect_line(line).iter().map(|i| line.eval(i.line_t))
         .filter(|q| q.distance(p) <= reach && on_direction(*q - p, dir))
         .min_by(|a, b| a.distance(p).total_cmp(&b.distance(p)))
+}
+
+
+/// Returns only real finite segment/cubic crossings with the guide's infinite
+/// supporting line. A short local cutter makes queries spatially bounded and
+/// handles even distant guide origins without coordinate overflow.
+fn guide_path_intersections(targets: &Targets, p: Point, at: Point, dir: Vec2, reach: f64) -> Vec<Point> {
+    if !p.is_finite() || !at.is_finite() || !dir.x.is_finite() || !dir.y.is_finite()
+        || !reach.is_finite() || reach <= 0.0 { return vec![]; }
+    let length = dir.hypot();
+    if length <= 1e-9 || !length.is_finite() { return vec![]; }
+    let u = dir / length;
+    let foot = at + u * (p - at).dot(u);
+    if !foot.is_finite() || foot.distance(p) > reach { return vec![]; }
+    let cutter = Line::new(foot - u * reach, foot + u * reach);
+    let mut out = Vec::new();
+    for (bounds, segment) in &targets.segments {
+        if !overlaps(*bounds, Rect::from_points(p, p).inflate(reach, reach)) { continue; }
+        if let PathSeg::Line(edge) = segment {
+            let v = edge.p1 - edge.p0;
+            let edge_length = v.hypot();
+            // Coincident edges are path contacts, not an isolated crossing.
+            if edge_length <= 1e-9 || (v.x * u.y - v.y * u.x).abs() <= 1e-9 * edge_length {
+                continue;
+            }
+        }
+        for hit in segment.intersect_line(cutter) {
+            let q = cutter.eval(hit.line_t);
+            if q.is_finite() && q.distance(p) <= reach + 1e-8 {
+                push_unique(&mut out, q);
+            }
+        }
+    }
+    out
+}
+
+fn intersection_guides(targets: &Targets, q: Point, acquire: f64) -> Vec<Overlay> {
+    let mut guides = vec![];
+    if targets.style.lines {
+        // Compact cross rather than the long phantom red line. Screen-sized
+        // via acquire (8 px), independently of document zoom.
+        let arm = acquire * 0.50;
+        guides.push(Overlay::Line {a:q + Vec2::new(-arm,0.0),b:q + Vec2::new(arm,0.0),color:INTERSECTION_HIT,dashed:false});
+        guides.push(Overlay::Line {a:q + Vec2::new(0.0,-arm),b:q + Vec2::new(0.0,arm),color:INTERSECTION_HIT,dashed:false});
+        guides.push(Overlay::CurvePoint {p:q,color:INTERSECTION_HIT,filled:false,size:11.0});
+    }
+    if targets.style.labels {
+        guides.push(Overlay::Label {p:q,text:"交点".into(),color:INTERSECTION_HIT});
+    }
+    guides
 }
 
 fn selected_anchor_points(cx: &ToolContext) -> Vec<Point> {
@@ -1266,6 +1400,78 @@ mod leo_snapping_engine_tests {
         assert_eq!(q, Point::new(100.0, 100.0));
         assert!(overlays.is_empty());
     }
+
+    #[test]
+    fn leo_smart_guide_crosses_finite_straight_edge_exactly() {
+        let mut t=Targets::default();
+        t.style.lines=true;
+        t.leo_drag_origin=Some(Point::new(100.0,40.0));
+        t.segments.push((Rect::new(80.0,104.0,120.0,144.0),
+            PathSeg::Line(Line::new((80.0,104.0),(120.0,144.0)))));
+        let target=Point::new(100.0,124.0);
+        let (hit, overlays)=t.leo_snap_guide_intersection(Point::new(103.0,126.0),None,false,8.0,12.8).unwrap();
+        assert!(hit.distance(target)<1e-7,"{hit:?}");
+        assert!(overlays.iter().any(|o|matches!(o,Overlay::Label {text,..} if text=="交点")));
+        assert!(overlays.iter().any(|o|matches!(o,Overlay::CurvePoint {p,..} if *p==target)));
+        // Acquisition is 8px, a held crossing releases strictly beyond 12.8px.
+        assert_eq!(t.leo_snap_guide_intersection(Point::new(107.0,134.0),None,false,8.0,12.8).unwrap().0,target);
+        assert!(t.leo_snap_guide_intersection(Point::new(113.0,124.0),None,false,8.0,12.8).is_none());
+        assert_eq!(t.leo_intersection.get(),None);
+    }
+
+    #[test]
+    fn leo_smart_guide_bezier_intersection_uses_curve_not_bounds() {
+        let mut t=Targets::default();
+        t.leo_drag_origin=Some(Point::new(20.0,-40.0));
+        let c=vectorcraft_geom::kurbo::CubicBez::new((0.0,0.0),(0.0,40.0),(40.0,40.0),(40.0,0.0));
+        t.segments.push((Rect::new(0.0,0.0,40.0,40.0),PathSeg::Cubic(c)));
+        let (q,_)=t.leo_snap_guide_intersection(Point::new(22.0,32.0),None,false,8.0,12.8).unwrap();
+        assert!(q.distance(Point::new(20.0,30.0))<1e-5,"Bezier crossing: {q:?}");
+    }
+
+    #[test]
+    fn leo_smart_guide_shift_oblique_crossing_and_release() {
+        let mut t=Targets::default();
+        t.segments.push((Rect::new(0.0,50.0,100.0,50.0),
+            PathSeg::Line(Line::new((0.0,50.0),(100.0,50.0)))));
+        let leave=super::super::snap::Leave::contact(Point::new(10.0,10.0));
+        let target=Point::new(50.0,50.0);
+        assert_eq!(t.leo_snap_guide_intersection(Point::new(48.0,48.0),Some(&leave),true,8.0,12.8).unwrap().0,target);
+        // Releasing Shift clears the constrained crossing lock.
+        assert!(t.leo_snap_guide_intersection(Point::new(48.0,48.0),None,false,8.0,12.8).is_none());
+        assert_eq!(t.leo_intersection.get(),None);
+    }
+
+    #[test]
+    fn leo_smart_guide_capture_is_screen_pixel_zoom_independent() {
+        for zoom in [0.25,1.0,4.0] {
+            let mut t=Targets::default();
+            t.leo_drag_origin=Some(Point::new(100.0,10.0));
+            t.segments.push((Rect::new(-100.0,124.0,300.0,124.0),
+                PathSeg::Line(Line::new((-100.0,124.0),(300.0,124.0)))));
+            let near=Point::new(100.0+7.9/zoom,124.0);
+            let far=Point::new(100.0+8.1/zoom,124.0);
+            assert_eq!(t.leo_snap_guide_intersection(near,None,false,8.0/zoom,12.8/zoom).unwrap().0,Point::new(100.0,124.0),"zoom={zoom}");
+            t.clear_leo_snap();
+            assert!(t.leo_snap_guide_intersection(far,None,false,8.0/zoom,12.8/zoom).is_none(),"zoom={zoom}");
+        }
+    }
+
+    #[test]
+    fn leo_smart_guide_ignores_parallel_overlap_and_off_segment_crossings() {
+        let mut t=Targets::default();
+        t.leo_drag_origin=Some(Point::new(100.0,40.0));
+        t.segments.push((Rect::new(100.0,110.0,100.0,140.0),
+            PathSeg::Line(Line::new((100.0,110.0),(100.0,140.0)))));
+        assert!(t.leo_snap_guide_intersection(Point::new(100.0,120.0),None,false,8.0,12.8).is_none(),
+            "collinear edge is not an isolated intersection");
+        t.segments.clear();
+        t.segments.push((Rect::new(60.0,122.0,80.0,122.0),
+            PathSeg::Line(Line::new((60.0,122.0),(80.0,122.0)))));
+        assert!(t.leo_snap_guide_intersection(Point::new(100.0,122.0),None,false,8.0,12.8).is_none(),
+            "never intersect a finite segment's imaginary extension");
+    }
+
     fn move_snap(bounds: Rect, sources: Vec<Point>, targets: Targets) -> ObjectMoveSnap {
         ObjectMoveSnap {
             bounds: Some(bounds),
