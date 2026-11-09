@@ -117,7 +117,7 @@ fn leo_snapping_engine_dense_document_tail_node_drag_with_and_without_shift() {
         use vectorcraft_geom::kurbo::ParamCurveNearest;
         assert!(target.nearest(endpoint,1e-8).distance_sq<1e-12,"shift={shift}: {v}");
         if shift {assert!((endpoint.y-340.0).abs()<1e-9);}
-        assert!(labels == vec!["path".to_string()] || labels == vec!["交点".to_string()], "unexpected label: {labels:?}");
+        assert!(labels == vec!["path".to_string()] || labels == vec!["参考线交点".to_string()], "unexpected label: {labels:?}");
     }
 }
 
@@ -140,7 +140,7 @@ fn leo_snapping_engine_shift_node_drag_uses_real_path_with_pixel_option() {
     let (v, labels) = drag(&mut tool, &c, (380.0, 340.0), (402.0, 340.0), Mods { shift: true, ..Mods::default() });
     assert!((v["dx"].as_f64().unwrap() - 23.333333333333).abs() < 1e-6, "{v}");
     assert_eq!(v["dy"], json!(0.0));
-    assert!(labels == vec!["path".to_string()] || labels == vec!["交点".to_string()], "unexpected label: {labels:?}");
+    assert!(labels == vec!["path".to_string()] || labels == vec!["参考线交点".to_string()], "unexpected label: {labels:?}");
 }
 
 #[test]
@@ -161,6 +161,29 @@ fn leo_snapping_engine_alt_copy_full_path_keeps_geometric_snap_with_pixel_option
         let (v, labels) = drag(&mut tool, &c, (600.0, 200.0), (504.0, 235.0), Mods { alt: true, shift, ..Mods::default() });
         assert_eq!(v["copy"], json!(true));
         assert_eq!(v["matrix"], json!([1.0, 0.0, 0.0, 1.0, -100.0, if shift { 0.0 } else { 35.0 }]));
-        assert!(labels == vec!["path".to_string()] || labels == vec!["交点".to_string()], "unexpected label: {labels:?}");
+        assert!(labels == vec!["path".to_string()] || labels == vec!["参考线交点".to_string()], "unexpected label: {labels:?}");
+    }
+}
+
+#[test]
+fn leo_snapping_engine_direct_anchor_crossing_preview_matches_two_stationary_paths() {
+    use vectorcraft_geom::shapes;
+    let mut d=vectorcraft_doc::Document::new(2000.0,1500.0);
+    let layer=d.layers[0].id;let source=d.alloc_id();
+    d.insert(Some(layer),0,vectorcraft_doc::Node::path(source,
+        shapes::line(Point::new(1100.0,410.0),Point::new(700.0,550.0)),
+        vectorcraft_doc::Appearance::default_art())).unwrap();
+    for (a,b) in [((40.0,734.0),(740.0,34.0)),((40.0,59.0),(580.0,734.0))] {
+        let id=d.alloc_id();d.insert(Some(layer),usize::MAX,vectorcraft_doc::Node::path(id,
+            shapes::line(a.into(),b.into()),vectorcraft_doc::Appearance::default_art())).unwrap();
+    }
+    let selected=anchors_of(source,&[(0,1)]);let paint=paint();
+    for zoom in [0.25,1.0,4.0,64.0] {
+        let c=ToolContext {zoom,snap_perpendicular:false,snap_tangent:false,..cx(&d,&selected,&paint)};
+        let mut tool=DirectSelectionTool::new(false);
+        let (v,labels)=drag(&mut tool,&c,(700.0,550.0),(340.0+3.0/zoom,434.0+4.0/zoom),Mods::default());
+        let q=Point::new(700.0+v["dx"].as_f64().unwrap(),550.0+v["dy"].as_f64().unwrap());
+        assert!(q.distance(Point::new(340.0,434.0))*zoom<1e-6,"zoom={zoom}: {v}");
+        assert_eq!(labels,["交点"]);
     }
 }

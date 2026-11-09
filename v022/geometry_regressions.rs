@@ -379,3 +379,66 @@ mod leo_v022_geometry_tests {
         assert!(edge.nearest(q - d, 1e-8).distance_sq < 1e-12);
     }
 }
+
+#[cfg(test)]
+mod leo_snapping_engine_intersection_offset_regressions {
+    use super::*;
+    fn target(a:PathSeg,b:PathSeg)->Targets {
+        let mut t=Targets::default();t.style.lines=true;t.style.labels=true;
+        for edge in [a,b] {t.segments.push((vectorcraft_geom::kurbo::ParamCurveExtrema::bounding_box(&edge),edge));}
+        t
+    }
+    #[test]
+    fn leo_snapping_engine_real_crossing_beats_guide_projection_and_keeps_marker_at_landing() {
+        let cross=Point::new(340.0,434.0);
+        let a=PathSeg::Line(Line::new((40.0,734.0),(740.0,34.0)));
+        let b=PathSeg::Line(Line::new((40.0,59.0),(580.0,734.0)));
+        for zoom in [0.25,1.0,4.0,64.0] {
+            let t=target(a,b);
+            let raw=cross+Vec2::new(3.0/zoom,4.0/zoom);
+            let (q,marks)=t.leo_snap_path_intersection(raw,None,false,8.0/zoom,12.8/zoom).unwrap();
+            assert!(q.distance(cross)*zoom<1e-6,"zoom={zoom}, {q:?}");
+            for mark in marks {match mark {
+                Overlay::CurvePoint {p,..}|Overlay::Label {p,..}=>assert!(p.distance(q)<1e-9),
+                _=>{}
+            }}
+            assert_eq!(t.leo_snap_path_intersection(cross+Vec2::new(12.7/zoom,0.0),None,false,8.0/zoom,12.8/zoom).unwrap().0,q);
+            assert!(t.leo_snap_path_intersection(cross+Vec2::new(12.9/zoom,0.0),None,false,8.0/zoom,12.8/zoom).is_none());
+        }
+        let t=target(a,b);
+        assert!(t.leo_snap_path_intersection(Point::new(306.0,468.0),None,false,8.0,12.8).is_none(),
+            "a crossing 48px away must not capture");
+    }
+    #[test]
+    fn leo_snapping_engine_finite_crossings_never_snap_to_imaginary_extensions_or_overlap() {
+        let a=PathSeg::Line(Line::new((0.0,0.0),(10.0,0.0)));
+        let b=PathSeg::Line(Line::new((20.0,-10.0),(20.0,10.0)));
+        assert!(target(a,b).leo_snap_path_intersection(Point::new(19.0,1.0),None,false,8.0,12.8).is_none());
+        let b=PathSeg::Line(Line::new((5.0,0.0),(15.0,0.0)));
+        assert!(target(a,b).leo_snap_path_intersection(Point::new(7.0,1.0),None,false,8.0,12.8).is_none());
+    }
+    #[test]
+    fn leo_snapping_engine_true_bezier_crossings_are_on_both_original_curves() {
+        use vectorcraft_geom::kurbo::CubicBez;
+        let curve=PathSeg::Cubic(CubicBez::new((100.0,100.0),(130.0,240.0),(240.0,40.0),(300.0,200.0)));
+        let want=curve.eval(0.37);
+        for other in [
+            PathSeg::Line(Line::new(want+Vec2::new(0.0,-100.0),want+Vec2::new(0.0,100.0))),
+            PathSeg::Cubic(CubicBez::new(want+Vec2::new(-30.0,-80.0),want+Vec2::new(20.0,-40.0),want+Vec2::new(-20.0,40.0),want+Vec2::new(30.0,80.0))),
+        ] {
+            let (q,_)=target(curve,other).leo_snap_path_intersection(want+Vec2::new(2.0,1.0),None,false,8.0,12.8).unwrap();
+            assert!(q.distance(want)<1e-5,"{q:?} vs {want:?}");
+            assert!(curve.nearest(q,1e-9).distance_sq<1e-12);
+            assert!(other.nearest(q,1e-9).distance_sq<1e-12);
+        }
+    }
+    #[test]
+    fn leo_snapping_engine_real_intersection_respects_shift_direction() {
+        let a=PathSeg::Line(Line::new((20.0,50.0),(80.0,50.0)));
+        let b=PathSeg::Line(Line::new((50.0,20.0),(50.0,80.0)));
+        let t=target(a,b);let leave=crate::guides::snap::Leave::contact(Point::new(10.0,10.0));
+        assert_eq!(t.leo_snap_path_intersection(Point::new(48.0,48.0),Some(&leave),true,8.0,12.8).unwrap().0,Point::new(50.0,50.0));
+        assert!(t.leo_snap_path_intersection(Point::new(48.0,49.0),Some(&leave),true,8.0,12.8).is_none());
+        assert_eq!(t.leo_snap_path_intersection(Point::new(48.0,49.0),None,false,8.0,12.8).unwrap().0,Point::new(50.0,50.0));
+    }
+}

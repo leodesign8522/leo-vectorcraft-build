@@ -147,6 +147,7 @@ pub(in crate::guides) enum SnapLock {
 pub(in crate::guides) struct LeoIntersectionLock {
     point: Point,
     shift: bool,
+    paths: bool,
 }
 
 /// Immutable path references from the drag-start scene. Query all intersecting
@@ -499,6 +500,44 @@ impl Targets {
     }
 
 
+    /// Two stationary finite paths meeting at one point are a discrete target.
+    /// Resolve this before construction guides or nearest-path projection.
+    pub(in crate::guides) fn leo_snap_path_intersection(
+        &self, p: Point, from: Option<&super::super::snap::Leave>, shift: bool,
+        acquire: f64, release: f64,
+    ) -> Option<(Point, Vec<Overlay>)> {
+        if !p.is_finite() || !acquire.is_finite() || !release.is_finite()
+            || acquire<=0.0 || release<acquire { self.leo_intersection.set(None);return None; }
+        let direction=if shift {from.map(|f|(f.at,p-f.at))} else {None};
+        let allowed=|q:Point| !shift || direction.is_some_and(|(at,dir)| dir.hypot()>1e-9 && on_direction(q-at,dir));
+        if let Some(lock)=self.leo_intersection.get().filter(|l|l.paths) {
+            if lock.shift==shift && lock.point.distance(p)<=release && allowed(lock.point) {
+                return Some((lock.point,intersection_guides(self,lock.point,acquire,"交点")));
+            }
+            self.leo_intersection.set(None);
+        }
+        let nearby=self.leo_near(Rect::from_points(p,p).inflate(acquire,acquire));
+        let geometry=nearby.as_ref().unwrap_or(self);
+        let epsilon=(acquire*1e-6).clamp(1e-10,1e-7);
+        let query=Rect::from_points(p,p).inflate(acquire,acquire);
+        let segments:Vec<PathSeg>=geometry.segments.iter()
+            .filter(|(bounds,seg)|overlaps(*bounds,query) && seg.nearest(p,epsilon).distance_sq<=acquire*acquire)
+            .map(|(_,seg)|*seg).collect();
+        let mut best:Option<Point>=None;
+        for (i,a) in segments.iter().enumerate() {
+            for b in segments.iter().skip(i+1) {
+                for q in finite_path_crossings(*a,*b,query,epsilon) {
+                    if q.distance(p)<=acquire && allowed(q) && best.is_none_or(|old|q.distance(p)<old.distance(p)) {best=Some(q);}
+                }
+            }
+        }
+        let q=best?;
+        if geometry.leo_nearest_anchor(p,acquire).is_some_and(|a|a.distance(p)<=q.distance(p)+epsilon) {return None;}
+        self.leo_intersection.set(Some(LeoIntersectionLock {point:q,shift,paths:true}));
+        self.leo_snap.set(None);self.leo_extension.set(None);
+        Some((q,intersection_guides(self,q,acquire,"交点")))
+    }
+
     /// Snap the dragged anchor to the *actual* intersection of a visible smart
     /// direction and finite path geometry. Neither a guide projection nor a
     /// nearest-path projection is allowed to masquerade as an intersection.
@@ -514,8 +553,8 @@ impl Targets {
         // A locked intersection is a fixed point, unlike a locked path whose
         // nearest point slides continuously. Shift changes release that lock.
         if let Some(lock) = self.leo_intersection.get() {
-            if lock.shift == shift && lock.point.distance(p) <= release {
-                return Some((lock.point, intersection_guides(self, lock.point, acquire)));
+            if !lock.paths && lock.shift == shift && lock.point.distance(p) <= release {
+                return Some((lock.point, intersection_guides(self, lock.point, acquire, "参考线交点")));
             }
         }
         self.leo_intersection.set(None);
@@ -571,10 +610,10 @@ impl Targets {
         // Comparing it to its own segment projection would reject almost every
         // crossing (the projection is mathematically always at least as close).
         // Native perpendicular/tangent contacts are prioritized by the caller.
-        self.leo_intersection.set(Some(LeoIntersectionLock {point:q, shift}));
+        self.leo_intersection.set(Some(LeoIntersectionLock {point:q, shift, paths:false}));
         self.leo_snap.set(None);
         self.leo_extension.set(None);
-        Some((q, intersection_guides(self, q, acquire)))
+        Some((q, intersection_guides(self, q, acquire, "参考线交点")))
     }
 
     /// Explicit native geometric-guide options still land on real finite geometry.
@@ -744,7 +783,61 @@ fn guide_path_intersections(targets: &Targets, p: Point, at: Point, dir: Vec2, r
     out
 }
 
-fn intersection_guides(targets: &Targets, q: Point, acquire: f64) -> Vec<Overlay> {
+/// Intersections must lie on BOTH finite paths. Never use bounding-box
+/// crossings or an unbounded supporting line as the result.
+fn finite_path_crossings(a:PathSeg,b:PathSeg,query:Rect,epsilon:f64)->Vec<Point> {
+    let mut result=Vec::new();
+    let valid=|q:Point|q.is_finite() && query.contains(q)
+        && a.nearest(q,epsilon).distance_sq<=epsilon*epsilon*4.0
+        && b.nearest(q,epsilon).distance_sq<=epsilon*epsilon*4.0;
+    if let (PathSeg::Line(la),PathSeg::Line(lb))=(a,b) {
+        let u=la.p1-la.p0;let v=lb.p1-lb.p0;let det=u.cross(v);
+        if det.abs()<=1e-12*u.hypot()*v.hypot() {return result;}
+        let d=lb.p0-la.p0;let t=d.cross(v)/det;let s=d.cross(u)/det;
+        if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&s) {
+            let q=la.eval(t);if valid(q) {result.push(q);}
+        }
+        return result;
+    }
+    if let (PathSeg::Line(line),curve)|(curve,PathSeg::Line(line))=(a,b) {
+        for hit in curve.intersect_line(line) {
+            if !(0.0..=1.0).contains(&hit.line_t) || !(0.0..=1.0).contains(&hit.segment_t) {continue;}
+            let q=curve.eval(hit.segment_t);if valid(q) {push_unique(&mut result,q);}
+        }
+        return result;
+    }
+    // Identical/reversed curves overlap along an interval, not at one isolated
+    // crossing. Avoid exponential subdivision of coincident geometry.
+    let same=|reverse:bool|[0.0,0.25,0.5,0.75,1.0].into_iter()
+        .all(|t|a.eval(t).distance(b.eval(if reverse {1.0-t}else{t}))<=epsilon);
+    if same(false)||same(true) {return result;}
+    let mut pending=vec![(a,b,0u8)];
+    let mut budget=8192usize;
+    while let Some((left,right,depth))=pending.pop() {
+        if budget==0 {break;}budget-=1;
+        let ba=vectorcraft_geom::kurbo::ParamCurveExtrema::bounding_box(&left);
+        let bb=vectorcraft_geom::kurbo::ParamCurveExtrema::bounding_box(&right);
+        if !overlaps(ba.inflate(epsilon,epsilon),bb) || !overlaps(ba,query) || !overlaps(bb,query) {continue;}
+        let sa=ba.width().max(ba.height());let sb=bb.width().max(bb.height());
+        if sa.max(sb)<=epsilon || depth>=64 {
+            let q=left.eval(0.5);
+            if valid(q) {push_unique(&mut result,q);}
+            continue;
+        }
+        // Subdivide actual Beziers; the final point is validated on the original
+        // curves, so flattening error can never be painted as an intersection.
+        if sa>=sb {
+            pending.push((left.subsegment(0.0..0.5),right,depth+1));
+            pending.push((left.subsegment(0.5..1.0),right,depth+1));
+        } else {
+            pending.push((left,right.subsegment(0.0..0.5),depth+1));
+            pending.push((left,right.subsegment(0.5..1.0),depth+1));
+        }
+    }
+    result
+}
+
+fn intersection_guides(targets: &Targets, q: Point, acquire: f64, label: &str) -> Vec<Overlay> {
     let mut guides = vec![];
     if targets.style.lines {
         // Compact cross rather than the long phantom red line. Screen-sized
@@ -755,7 +848,7 @@ fn intersection_guides(targets: &Targets, q: Point, acquire: f64) -> Vec<Overlay
         guides.push(Overlay::CurvePoint {p:q,color:INTERSECTION_HIT,filled:false,size:11.0});
     }
     if targets.style.labels {
-        guides.push(Overlay::Label {p:q,text:"交点".into(),color:INTERSECTION_HIT});
+        guides.push(Overlay::Label {p:q,text:label.into(),color:INTERSECTION_HIT});
     }
     guides
 }
@@ -1415,7 +1508,7 @@ mod leo_snapping_engine_tests {
         let target=Point::new(100.0,124.0);
         let (hit, overlays)=t.leo_snap_guide_intersection(Point::new(103.0,126.0),None,false,8.0,12.8).unwrap();
         assert!(hit.distance(target)<1e-7,"{hit:?}");
-        assert!(overlays.iter().any(|o|matches!(o,Overlay::Label {text,..} if text=="交点")));
+        assert!(overlays.iter().any(|o|matches!(o,Overlay::Label {text,..} if text=="参考线交点")));
         assert!(overlays.iter().any(|o|matches!(o,Overlay::CurvePoint {p,..} if *p==target)));
         // Acquisition is 8px, a held crossing releases strictly beyond 12.8px.
         assert_eq!(t.leo_snap_guide_intersection(Point::new(107.0,134.0),None,false,8.0,12.8).unwrap().0,target);

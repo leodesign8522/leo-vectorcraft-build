@@ -69,6 +69,9 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
         let constrained = if shift { from.and_then(|f| f.constrained(p)) } else { None };
         let p = constrained.unwrap_or(p);
         if let Some((targets, _)) = &self.targets {
+            if cx.smart_guides {
+                if let Some(hit)=targets.leo_snap_path_intersection(p,from,shift,cx.tol(8.0),cx.tol(12.8)) {return hit;}
+            }
             if !shift && let Some(f) = from.filter(|f| f.contact)
                 && let Some(hit) = targets.leo_snap_contact(p, f.at, cx.tol(8.0)) {
                 targets.leo_extension.set(None);
@@ -439,11 +442,11 @@ begin = s.index("fn dragged_line_ends_snap_perpendicular_to_segments_and_tangent
 end = s.index("fn moved_objects_snap_with_smart_guides()", begin)
 block = s[begin:end]
 old = 'assert!(near(&v, (-60.0, -7.0), 1e-6) && labels == ["path"], "{v} {labels:?}");'
-new = 'assert!(near(&v, (-60.0, 0.0), 1e-6) && labels == ["交点"], "{v} {labels:?}");'
+new = 'assert!(near(&v, (-60.0, 0.0), 1e-6) && labels == ["参考线交点"], "{v} {labels:?}");'
 if block.count(old) != 1: raise SystemExit("FAIL native contact-off crossing assertion")
 block = block.replace(old, new)
 old = 'assert_eq!(drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none).1, ["path"]);'
-new = 'let (v, labels) = drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none); assert!(near(&v, (-60.0, 0.0), 1e-6) && labels == ["交点"], "{v} {labels:?}");'
+new = 'let (v, labels) = drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none); assert!(near(&v, (-60.0, 0.0), 1e-6) && labels == ["参考线交点"], "{v} {labels:?}");'
 if block.count(old) != 3: raise SystemExit("FAIL native non-endpoint crossing assertions")
 block = block.replace(old, new)
 s = s[:begin] + block + s[end:]
