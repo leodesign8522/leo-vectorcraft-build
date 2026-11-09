@@ -428,3 +428,23 @@ edit("select/tests.rs",
 
 with (root / "xform/transform.rs").open("a",encoding="utf-8") as f:
     f.write(Path(__file__).with_name("rotation_tool_regressions.rs").read_text(encoding="utf-8"))
+
+# Smart-guide x path crossings now intentionally acquire within 8 screen pixels.
+# Keep native perpendicular/tangent assertions above intact; only update cases
+# that explicitly disable contact or edit non-endpoint anchors and now hit a
+# different, valid crossing. Check the exact resulting coordinates as well.
+p = root / "direct/tests.rs"
+s = p.read_text(encoding="utf-8")
+begin = s.index("fn dragged_line_ends_snap_perpendicular_to_segments_and_tangent_to_curves()")
+end = s.index("fn moved_objects_snap_with_smart_guides()", begin)
+block = s[begin:end]
+old = 'assert!(near(&v, (-60.0, -7.0), 1e-6) && labels == ["path"], "{v} {labels:?}");'
+new = 'assert!(near(&v, (-60.0, 0.0), 1e-6) && labels == ["交点"], "{v} {labels:?}");'
+if block.count(old) != 1: raise SystemExit("FAIL native contact-off crossing assertion")
+block = block.replace(old, new)
+old = 'assert_eq!(drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none).1, ["path"]);'
+new = 'let (v, labels) = drag(&mut t, &c, (260.0, 170.0), (202.0, 163.0), none); assert!(near(&v, (-60.0, 0.0), 1e-6) && labels == ["交点"], "{v} {labels:?}");'
+if block.count(old) != 3: raise SystemExit("FAIL native non-endpoint crossing assertions")
+block = block.replace(old, new)
+s = s[:begin] + block + s[end:]
+p.write_text(s, encoding="utf-8", newline="\n")
