@@ -567,16 +567,10 @@ impl Targets {
             .is_some_and(|anchor| anchor.distance(p) <= distance + 1e-7) {
             return None;
         }
-        // A genuine intersection must be near the pointer, not merely inside
-        // the broad 8px acquisition circle while the pointer is following a
-        // different place on the same edge. Preserve native path/perpendicular
-        // behavior until the intersection is itself the best candidate.
-        // The small tie band is in document units, scaled from screen pixels.
-        if geometry.leo_nearest_segment(p, acquire).is_some_and(|(_, nearest)| {
-            nearest.distance(p) + acquire * 0.08 < distance
-        }) {
-            return None;
-        }
+        // A finite crossing within the acquisition radius is a discrete target.
+        // Comparing it to its own segment projection would reject almost every
+        // crossing (the projection is mathematically always at least as close).
+        // Native perpendicular/tangent contacts are prioritized by the caller.
         self.leo_intersection.set(Some(LeoIntersectionLock {point:q, shift}));
         self.leo_snap.set(None);
         self.leo_extension.set(None);
@@ -1484,14 +1478,16 @@ mod leo_snapping_engine_tests {
 
 
     #[test]
-    fn leo_smart_guide_does_not_steal_closer_path_snap() {
+    fn leo_smart_guide_crossing_beats_projection_within_capture() {
         let mut t=Targets::default();
         t.leo_drag_origin=Some(Point::new(260.0,170.0));
         t.segments.push((Rect::new(200.0,120.0,200.0,190.0),
             PathSeg::Line(Line::new((200.0,120.0),(200.0,190.0)))));
-        // 8px capture alone must NOT drag the pointer seven pixels along a
-        // vertical edge to an H guide merely because that guide also crosses.
-        assert!(t.leo_snap_guide_intersection(Point::new(202.0,163.0),None,false,8.0,12.8).is_none());
+        // Nearest projection is always closer than the crossing on its segment.
+        // That must not shrink the documented 8px capture radius.
+        assert_eq!(t.leo_snap_guide_intersection(Point::new(202.0,163.0),None,false,8.0,12.8).unwrap().0,Point::new(200.0,170.0));
+        t.clear_leo_snap();
+        assert!(t.leo_snap_guide_intersection(Point::new(202.0,162.0),None,false,8.0,12.8).is_none());
         // Once actually approaching the crossing, select the exact point.
         assert_eq!(t.leo_snap_guide_intersection(Point::new(201.0,169.2),None,false,8.0,12.8).unwrap().0,Point::new(200.0,170.0));
         assert_eq!(t.leo_snap_guide_intersection(Point::new(203.0,180.0),None,false,8.0,12.8).unwrap().0,Point::new(200.0,170.0));
