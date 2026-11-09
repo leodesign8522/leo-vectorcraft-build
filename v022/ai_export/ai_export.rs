@@ -129,15 +129,20 @@ pub fn export(app: &mut VectorcraftApp,p:&Value)->Result<Value,String>{
 fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
     if !cfg!(windows) { return Err("可编辑 AI 导出需要 Windows 和已安装的 Illustrator。".into()); }
     let st=app.session.active().ok_or("请先打开文档。")?;
-    let uid=st.uid;let doc=st.doc.clone();
+    let uid=st.uid;
+    let handoff=p.get("handoff").and_then(Value::as_bool)==Some(true);
+    let selected=p.get("selectedOnly").and_then(Value::as_bool)==Some(true);
+    let doc=vectorcraft_engine::cmd::fileio::export_source(st,&json!({"selectedOnly":selected}))
+        .map_err(|e|e.to_string())?.into_owned();
     // Report unsupported content before opening a save picker or launching Illustrator.
     let token=format!("{}_{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e|e.to_string())?.as_nanos());
     let prepared=prepare(&doc,&token)?;
-    if p.get("path").and_then(Value::as_str).is_none()
+    if !handoff && p.get("path").and_then(Value::as_str).is_none()
         && !crate::picks::can(app,&crate::picks::PickRequest::Save(FilePick::default())) {
         return Err("无法打开保存窗口。请重新启动 VectorCraft 后重试。".into());
     }
-    let path=p.get("path").and_then(Value::as_str).map(str::to_owned).or_else(||crate::picks::save(app,&FilePick {
+    let send_path=if handoff {Some(super::bridge::outbound()?.to_string_lossy().into_owned())}else{None};
+    let path=send_path.or_else(||p.get("path").and_then(Value::as_str).map(str::to_owned)).or_else(||crate::picks::save(app,&FilePick {
         filters:vec![FilePick::filter("Editable Illustrator AI",&["ai"])],..FilePick::named("可编辑文字.ai")
     }));
     let Some(path)=path else {return Ok(json!({"cancelled":true}));};
@@ -152,9 +157,9 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
         std::fs::create_dir(&temp).map_err(|e|format!("无法建立导出临时目录：{e}"))?;
         let result=(||{
             let (bytes,warnings)=vectorcraft_engine::cmd::fileio::encode_with_warnings(&prepared.doc,"ai",&json!({"format":"ai","editingData":true,"pdfCompatible":true})).map_err(|e|e.to_string())?;
-            let input=temp.join("structure.ai");let final_ai=temp.join("editable.ai");let manifest=temp.join("manifest.json");let report=temp.join("report.json");let script=temp.join("bridge.jsx");
+            let input=temp.join("structure.ai");let final_ai=if handoff {output.clone()}else{temp.join("editable.ai")};let manifest=temp.join("manifest.json");let report=temp.join("report.json");let script=temp.join("bridge.jsx");
             write(&input.to_string_lossy(),&bytes)?;write(&script.to_string_lossy(),SCRIPT.as_bytes())?;
-            let data=json!({"version":1,"mode":mode,"inputAi":input,"outputAi":final_ai,"reportPath":report,"texts":prepared.texts});
+            let data=json!({"version":1,"mode":mode,"inputAi":input,"outputAi":final_ai,"reportPath":report,"texts":prepared.texts,"openAfter":handoff});
             write(&manifest.to_string_lossy(),&serde_json::to_vec(&data).map_err(|e|e.to_string())?)?;
             run_illustrator(&script,&manifest)?;
             let proof:Value=serde_json::from_slice(&std::fs::read(&report).map_err(|e|format!("Illustrator 未返回验证报告：{e}"))?).map_err(|e|e.to_string())?;
@@ -162,8 +167,8 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
             let bytes=std::fs::read(&final_ai).map_err(|e|e.to_string())?;
             if !bytes.starts_with(b"%PDF-") {return Err("Illustrator 未生成 PDF 兼容 AI 文件。".into());}
             // Only the successfully generated, verified result reaches the user's path.
-            write(&path,&bytes)?;
-            Ok(json!({"path":path,"mode":mode,"bytes":bytes.len(),"textFrames":proof["texts"].as_array().map_or(0,Vec::len),"artboards":proof["artboards"],"layers":proof["layers"],"warnings":warnings,"illustrator":proof["version"]}))
+            if !handoff {write(&path,&bytes)?;}
+            Ok(json!({"path":path,"mode":mode,"bytes":bytes.len(),"textFrames":proof["texts"].as_array().map_or(0,Vec::len),"artboards":proof["artboards"],"layers":proof["layers"],"warnings":warnings,"illustrator":proof["version"],"handoff":handoff}))
         })();
         // This directory was created by this call, with a unique name; never remove an input.
         let owned=std::fs::canonicalize(&temp).ok();
@@ -176,6 +181,13 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
         result
     },|app,result|{
         match &result {
+            Ok(v) if v["handoff"]==true=>{
+                app.status("已发送选中对象到 Illustrator，新文档已打开。");
+                if let Some(warnings)=v["warnings"].as_array().filter(|w|!w.is_empty()) {
+                    let details=warnings.iter().filter_map(Value::as_str).collect::<Vec<_>>().join("\n");
+                    crate::dialogs::confirm::tell(app,"发送兼容提示",&details);
+                }
+            }
             Ok(v)=>{let mut message=format!("已导出：{}\n颜色模式：{}；活文字框：{}；画板：{}。\n文件由本机 Illustrator 保存。请打开复核字体和复杂外观。",v["path"].as_str().unwrap_or(""),v["mode"].as_str().unwrap_or(""),v["textFrames"],v["artboards"]);
                 if let Some(w)=v["warnings"].as_array().filter(|a|!a.is_empty()) {message.push_str("\n原生结构导出提示：\n");for note in w.iter().filter_map(Value::as_str){message.push_str(note);message.push('\n');}}
                 crate::dialogs::confirm::tell(app,"可编辑 AI 导出完成",&message);app.status("可编辑 AI 导出完成。");}
@@ -190,7 +202,7 @@ fn run_illustrator(script:&std::path::Path,manifest:&std::path::Path)->Result<()
     use std::os::windows::process::CommandExt;
     use std::process::{Command,Stdio};
     let failure=script.with_file_name("failure.txt");
-    let code=r#"$ErrorActionPreference='Stop';try{$app=New-Object -ComObject Illustrator.Application;$js=[IO.File]::ReadAllText($env:LEO_AI_SCRIPT,[Text.Encoding]::UTF8);$prefix='var LEO_BUNDLE_PATH = '+(ConvertTo-Json -InputObject $env:LEO_AI_MANIFEST -Compress)+';';[void]$app.DoJavaScript($prefix+$js);[void][Runtime.InteropServices.Marshal]::ReleaseComObject($app);exit 0}catch{[IO.File]::WriteAllText($env:LEO_AI_FAILURE,$_.Exception.Message,[Text.Encoding]::UTF8);exit 1}"#;
+    let code=r#"$ErrorActionPreference='Stop';try{$app=New-Object -ComObject Illustrator.Application;$js=[IO.File]::ReadAllText($env:LEO_AI_SCRIPT,[Text.Encoding]::UTF8);$prefix='var LEO_BUNDLE_PATH = '+(ConvertTo-Json -InputObject $env:LEO_AI_MANIFEST -Compress)+';';[void]$app.DoJavaScript($prefix+$js);$data=Get-Content -LiteralPath $env:LEO_AI_MANIFEST -Raw -Encoding UTF8|ConvertFrom-Json;if($data.openAfter){Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class LeoBridgeFocus{[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h,int n);}';Get-Process Illustrator -ErrorAction SilentlyContinue|Where-Object {$_.MainWindowHandle -ne 0}|Select-Object -First 1|ForEach-Object {[void][LeoBridgeFocus]::ShowWindowAsync($_.MainWindowHandle,9);[void][LeoBridgeFocus]::SetForegroundWindow($_.MainWindowHandle)}};[void][Runtime.InteropServices.Marshal]::ReleaseComObject($app);exit 0}catch{[IO.File]::WriteAllText($env:LEO_AI_FAILURE,$_.Exception.Message,[Text.Encoding]::UTF8);exit 1}"#;
     let mut child=Command::new("powershell.exe").args(["-NoProfile","-NonInteractive","-STA","-Command",code])
         .env("LEO_AI_SCRIPT",script).env("LEO_AI_MANIFEST",manifest).env("LEO_AI_FAILURE",&failure)
         .creation_flags(0x08000000).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn()

@@ -230,8 +230,11 @@
     finally{
         if(doc)doc.close(SaveOptions.DONOTSAVECHANGES);
         if(sourceDoc)sourceDoc.close(SaveOptions.DONOTSAVECHANGES);
-        app.coordinateSystem=coordinates;app.userInteractionLevel=interaction;if(previous)previous.activate();report.afterDocuments=app.documents.length;
+        app.coordinateSystem=coordinates;app.userInteractionLevel=interaction;if(previous && !manifest.openAfter)previous.activate();report.afterDocuments=app.documents.length;
         if(manifest.reportPath)write(manifest.reportPath,report);
+    }
+    if(report.pass && manifest.openAfter) {
+        var received=app.open(new File(manifest.outputAi));received.activate();
     }
     return json(report);
 })();

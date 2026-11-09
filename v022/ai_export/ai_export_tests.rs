@@ -100,3 +100,37 @@ fn leo_ai_export_tests_worker_failure_opens_visible_message(){
     assert!(dialog.fields["detail"].as_str().unwrap().contains("缺少字体"));
     assert!(app.ui.told.is_empty(),"foreground reporting must not duplicate the same error");
 }
+
+#[test]
+fn leo_ai_bridge_selected_snapshot_excludes_unselected_unsupported_text_and_preserves_source() {
+    let (mut doc,shape,text)=fixture("rgb");
+    let NodeKind::Text(t)=&mut doc.node_mut(text).unwrap().kind else {panic!()};
+    t.runs[0].style.font_axes.insert("wght".into(),700.0);
+    doc.node_mut(shape).unwrap().opacity=0.42;
+    let before=serde_json::to_value(&doc).unwrap();
+    let mut session=Session::new();
+    session.execute("file.new",&json!({})).unwrap();
+    session.doc_mut().unwrap().doc=std::sync::Arc::new(doc);
+    session.execute("select.set",&json!({"ids":[shape.0]})).unwrap();
+    let st=session.active().unwrap();
+    let snapshot=vectorcraft_engine::cmd::fileio::export_source(st,&json!({"selectedOnly":true})).unwrap();
+    assert!(snapshot.node(text).is_none(),"unselected content must not be sent");
+    assert_eq!(snapshot.node(shape).unwrap().opacity,0.42);
+    assert_eq!(snapshot.node(shape),st.doc.node(shape),"appearance and stroke remain identical");
+    assert!(prepare(&snapshot,"selected-only").is_ok(),"unselected variable font must not block a shape transfer");
+    assert_eq!(serde_json::to_value(&*st.doc).unwrap(),before);
+    assert_eq!(st.selection.objects,vec![shape]);
+}
+
+#[test]
+fn leo_ai_bridge_partial_selection_is_rejected_without_changing_the_document() {
+    let (doc,shape,_)=fixture("rgb");
+    let mut session=Session::new();session.execute("file.new",&json!({})).unwrap();
+    session.doc_mut().unwrap().doc=std::sync::Arc::new(doc);
+    session.execute("select.set",&json!({"ids":[shape.0]})).unwrap();
+    session.doc_mut().unwrap().selection.anchors.insert(shape,[(0,0)].into());
+    let mut app=VectorcraftApp::new(session,crate::Services::default());
+    let before=serde_json::to_value(&*app.session.active().unwrap().doc).unwrap();
+    assert!(super::super::bridge::send(&mut app,&json!({})).is_err());
+    assert_eq!(serde_json::to_value(&*app.session.active().unwrap().doc).unwrap(),before);
+}

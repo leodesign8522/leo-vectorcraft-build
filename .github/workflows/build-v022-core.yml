@@ -1,4 +1,4 @@
-name: Leo Design Core Bridge v0.15.1
+name: Leo Design Core Bridge v0.16.0
 on:
   workflow_dispatch:
   push:
@@ -15,6 +15,7 @@ on:
       - "v022/*regressions.rs"
       - "v022/patch_*.py"
       - "v022/ai_export/**"
+      - "v022/ai_bridge/**"
       - "v022/overlay/**"
       - "v022/session_regressions.rs"
       - "v022/selected_segments_clipboard_tests.rs"
@@ -29,7 +30,7 @@ jobs:
     uses: ./.github/workflows/build-v022-edition.yml
     with:
       flavor: core
-      label: Leo Design Core Bridge v0.15.1
-      artifact: Leo_Design_Core_Bridge_v0.15.1_Windows_x64
-      installer: v022/overlay/Leo_Design_Core_Bridge_0_15_1.iss
-      output: Leo_Design_Core_Bridge_v0.15.1_Installer
+      label: Leo Design Core Bridge v0.16.0
+      artifact: Leo_Design_Core_Bridge_v0.16.0_Windows_x64
+      installer: v022/overlay/Leo_Design_Core_Bridge_0_16_0.iss
+      output: Leo_Design_Core_Bridge_v0.16.0_Installer
