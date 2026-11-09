@@ -34,14 +34,14 @@ with NativeControl(exe) as a:
         assert {str(i):a.node(i) for i in [rect,circle,group,point,area]}==before,'export changed source nodes'
         assert a.call('document.inspect')['selection']==selection,'export changed selection'
         assert not list(root.glob('.leo-ai-export-*')),'owned temporary data was not cleaned'
-        a.call('ui.dialog.confirm')
+        a.call('ui.dialog.cancel')  # Dismiss the completed-export notice, no continuation command.
     # The first real UI check exposed long ink names in text-only documents.
     cmd('file.new',width=300,height=200)
     only=cmd('text.create',x=30,y=80,text='Only editable text',font='Arial',size=24)['id']
     original=a.node(only)
     a.call('ui.menu.invoke',{'command':'file.leoExportEditableAi','params':{'path':str(root/'TEXT_ONLY.ai'),'wait':True}})
     assert a.node(only)==original
-    a.call('ui.dialog.confirm')
+    a.call('ui.dialog.cancel')
     # Empty frames must remain empty/editable, retaining their insertion fonts.
     cmd('file.new',width=300,height=250)
     cmd('text.create',x=30,y=80,text='',font='Arial',size=24)
@@ -49,7 +49,7 @@ with NativeControl(exe) as a:
     empty=root/'EMPTY_EDITABLE.ai'
     a.call('ui.menu.invoke',{'command':'file.leoExportEditableAi','params':{'path':str(empty),'wait':True}})
     assert empty.exists() and empty.read_bytes().startswith(b'%PDF-')
-    a.call('ui.dialog.confirm')
+    a.call('ui.dialog.cancel')
     # A missing font must fail without replacing an existing destination file.
     cmd('file.new',width=300,height=200)
     cmd('text.create',x=30,y=80,text='Missing font',font='LEO_MISSING_FONT_FOR_REGRESSION_0150',size=24)

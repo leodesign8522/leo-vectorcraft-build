@@ -1,3 +1,11 @@
+# Core Bridge 0.15.0 / Illustrator-backed editable AI export
+
+Adds an explicit UI export command without changing native AI saves. An immutable document snapshot replaces live text with uniquely named spot-colour markers while the native encoder retains nontext geometry and structure. A fixed JSON-driven Illustrator script recreates point/area text in the same hierarchy, maps supported character/paragraph attributes and transforms, and saves an actual AI file. A fresh native Illustrator document avoids imported-editing-data save failures. Artboard metadata is snapshotted before creating the destination; text attributes are acquired once from the final range reference. Empty frames seed and remove a private temporary glyph before saving.
+
+Windows uses a hidden STA PowerShell COM worker with file/env arguments, bounded waiting, explicit font resolution and guarded owned-directory cleanup. Source nodes and selection remain unchanged; the final destination is written only after success. Assigned ICC, unsupported text structures and advanced attributes are rejected instead of silently losing data. RGB/CMYK mode and channel preservation is separately tested from ICC inheritance.
+
+Six CI preflight tests, actual-command export/Illustrator edit-save-reopen checks and all configured retained regressions, release compilation and installer identity/hash verification pass. See [exact evidence and limitations](VERIFIED_RELEASE.md).
+
 # Core Bridge 0.14.9 / VectorCraft 0.22.0
 
 Whole selected containers now remain selected throughout Direct Selection drags from descendant anchors, strokes and fills. Click-only release still drills down; Alt ancestor cycling and copying stay native. Shift+Space is disabled at canvas pointer-down, with no navigation cursor; Space alone still pans. Three engine regressions, five UI state/navigation tests, 30 actual A-key group cases and retained suites pass. See [verification](VERIFIED_RELEASE.md).
