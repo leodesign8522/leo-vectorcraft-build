@@ -167,3 +167,29 @@ fn leo_ai_bridge_selection_canvas_is_measured_before_text_markers(){
     assert_eq!(prepared.doc.node(text).unwrap().geometric_bounds().unwrap().width(),1.0);
     assert!(simple_geometry_witness(&framed).is_none(),"text uses font-specific bounds, not the plain path witness");
 }
+
+#[test]
+fn leo_ai_export_tests_tabular_digits_remain_live_and_source_is_unchanged(){
+    for mode in ["rgb","cmyk"] {
+        let (mut doc,_,id)=fixture(mode);
+        let NodeKind::Text(t)=&mut doc.node_mut(id).unwrap().kind else{panic!()};
+        t.runs[0].text="13".into();t.runs[0].style.features=vec!["tnum".into()];
+        let mut ordinary=t.runs[0].clone();
+        ordinary.text="12".into();ordinary.style.features.clear();t.runs.push(ordinary);
+        let before=serde_json::to_value(&doc).unwrap();
+        let p=prepare(&doc,"tabular").unwrap();
+        assert_eq!(serde_json::to_value(&doc).unwrap(),before);
+        assert_eq!(p.texts[0]["node"]["kind"]["runs"][0]["style"]["features"],json!(["tnum"]));
+        assert!(p.texts[0]["node"]["kind"]["runs"][1]["style"].get("features").is_none());
+    }
+}
+#[test]
+fn leo_ai_export_tests_unmapped_features_report_the_actual_field(){
+    let (mut doc,_,id)=fixture("rgb");
+    let NodeKind::Text(t)=&mut doc.node_mut(id).unwrap().kind else{panic!()};
+    t.runs[0].style.features=vec!["tnum".into(),"ss01".into()];
+    let before=serde_json::to_value(&doc).unwrap();
+    let error=prepare(&doc,"unmapped").err().unwrap();
+    assert!(error.contains("features"));assert!(!error.contains("fontAxes"));
+    assert_eq!(serde_json::to_value(&doc).unwrap(),before);
+}

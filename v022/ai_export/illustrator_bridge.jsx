@@ -58,6 +58,13 @@
         // proxy in Illustrator. Obtain it once from the final range reference.
         var a=range.characterAttributes;
         a.textFont=font(s);a.size=s.size/scale;a.tracking=s.tracking||0;
+        // Reset every run so ordinary digits do not inherit a previous tnum run.
+        a.figureStyle=FigureStyleType.DEFAULTFIGURESTYLE;
+        var features=s.features||[];
+        for(var feature=0;feature<features.length;feature++){
+            if(features[feature]!=='tnum')throw Error('Unsupported OpenType feature: '+features[feature]);
+            a.figureStyle=FigureStyleType.TABULAR;
+        }
         a.horizontalScale=s.h_scale===undefined?100:s.h_scale;a.verticalScale=s.v_scale===undefined?100:s.v_scale;
         a.baselineShift=(s.baseline_shift||0)/scale;a.rotation=-(s.rotation||0);
         a.autoLeading=s.leading===undefined||s.leading===null;if(!a.autoLeading)a.leading=s.leading/scale;

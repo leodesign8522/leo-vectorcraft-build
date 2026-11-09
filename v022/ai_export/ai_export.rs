@@ -47,7 +47,18 @@ fn check_text(n: &Node) -> Result<(), String> {
         supported.all_caps=s.all_caps;supported.no_break=s.no_break;
         supported.overprint_fill=s.overprint_fill;supported.overprint_stroke=s.overprint_stroke;
         supported.style_name=s.style_name.clone();
-        if &supported!=s { return Err(fail("存在尚未支持的高级字符属性（如可变字体轴、注音字形或特殊字符位置）")); }
+        // Tabular lining digits map to Illustrator's live OpenType figure style.
+        if s.features.iter().all(|feature| feature == "tnum") {
+            supported.features=s.features.clone();
+        }
+        if &supported!=s {
+            let actual=serde_json::to_value(s).map_err(|e|e.to_string())?;
+            let baseline=serde_json::to_value(&supported).map_err(|e|e.to_string())?;
+            let fields=actual.as_object().into_iter().flat_map(|o|o.iter())
+                .filter(|(key,value)|baseline.get(key.as_str())!=Some(*value))
+                .map(|(key,_)|key.as_str()).collect::<Vec<_>>();
+            return Err(fail(&format!("存在尚未支持的高级字符属性：{}",fields.join("、"))));
+        }
     }
     for para in std::iter::once(&t.para).chain(t.paras.iter()) {
         if para.list.is_some() || !para.tabs.is_empty() || para.direction.is_some() {
