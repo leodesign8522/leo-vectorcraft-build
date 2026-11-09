@@ -1482,6 +1482,21 @@ mod leo_snapping_engine_tests {
             "never intersect a finite segment's imaginary extension");
     }
 
+
+    #[test]
+    fn leo_smart_guide_does_not_steal_closer_path_snap() {
+        let mut t=Targets::default();
+        t.leo_drag_origin=Some(Point::new(260.0,170.0));
+        t.segments.push((Rect::new(200.0,120.0,200.0,190.0),
+            PathSeg::Line(Line::new((200.0,120.0),(200.0,190.0)))));
+        // 8px capture alone must NOT drag the pointer seven pixels along a
+        // vertical edge to an H guide merely because that guide also crosses.
+        assert!(t.leo_snap_guide_intersection(Point::new(202.0,163.0),None,false,8.0,12.8).is_none());
+        // Once actually approaching the crossing, select the exact point.
+        assert_eq!(t.leo_snap_guide_intersection(Point::new(201.0,169.2),None,false,8.0,12.8).unwrap().0,Point::new(200.0,170.0));
+        assert_eq!(t.leo_snap_guide_intersection(Point::new(203.0,180.0),None,false,8.0,12.8).unwrap().0,Point::new(200.0,170.0));
+    }
+
     fn move_snap(bounds: Rect, sources: Vec<Point>, targets: Targets) -> ObjectMoveSnap {
         ObjectMoveSnap {
             bounds: Some(bounds),
