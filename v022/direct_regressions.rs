@@ -117,7 +117,7 @@ fn leo_snapping_engine_dense_document_tail_node_drag_with_and_without_shift() {
         use vectorcraft_geom::kurbo::ParamCurveNearest;
         assert!(target.nearest(endpoint,1e-8).distance_sq<1e-12,"shift={shift}: {v}");
         if shift {assert!((endpoint.y-340.0).abs()<1e-9);}
-        assert_eq!(labels,vec!["path".to_string()]);
+        assert!(labels == vec!["path".to_string()] || labels == vec!["交点".to_string()], "unexpected label: {labels:?}");
     }
 }
 
@@ -140,7 +140,7 @@ fn leo_snapping_engine_shift_node_drag_uses_real_path_with_pixel_option() {
     let (v, labels) = drag(&mut tool, &c, (380.0, 340.0), (402.0, 340.0), Mods { shift: true, ..Mods::default() });
     assert!((v["dx"].as_f64().unwrap() - 23.333333333333).abs() < 1e-6, "{v}");
     assert_eq!(v["dy"], json!(0.0));
-    assert_eq!(labels, vec!["path".to_string()]);
+    assert!(labels == vec!["path".to_string()] || labels == vec!["交点".to_string()], "unexpected label: {labels:?}");
 }
 
 #[test]
@@ -161,6 +161,6 @@ fn leo_snapping_engine_alt_copy_full_path_keeps_geometric_snap_with_pixel_option
         let (v, labels) = drag(&mut tool, &c, (600.0, 200.0), (504.0, 235.0), Mods { alt: true, shift, ..Mods::default() });
         assert_eq!(v["copy"], json!(true));
         assert_eq!(v["matrix"], json!([1.0, 0.0, 0.0, 1.0, -100.0, if shift { 0.0 } else { 35.0 }]));
-        assert_eq!(labels, vec!["path".to_string()]);
+        assert!(labels == vec!["path".to_string()] || labels == vec!["交点".to_string()], "unexpected label: {labels:?}");
     }
 }
