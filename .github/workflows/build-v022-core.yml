@@ -12,6 +12,7 @@ on:
       - "v022/text_glyph_*.rs"
       - "v022/text_mode_*.rs"
       - "v022/whole_selection_regressions.rs"
+      - "v022/*regressions.rs"
       - "v022/patch_*.py"
       - "v022/ai_export/**"
       - "v022/overlay/**"
