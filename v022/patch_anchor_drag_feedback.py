@@ -72,6 +72,7 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
             if !shift && let Some(f) = from.filter(|f| f.contact)
                 && let Some(hit) = targets.leo_snap_contact(p, f.at, cx.tol(8.0)) {
                 targets.leo_extension.set(None);
+                targets.leo_intersection.set(None);
                 return hit;
             }
             // Existing perpendicular/tangent contact takes priority for open
