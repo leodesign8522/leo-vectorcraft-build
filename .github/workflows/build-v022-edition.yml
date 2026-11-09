@@ -53,6 +53,19 @@ jobs:
         run: |
           python -m compileall -q v022 scripts
           if ($LASTEXITCODE -ne 0) { throw "Python patch syntax validation failed" }
+      - name: Validate combined Illustrator sender installer before Rust compilation
+        shell: pwsh
+        run: |
+          $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          New-Item -ItemType Directory -Path installer-fixture -Force | Out-Null
+          Set-Content installer-fixture/vectorcraft.exe "compiler fixture"
+          $stub = (Resolve-Path installer-fixture/vectorcraft.exe).Path
+          & $compiler "/DSourceExe=$stub" "/Oinstaller-fixture-output" "${{ inputs.installer }}"
+          if ($LASTEXITCODE -ne 0) { throw "Combined installer syntax failed" }
       - name: Install stable Rust toolchain
         shell: pwsh
         run: |

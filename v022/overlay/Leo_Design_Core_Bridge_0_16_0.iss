@@ -30,6 +30,13 @@ Name: "{group}\Uninstall"; Filename: "{uninstallexe}"
 var SenderPaths: String;
 function BridgeRoot: String;
 begin Result:=ExpandConstant('{localappdata}\Leo Design\AI Bridge'); end;
+procedure WriteUtf8(const FileName, Content: String);
+var Lines: TArrayOfString;
+begin
+  SetArrayLength(Lines,1);
+  Lines[0]:=Content;
+  if not SaveStringsToUTF8File(FileName,Lines,False) then RaiseException('Unable to write bridge configuration: '+FileName);
+end;
 procedure InstallAt(const AppRoot: String);
 var Locales, Dirs: TFindRec; Presets, Candidate, Folder: String;
 begin
@@ -79,7 +86,7 @@ begin
   if CurStep=ssPostInstall then begin
     ForceDirectories(BridgeRoot);
     ForceDirectories(BridgeRoot+'\inbox');
-    SaveStringToUTF8File(BridgeRoot+'\receiver.txt',ExpandConstant('{app}\vectorcraft.exe'),False);
+    WriteUtf8(BridgeRoot+'\receiver.txt',ExpandConstant('{app}\vectorcraft.exe'));
     SenderPaths:='';
     ScanAdobe(ExpandConstant('{pf64}\Adobe'));
     ScanAdobe(ExpandConstant('{pf32}\Adobe'));
@@ -88,7 +95,7 @@ begin
       for Attempts:=0 to 4 do begin InstallAt(Candidate);Candidate:=ExtractFileDir(Candidate);end;
     end;
     // Keep the list for diagnostics; never remove user scripts or script directories.
-    SaveStringToUTF8File(BridgeRoot+'\installed-senders.txt',SenderPaths,False);
+    WriteUtf8(BridgeRoot+'\installed-senders.txt',SenderPaths);
     if SenderPaths='' then begin
       Log('Illustrator script directory was not found. Sender remains available in the installed AI Bridge folder.');
       if not WizardSilent then MsgBox('未找到 Illustrator 脚本目录。VectorCraft 已安装；发送脚本位于安装目录的 AI Bridge 文件夹。自定义安装的 Illustrator 可将该脚本放入其 Presets/语言/脚本目录。',mbInformation,MB_OK);
