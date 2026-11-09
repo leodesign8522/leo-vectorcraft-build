@@ -109,6 +109,49 @@ fn prepare(doc: &Document, token: &str) -> Result<Prepared, String> {
     Ok(Prepared {doc:marked,texts})
 }
 
+/// Give a selected-object handoff its own artboard BEFORE replacing text with
+/// markers. Keeping an unrelated board near (0,0) can place far-away artwork
+/// outside Illustrator's 16383-point normal canvas and corrupt its bounds.
+fn handoff_document(mut doc:Document)->Result<Document,String>{
+    let bounds=vectorcraft_render::encode::art_bounds(&doc).ok_or("选中内容没有可发送的可见范围。")?;
+    if !bounds.is_finite() {return Err("选中内容的范围无效。".into());}
+    let bounds=Rect::new(bounds.x0,bounds.y0,
+        bounds.x1.max(bounds.x0+1.0),bounds.y1.max(bounds.y0+1.0));
+    let mut board=Document::new(1.0,1.0).artboards.remove(0);
+    board.rect=bounds;board.name="Selection".into();
+    doc.artboards=vec![board];
+    Ok(doc)
+}
+
+/// A simple path has exact geometric bounds in both applications. Record this
+/// witness so an extra stray point/helper cannot silently enlarge the AI box.
+/// Text, masks, clipping and effects need different bounds rules and are excluded.
+fn simple_geometry_witness(doc:&Document)->Option<Value>{
+    let mut bounds=None;let mut count=0;let mut supported=true;
+    doc.walk(|n|{
+        if !n.visible || !n.appearance.effects.is_empty() || n.extras().mask.is_some() {supported=false;}
+        match &n.kind {
+            NodeKind::Path{guide:false,..}=>{
+                count+=1;bounds=n.geometric_bounds();
+                if !n.appearance.items.iter().all(|item| {
+                    if !item.effects().is_empty() || !simple_paint(item.paint()) {return false;}
+                    match item {
+                        vectorcraft_doc::AppearanceItem::Fill(_)=>true,
+                        vectorcraft_doc::AppearanceItem::Stroke(s)=>s.align==Default::default()
+                            && s.brush.is_none() && s.profile.is_none()
+                            && s.start_arrow.is_none() && s.end_arrow.is_none(),
+                    }
+                }) {supported=false;}
+            }
+            NodeKind::Layer{clip:false,..}|NodeKind::Group{clip:false,..}=>{if !n.appearance.items.is_empty(){supported=false;}},
+            _=>supported=false,
+        }
+    });
+    if !supported || count!=1 {return None;}
+    let b=bounds?;let board=doc.artboards.first()?.rect;
+    Some(json!({"bounds":[b.x0,b.y0,b.x1,b.y1],"artboard":[board.x0,board.y0,board.x1,board.y1]}))
+}
+
 fn report_failure(app:&mut VectorcraftApp,error:&str) {
     crate::dialogs::confirm::tell(app,"可编辑 AI 导出失败",error);
     app.status(format!("AI 导出失败：{error}"));
@@ -134,6 +177,8 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
     let selected=p.get("selectedOnly").and_then(Value::as_bool)==Some(true);
     let doc=vectorcraft_engine::cmd::fileio::export_source(st,&json!({"selectedOnly":selected}))
         .map_err(|e|e.to_string())?.into_owned();
+    let doc=if handoff {handoff_document(doc)?}else{doc};
+    let geometry_witness=simple_geometry_witness(&doc);
     // Report unsupported content before opening a save picker or launching Illustrator.
     let token=format!("{}_{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e|e.to_string())?.as_nanos());
     let prepared=prepare(&doc,&token)?;
@@ -159,7 +204,7 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
             let (bytes,warnings)=vectorcraft_engine::cmd::fileio::encode_with_warnings(&prepared.doc,"ai",&json!({"format":"ai","editingData":true,"pdfCompatible":true})).map_err(|e|e.to_string())?;
             let input=temp.join("structure.ai");let final_ai=if handoff {output.clone()}else{temp.join("editable.ai")};let manifest=temp.join("manifest.json");let report=temp.join("report.json");let script=temp.join("bridge.jsx");
             write(&input.to_string_lossy(),&bytes)?;write(&script.to_string_lossy(),SCRIPT.as_bytes())?;
-            let data=json!({"version":1,"mode":mode,"inputAi":input,"outputAi":final_ai,"reportPath":report,"texts":prepared.texts,"openAfter":handoff});
+            let data=json!({"version":1,"mode":mode,"inputAi":input,"outputAi":final_ai,"reportPath":report,"texts":prepared.texts,"openAfter":handoff,"geometryWitness":geometry_witness});
             write(&manifest.to_string_lossy(),&serde_json::to_vec(&data).map_err(|e|e.to_string())?)?;
             run_illustrator(&script,&manifest)?;
             let proof:Value=serde_json::from_slice(&std::fs::read(&report).map_err(|e|format!("Illustrator 未返回验证报告：{e}"))?).map_err(|e|e.to_string())?;

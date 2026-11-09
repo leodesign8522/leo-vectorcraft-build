@@ -127,6 +127,29 @@
         tf.name=node.name||('Text '+node.id);tf.opacity=(node.opacity===undefined?1:node.opacity)*100;
         tf.hidden=node.visible===false;tf.locked=!!node.locked;marker.remove();return tf;
     }
+    // LEO_GEOMETRY_VALIDATION_BEGIN
+    function expectedGeometryBounds(board,witness,scale) {
+        var b=witness.bounds,ab=witness.artboard;
+        return [board[0]+(b[0]-ab[0])/scale,board[1]-(b[1]-ab[1])/scale,
+            board[0]+(b[2]-ab[0])/scale,board[1]-(b[3]-ab[1])/scale];
+    }
+    function validateGeometryBounds(document,witness) {
+        if(!witness)return null;
+        var scale=Number(document.scaleFactor)||1,board=document.artboards[0].artboardRect;
+        var expected=expectedGeometryBounds(board,witness,scale);
+        var actual=[Infinity,-Infinity,-Infinity,Infinity],count=0;
+        for(var i=0;i<document.pageItems.length;i++){
+            var bounds=document.pageItems[i].geometricBounds;
+            for(var k=0;k<4;k++)if(!isFinite(bounds[k]))throw Error('AI 对象范围无效，已停止发送。');
+            actual[0]=Math.min(actual[0],bounds[0]);actual[1]=Math.max(actual[1],bounds[1]);
+            actual[2]=Math.max(actual[2],bounds[2]);actual[3]=Math.min(actual[3],bounds[3]);count++;
+        }
+        if(!count)throw Error('AI 未生成选中的路径，已停止发送。');
+        for(var axis=0;axis<4;axis++)if(Math.abs(actual[axis]-expected[axis])>0.05/scale)
+            throw Error('AI 选框范围校验失败，可能存在额外路径或坐标偏移，已停止发送。预期：'+expected.join(',')+'；实际：'+actual.join(','));
+        return {pass:true,expected:expected,actual:actual,items:count,scale:scale};
+    }
+    // LEO_GEOMETRY_VALIDATION_END
     function freshDocument(src){
         var activeBoard=0;
         try{activeBoard=src.artboards.getActiveArtboardIndex();}catch(uninitializedBoard){}
@@ -219,13 +242,20 @@
         }
         for(n=0;n<manifest.texts.length;n++){try{doc.spots.getByName(manifest.texts[n].marker).remove();}catch(ignore){}}
         for(n=unlocked.length-1;n>=0;n--){var state=unlocked[n];if(state.layer)state.item.visible=!state.hidden;else state.item.hidden=state.hidden;state.item.locked=state.locked;}
+        report.geometry=validateGeometryBounds(doc,manifest.geometryWitness);
         report.stage='save';
         var options=new IllustratorSaveOptions();options.pdfCompatible=true;options.compressed=true;options.embedICCProfile=true;options.embedLinkedFiles=true;
         doc.saveAs(new File(manifest.outputAi),options);
         report.stage='saved';
         report.mode=cmyk?'cmyk':'rgb';report.artboards=doc.artboards.length;report.layers=[];
         for(n=0;n<doc.layers.length;n++)report.layers.push(doc.layers[n].name);
-        doc.close(SaveOptions.DONOTSAVECHANGES);doc=null;report.pass=true;
+        doc.close(SaveOptions.DONOTSAVECHANGES);doc=null;
+        if(manifest.geometryWitness){
+            doc=app.open(new File(manifest.outputAi));
+            report.reopenedGeometry=validateGeometryBounds(doc,manifest.geometryWitness);
+            doc.close(SaveOptions.DONOTSAVECHANGES);doc=null;
+        }
+        report.pass=true;
     }catch(e){report.error=String(e);throw e;}
     finally{
         if(doc)doc.close(SaveOptions.DONOTSAVECHANGES);

@@ -134,3 +134,36 @@ fn leo_ai_bridge_partial_selection_is_rejected_without_changing_the_document() {
     assert!(super::super::bridge::send(&mut app,&json!({})).is_err());
     assert_eq!(serde_json::to_value(&*app.session.active().unwrap().doc).unwrap(),before);
 }
+
+#[test]
+fn leo_ai_bridge_far_rotated_rectangle_uses_selection_artboard_without_changing_art(){
+    let mut s=Session::new();
+    s.execute("file.new",&json!({"width":600,"height":500})).unwrap();
+    let id=NodeId(s.execute("shape.rectangle",&json!({
+        "x":14018.7,"y":-378.3,"width":519.05,"height":141.73,"rotation":9.96
+    })).unwrap()["id"].as_u64().unwrap());
+    let original=s.doc().unwrap().doc.clone();let before=serde_json::to_value(&*original).unwrap();
+    let framed=handoff_document((*original).clone()).unwrap();
+    let bounds=framed.node(id).unwrap().geometric_bounds().unwrap();
+    assert_eq!(framed.artboards.len(),1);
+    assert!(framed.artboards[0].rect.x0>13000.0,"do not keep an unrelated board at zero");
+    assert!(framed.artboards[0].rect.contains(bounds.center()));
+    assert!(framed.artboards[0].rect.width()<600.0);
+    assert!(framed.artboards[0].rect.height()<300.0);
+    assert_eq!(framed.node(id),original.node(id),"never resize, translate or reshape the selected rectangle");
+    let witness=simple_geometry_witness(&framed).unwrap();
+    assert_eq!(witness["bounds"],json!([bounds.x0,bounds.y0,bounds.x1,bounds.y1]));
+    assert_eq!(serde_json::to_value(&*original).unwrap(),before);
+    assert!(prepare(&framed,"far-rotated").is_ok());
+}
+#[test]
+fn leo_ai_bridge_selection_canvas_is_measured_before_text_markers(){
+    let (doc,_,text)=fixture("rgb");
+    let framed=handoff_document(doc).unwrap();
+    let board=framed.artboards[0].rect;
+    let prepared=prepare(&framed,"before-text-marker").unwrap();
+    assert_eq!(prepared.doc.artboards[0].rect,board);
+    assert!(board.height()>100.0 && board.width()>100.0);
+    assert_eq!(prepared.doc.node(text).unwrap().geometric_bounds().unwrap().width(),1.0);
+    assert!(simple_geometry_witness(&framed).is_none(),"text uses font-specific bounds, not the plain path witness");
+}
