@@ -1,3 +1,11 @@
+# Core Bridge 0.16.2 / 等宽数字可编辑 AI 导出修复（CI 与安装校验通过）
+
+- 修复 OpenType `tnum`（等宽数字）被高级字符预检误拦截的问题，映射为 Illustrator 活文字的等宽数字格式。
+- 混排普通数字逐段恢复默认数字格式；未映射属性继续明确拒绝，并显示具体字段。
+- 14 项可编辑 AI 预检回归、生产字符映射测试、新旧代码负对照、全部配置的保留功能回归、独立吸附回归、Windows 编译及安装后版本校验通过。
+- 本次未完成本机 Illustrator 实机导出复测，不能把 CI 通过视为用户原稿已完成实机导出。
+- [完整安装包](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/42650970909/artifacts/13693443332)；[源码、校验与验证范围](v022/RELEASE_0_16_2.md)。安装后启动 **Leo Design VectorCraft 0.22 Bridge 0.16.2**。
+
 # Core Bridge 0.15.0 / 可编辑 AI 导出（已验证）
 
 - 文件 → 导出 → 导出可编辑 AI（通过 Illustrator）：可编辑点文字及整段区域框，保留 RGB/CMYK 模式和已测数值、图层/编组/多画板；需要本机 Illustrator 和对应字体。
