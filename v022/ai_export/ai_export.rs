@@ -109,11 +109,21 @@ fn prepare(doc: &Document, token: &str) -> Result<Prepared, String> {
     Ok(Prepared {doc:marked,texts})
 }
 
+fn report_failure(app:&mut VectorcraftApp,error:&str) {
+    crate::dialogs::confirm::tell(app,"可编辑 AI 导出失败",error);
+    app.status(format!("AI 导出失败：{error}"));
+}
+
 pub fn export(app: &mut VectorcraftApp,p:&Value)->Result<Value,String>{
-    if p.get("wait").and_then(Value::as_bool)==Some(true) {
-        return crate::background::in_foreground(app,|app|export_now(app,p));
-    }
-    export_now(app,p)
+    let result=if p.get("wait").and_then(Value::as_bool)==Some(true) {
+        crate::background::in_foreground(app,|app|export_now(app,p))
+    } else {
+        export_now(app,p)
+    };
+    // Preflight can fail before the save picker. Menu invocation only puts Err
+    // in the status bar, which is easy to miss. Always keep a visible explanation.
+    if let Err(error)=&result { report_failure(app,error); }
+    result
 }
 
 fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
@@ -123,6 +133,10 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
     // Report unsupported content before opening a save picker or launching Illustrator.
     let token=format!("{}_{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e|e.to_string())?.as_nanos());
     let prepared=prepare(&doc,&token)?;
+    if p.get("path").and_then(Value::as_str).is_none()
+        && !crate::picks::can(app,&crate::picks::PickRequest::Save(FilePick::default())) {
+        return Err("无法打开保存窗口。请重新启动 VectorCraft 后重试。".into());
+    }
     let path=p.get("path").and_then(Value::as_str).map(str::to_owned).or_else(||crate::picks::save(app,&FilePick {
         filters:vec![FilePick::filter("Editable Illustrator AI",&["ai"])],..FilePick::named("可编辑文字.ai")
     }));
@@ -165,7 +179,7 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
             Ok(v)=>{let mut message=format!("已导出：{}\n颜色模式：{}；活文字框：{}；画板：{}。\n文件由本机 Illustrator 保存。请打开复核字体和复杂外观。",v["path"].as_str().unwrap_or(""),v["mode"].as_str().unwrap_or(""),v["textFrames"],v["artboards"]);
                 if let Some(w)=v["warnings"].as_array().filter(|a|!a.is_empty()) {message.push_str("\n原生结构导出提示：\n");for note in w.iter().filter_map(Value::as_str){message.push_str(note);message.push('\n');}}
                 crate::dialogs::confirm::tell(app,"可编辑 AI 导出完成",&message);app.status("可编辑 AI 导出完成。");}
-            Err(e)=>app.status(format!("AI 导出失败：{e}")),
+            Err(e)=>report_failure(app,e),
         }
         result
     })

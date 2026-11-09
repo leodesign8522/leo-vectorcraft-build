@@ -78,3 +78,25 @@ fn leo_ai_export_tests_oversized_global_ink_names_fail_before_export(){
     assert!(prepare(&doc,"long").err().unwrap().contains("31"));
     assert_eq!(serde_json::to_value(&doc).unwrap(),before);
 }
+
+#[test]
+fn leo_ai_export_tests_preflight_failure_opens_visible_message_without_save_picker(){
+    let mut app=VectorcraftApp::new(Session::new(),crate::Services::default());
+    let result=export(&mut app,&json!({}));
+    assert!(result.is_err());
+    let dialog=app.ui.dialog.as_ref().expect("preflight error must be visible");
+    assert_eq!(dialog.kind,crate::dialogs::confirm::MESSAGE);
+    assert!(!dialog.fields["detail"].as_str().unwrap().is_empty());
+    assert!(app.session.documents().is_empty());
+}
+
+#[test]
+fn leo_ai_export_tests_worker_failure_opens_visible_message(){
+    let mut app=VectorcraftApp::new(Session::new(),crate::Services::default());
+    report_failure(&mut app,"Illustrator 缺少字体：Example");
+    report_failure(&mut app,"Illustrator 缺少字体：Example");
+    let dialog=app.ui.dialog.as_ref().expect("worker failure must be visible");
+    assert_eq!(dialog.fields["message"],"可编辑 AI 导出失败");
+    assert!(dialog.fields["detail"].as_str().unwrap().contains("缺少字体"));
+    assert!(app.ui.told.is_empty(),"foreground reporting must not duplicate the same error");
+}
