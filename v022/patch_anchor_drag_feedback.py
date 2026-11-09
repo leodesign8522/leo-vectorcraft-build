@@ -69,18 +69,20 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
         let constrained = if shift { from.and_then(|f| f.constrained(p)) } else { None };
         let p = constrained.unwrap_or(p);
         if let Some((targets, _)) = &self.targets {
-            // A real finite path crossing wins over nearest-path projection.
+            if !shift && let Some(f) = from.filter(|f| f.contact)
+                && let Some(hit) = targets.leo_snap_contact(p, f.at, cx.tol(8.0)) {
+                targets.leo_extension.set(None);
+                return hit;
+            }
+            // Existing perpendicular/tangent contact takes priority for open
+            // line endpoints; otherwise a real guide/path crossing wins over
+            // the generic nearest-path projection.
             if cx.smart_guides {
                 if let Some(hit) = targets.leo_snap_guide_intersection(p, from, shift, cx.tol(8.0), cx.tol(12.8)) {
                     return hit;
                 }
             } else {
                 targets.leo_intersection.set(None);
-            }
-            if !shift && let Some(f) = from.filter(|f| f.contact)
-                && let Some(hit) = targets.leo_snap_contact(p, f.at, cx.tol(8.0)) {
-                targets.leo_extension.set(None);
-                return hit;
             }
             let hit = if let (Some(q), Some(f)) = (constrained, from) {
                 targets.leo_snap_anchor_along(q, f.at, cx.tol(8.0), cx.tol(12.8))
