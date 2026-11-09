@@ -567,6 +567,16 @@ impl Targets {
             .is_some_and(|anchor| anchor.distance(p) <= distance + 1e-7) {
             return None;
         }
+        // A genuine intersection must be near the pointer, not merely inside
+        // the broad 8px acquisition circle while the pointer is following a
+        // different place on the same edge. Preserve native path/perpendicular
+        // behavior until the intersection is itself the best candidate.
+        // The small tie band is in document units, scaled from screen pixels.
+        if geometry.leo_nearest_segment(p, acquire).is_some_and(|(_, nearest)| {
+            nearest.distance(p) + acquire * 0.08 < distance
+        }) {
+            return None;
+        }
         self.leo_intersection.set(Some(LeoIntersectionLock {point:q, shift}));
         self.leo_snap.set(None);
         self.leo_extension.set(None);
