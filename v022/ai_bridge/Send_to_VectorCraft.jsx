@@ -121,7 +121,8 @@
         if(!ready.rename('ready.json'))throw Error('无法提交发送任务。');
         var heartbeat=new File(root.fsName+'/heartbeat.txt'),alive=false;
         if(heartbeat.open('r')){var stamp=Number(heartbeat.read());heartbeat.close();alive=isFinite(stamp)&&new Date().getTime()-stamp<15000&&new Date().getTime()>=stamp;}
-        if(!testing && !alive && !receiver.execute())throw Error('已保存发送内容，但无法启动 VectorCraft。请手动打开新版接收。');
+        var launcher=new File(root.fsName+'/LaunchVectorCraft.lnk');
+        if(!testing && !alive && (!launcher.exists || !launcher.execute()))throw Error('已保存发送内容，但无法启动 VectorCraft。请从新版快捷方式打开接收。');
         return json({pass:true,job:job.fsName,objects:copied,mode:source.documentColorSpace===DocumentColorSpace.CMYK?'cmyk':'rgb'});
     } catch(error) {
         if(testing)throw error;

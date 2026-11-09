@@ -24,7 +24,8 @@ SetupLogging=yes
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
-Name: "{group}\Leo Design VectorCraft 0.22 Bridge 0.16.0"; Filename: "{app}\vectorcraft.exe"
+Name: "{group}\Leo Design VectorCraft 0.22 Bridge 0.16.0"; Filename: "{app}\vectorcraft.exe"; Parameters: "--new-instance"
+Name: "{localappdata}\Leo Design\AI Bridge\LaunchVectorCraft"; Filename: "{app}\vectorcraft.exe"; Parameters: "--new-instance"
 Name: "{group}\Uninstall"; Filename: "{uninstallexe}"
 [Code]
 var SenderPaths: String;

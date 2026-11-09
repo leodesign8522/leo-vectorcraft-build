@@ -363,6 +363,10 @@ jobs:
           $process = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=`"$installDir`"" -Wait -PassThru -WindowStyle Hidden
           if ($process.ExitCode -ne 0) { throw "Installer smoke test failed" }
           $installed = Join-Path $installDir "vectorcraft.exe"
+          $launchLink = Join-Path $env:LOCALAPPDATA "Leo Design/AI Bridge/LaunchVectorCraft.lnk"
+          if (-not (Test-Path $launchLink)) { throw "Installer omitted isolated receiver launcher" }
+          $link = (New-Object -ComObject WScript.Shell).CreateShortcut($launchLink)
+          if ($link.Arguments -ne "--new-instance") { throw "Receiver must not forward to an official VectorCraft process" }
           $sender = Join-Path $aiFixture "Leo Design - Send to VectorCraft.jsx"
           if (-not (Test-Path $sender)) { throw "Combined installer omitted Illustrator sender" }
           if ((Get-FileHash $sender).Hash -ne (Get-FileHash "overlay-source/AI Bridge/Send_to_VectorCraft.jsx").Hash) { throw "Sender differs from tested source" }
