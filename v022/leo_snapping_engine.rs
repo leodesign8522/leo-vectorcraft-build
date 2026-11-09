@@ -1434,7 +1434,7 @@ mod leo_snapping_engine_tests {
         let mut t=Targets::default();
         t.segments.push((Rect::new(0.0,50.0,100.0,50.0),
             PathSeg::Line(Line::new((0.0,50.0),(100.0,50.0)))));
-        let leave=super::super::snap::Leave::contact(Point::new(10.0,10.0));
+        let leave=crate::guides::snap::Leave::contact(Point::new(10.0,10.0));
         let target=Point::new(50.0,50.0);
         assert_eq!(t.leo_snap_guide_intersection(Point::new(48.0,48.0),Some(&leave),true,8.0,12.8).unwrap().0,target);
         // Releasing Shift clears the constrained crossing lock.
