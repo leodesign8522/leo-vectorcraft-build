@@ -112,50 +112,79 @@
         }
         for(i=0;i<tf.paragraphs.length;i++)paragraph(tf.paragraphs[i].paragraphAttributes,(t.paras&&t.paras[i])||t.para||{},scale);
         var x=t.xf,m=app.getIdentityMatrix(),anchor=marker.geometricBounds;
-        m.mValueA=x[0];m.mValueB=-x[1];m.mValueC=-x[2];m.mValueD=x[3];m.mValueTX=anchor[0];m.mValueTY=anchor[1];
+        m.mValueA=x[0];m.mValueB=-x[1];m.mValueC=-x[2];m.mValueD=x[3];m.mValueTX=0;m.mValueTY=0;
         tf.transform(m,true,true,true,true,100,Transformation.DOCUMENTORIGIN);
+        // Illustrator's transform origin depends on the active artboard/rulers.
+        // Align an actual anchor after the linear transform instead of assuming it.
+        var target=[anchor[0],anchor[1]],actual;
+        if(kind==='point')actual=tf.anchor;
+        else {var first=t.kind.frame.subpaths[0].anchors[0].p;
+            target[0]+=(x[0]*first[0]+x[2]*first[1])/scale;
+            target[1]-=(x[1]*first[0]+x[3]*first[1])/scale;
+            actual=tf.textPath.pathPoints[0].anchor;}
+        tf.translate(target[0]-actual[0],target[1]-actual[1]);
         if(empty)tf.contents='';
         tf.name=node.name||('Text '+node.id);tf.opacity=(node.opacity===undefined?1:node.opacity)*100;
         tf.hidden=node.visible===false;tf.locked=!!node.locked;marker.remove();return tf;
     }
     function freshDocument(src){
+        var activeBoard=0;
+        try{activeBoard=src.artboards.getActiveArtboardIndex();}catch(uninitializedBoard){}
+        if(activeBoard<0||activeBoard>=src.artboards.length)activeBoard=0;
+        // Some native editing-data imports expose artboards but no valid active
+        // board. Initialize it before reading ruler or artwork coordinates.
+        src.artboards.setActiveArtboardIndex(activeBoard);
         var boards=[];for(var index=0;index<src.artboards.length;index++){
             var original=src.artboards[index],bounds=original.artboardRect;
             boards.push({name:String(original.name),rect:[bounds[0],bounds[1],bounds[2],bounds[3]]});
         }
         var sourceRuler=src.rulerOrigin,ruler=[sourceRuler[0],sourceRuler[1]];
+        // Freeze source positions while the source is active. Cross-document DOM
+        // reads and duplicate() can otherwise use different ruler/artboard origins.
+        function capture(from){
+            var r={item:from,name:String(from.name),locked:from.locked,visible:from.visible,opacity:from.opacity,blend:from.blendingMode,printable:from.printable,color:from.color,entries:[]},j;
+            for(j=0;j<from.layers.length;j++)r.entries.push({layer:true,data:capture(from.layers[j]),z:from.layers[j].zOrderPosition});
+            for(j=0;j<from.pageItems.length;j++)if(from.pageItems[j].parent===from){var item=from.pageItems[j],box=item.geometricBounds;
+                r.entries.push({layer:false,item:item,locked:item.locked,hidden:item.hidden,position:[box[0],box[1]],z:item.zOrderPosition});}
+            r.entries.sort(function(a,b){return b.z-a.z;});return r;
+        }
+        var layers=[];for(index=0;index<src.layers.length;index++)layers.push(capture(src.layers[index]));
+        var colors=[];for(index=0;index<src.spots.length;index++){
+            var sourceSpot=src.spots[index],spotName=String(sourceSpot.name),spotType=sourceSpot.colorType;
+            if(spotName==='[Registration]'||spotType===ColorModel.REGISTRATION)continue;
+            colors.push({name:spotName,type:spotType,color:sourceSpot.color});
+        }
         var scale=Number(src.scaleFactor)||1,b=boards[0].rect;
         var width=(b[2]-b[0])*scale,height=(b[1]-b[3])*scale;
         if(scale>1)width=Math.max(width,16384);
         var dst=app.documents.add(src.documentColorSpace,width,height),initial=dst.layers[0];
         try{
-            // Cross-document duplication otherwise shifts all artwork by the
-            // page height when imported and script-created ruler origins differ.
-            dst.rulerOrigin=ruler;
             if((Number(dst.scaleFactor)||1)!==scale)throw Error('Illustrator 大画布比例不一致，已停止导出');
             dst.artboards[0].artboardRect=b;
             for(var i=1;i<boards.length;i++)dst.artboards.add(boards[i].rect);
             for(i=0;i<boards.length;i++)dst.artboards[i].name=boards[i].name;
+            dst.artboards.setActiveArtboardIndex(activeBoard);dst.rulerOrigin=ruler;
             // Preserve spot/process definitions before cross-document duplication.
-            for(i=0;i<src.spots.length;i++){
-                var spot=src.spots[i];if(spot.name==='[Registration]' || spot.colorType===ColorModel.REGISTRATION)continue;
-                var target;try{target=dst.spots.getByName(spot.name);}catch(missing){target=dst.spots.add();target.name=spot.name;}
-                target.colorType=spot.colorType;target.color=spot.color;
-            }
-            function layer(from,parent){
-                var to=parent.layers.add(),locked=from.locked,visible=from.visible,entries=[],j;
-                to.name=from.name;from.locked=false;from.visible=true;
-                for(j=0;j<from.layers.length;j++)entries.push({item:from.layers[j],layer:true,z:from.layers[j].zOrderPosition});
-                for(j=0;j<from.pageItems.length;j++)if(from.pageItems[j].parent===from)entries.push({item:from.pageItems[j],layer:false,z:from.pageItems[j].zOrderPosition});
-                entries.sort(function(a,b){return b.z-a.z;});
-                for(j=0;j<entries.length;j++){
-                    var e=entries[j];if(e.layer)layer(e.item,to);
-                    else {var il=e.item.locked,ih=e.item.hidden;e.item.locked=false;e.item.hidden=false;var copy=e.item.duplicate(to,ElementPlacement.PLACEATBEGINNING);copy.hidden=ih;copy.locked=il;}
+            for(i=0;i<colors.length;i++){
+                var definition=colors[i],target;
+                try{target=dst.spots.getByName(definition.name);}catch(missing){
+                    var added=dst.spots.add();added.name=definition.name;target=dst.spots.getByName(definition.name);
                 }
-                to.opacity=from.opacity;to.blendingMode=from.blendingMode;to.printable=from.printable;to.color=from.color;
-                to.visible=visible;to.locked=locked;return to;
+                target.colorType=definition.type;target.color=definition.color;
             }
-            for(i=src.layers.length-1;i>=0;i--)layer(src.layers[i],dst);
+            function layer(record,parent){
+                dst.activate();var to=parent.layers.add(),from=record.item,j;
+                to.name=record.name;from.locked=false;from.visible=true;
+                for(j=0;j<record.entries.length;j++){
+                    var e=record.entries[j];if(e.layer)layer(e.data,to);
+                    else {e.item.locked=false;e.item.hidden=false;var copy=e.item.duplicate(to,ElementPlacement.PLACEATBEGINNING);
+                        dst.activate();var box=copy.geometricBounds;copy.translate(e.position[0]-box[0],e.position[1]-box[1]);
+                        copy.hidden=e.hidden;copy.locked=e.locked;}
+                }
+                to.opacity=record.opacity;to.blendingMode=record.blend;to.printable=record.printable;to.color=record.color;
+                to.visible=record.visible;to.locked=record.locked;return to;
+            }
+            for(i=layers.length-1;i>=0;i--)layer(layers[i],dst);
             initial.remove();dst.activate();return dst;
         }catch(e){dst.close(SaveOptions.DONOTSAVECHANGES);throw e;}
     }
@@ -173,7 +202,7 @@
         app.coordinateSystem=CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
         for(var n=0;n<manifest.texts.length;n++)for(var r=0;r<manifest.texts[n].node.kind.runs.length;r++)font(manifest.texts[n].node.kind.runs[r].style);
         sourceDoc=app.open(new File(manifest.inputAi));
-        doc=freshDocument(sourceDoc);sourceDoc.close(SaveOptions.DONOTSAVECHANGES);sourceDoc=null;
+        doc=freshDocument(sourceDoc);sourceDoc.close(SaveOptions.DONOTSAVECHANGES);sourceDoc=null;doc.activate();
         var cmyk=doc.documentColorSpace===DocumentColorSpace.CMYK;
         if(cmyk!==(manifest.mode==='cmyk'))throw Error('导入后的文档颜色模式不一致，已停止导出');
         var scale=Number(doc.scaleFactor)||1,markers={},expected={};

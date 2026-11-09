@@ -22,8 +22,9 @@
    ok(near(area.textPath.width,210)&&near(area.textPath.height,150),'frame dimensions changed');
    var first=d.artboards[0].artboardRect,anchor=point.anchor,frameLeft=Infinity,frameTop=-Infinity;
    for(var fp=0;fp<area.textPath.pathPoints.length;fp++){var xy=area.textPath.pathPoints[fp].anchor;frameLeft=Math.min(frameLeft,xy[0]);frameTop=Math.max(frameTop,xy[1]);}
-   ok(near(anchor[0]-first[0],60)&&near(first[1]-anchor[1],230),'point text position changed');
-   ok(near(frameLeft-first[0],60)&&near(first[1]-frameTop,300),'area frame position changed');
+   var offsetX=m?100:0,offsetY=m?150:0;
+   ok(near(anchor[0]-first[0],60+offsetX)&&near(first[1]-anchor[1],230+offsetY),'point text position changed');
+   ok(near(frameLeft-first[0],60+offsetX)&&near(first[1]-frameTop,300+offsetY),'area frame position changed');
    ok(point.textRange.characterAttributes.textFont.name==='ArialMT','point font changed');
    ok(area.textRange.characterAttributes.textFont.name==='MicrosoftYaHei','area font changed');
    var c=area.textRange.characterAttributes.fillColor;
@@ -35,10 +36,10 @@
    var colored=0;for(var p=0;p<d.pathItems.length;p++)if(d.pathItems[p].filled){
     var item=d.pathItems[p],b=item.geometricBounds;checkColor(item.fillColor);colored++;
     var left=b[0]-first[0],top=first[1]-b[1],width=b[2]-b[0],height=b[1]-b[3];
-    ok((near(left,60)&&near(top,60)&&near(width,180)&&near(height,100))||(near(left,300)&&near(top,60)&&near(width,100)&&near(height,100)),'geometry moved relative to artboard');
+    ok((near(left,60+offsetX)&&near(top,60+offsetY)&&near(width,180)&&near(height,100))||(near(left,300+offsetX)&&near(top,60+offsetY)&&near(width,100)&&near(height,100)),'geometry moved relative to artboard');
    }
    ok(colored===2,'geometry missing');
-   for(var s=0;s<d.spots.length;s++)ok(d.spots[s].name.indexOf('LEO_AI_TEXT_')!==0,'marker spot remained');
+   for(var s=0;s<d.spots.length;s++)ok(d.spots[s].name.indexOf('LEO_T_')!==0,'marker spot remained');
    var lines=area.lines.length;area.textPath.width=150;ok(area.lines.length>lines,'area text does not reflow');
    area.textPath.width=210;area.contents=area.contents+'\r新增可编辑文字';
    var o=new IllustratorSaveOptions();o.pdfCompatible=true;o.compressed=true;o.embedICCProfile=true;
@@ -54,6 +55,12 @@
    ok(empty.textRange.characterAttributes.textFont.name===(empty.kind===TextType.POINTTEXT?'ArialMT':'MicrosoftYaHei'),'empty frame insertion font lost');
   }
   d.close(SaveOptions.DONOTSAVECHANGES);d=null;results.push('empty frames: PASS / no placeholder / editable insertion fonts');
+  d=app.open(new File(root+'TEXT_ONLY.ai'));ok(d.textFrames.length===1&&d.pathItems.length===0,'text-only document structure');
+  var only=d.textFrames[0],board=d.artboards[0].artboardRect;
+  ok(only.kind===TextType.POINTTEXT&&only.contents==='Only editable text','text-only content');
+  ok(near(only.anchor[0]-board[0],30)&&near(board[1]-only.anchor[1],80),'text-only position');
+  ok(only.textRange.characterAttributes.textFont.name==='ArialMT','text-only font');
+  d.close(SaveOptions.DONOTSAVECHANGES);d=null;results.push('text-only scene: PASS / live type / exact origin / no helper geometry');
   return results.join('\n');
  }finally{if(d)d.close(SaveOptions.DONOTSAVECHANGES);app.coordinateSystem=coordinates;app.userInteractionLevel=level;if(old)old.activate();}
 })();

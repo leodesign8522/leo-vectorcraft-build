@@ -23,7 +23,7 @@ fn leo_ai_export_tests_snapshot_keeps_source_colors_layers_and_full_area_text(){
         assert_eq!(p.doc.node(shape),doc.node(shape));assert!(matches!(p.doc.node(text).unwrap().kind,NodeKind::Path{..}));
         assert_eq!(p.texts.len(),1);assert_eq!(p.texts[0]["node"],serde_json::to_value(doc.node(text).unwrap()).unwrap());
         assert_eq!(p.texts[0]["node"]["kind"]["kind"]["kind"],"area");
-        let marker=p.texts[0]["marker"].as_str().unwrap();let swatch=p.doc.swatches.iter().find(|s|s.name==marker).unwrap();assert!(swatch.spot&&swatch.global);
+        let marker=p.texts[0]["marker"].as_str().unwrap();assert!(marker.encode_utf16().count()<=31);let swatch=p.doc.swatches.iter().find(|s|s.name==marker).unwrap();assert!(swatch.spot&&swatch.global);
         let b=p.doc.node(text).unwrap().geometric_bounds().unwrap();assert_eq!((b.x0,b.y0,b.width(),b.height()),(60.,210.,1.,1.));
         let (bytes,warnings)=vectorcraft_engine::cmd::fileio::encode_with_warnings(&p.doc,"ai",&json!({"editingData":true,"pdfCompatible":true})).unwrap();
         assert!(bytes.starts_with(b"%PDF-"));assert!(!warnings.iter().any(|w|w.contains("type is written as its outlines")));
@@ -68,4 +68,13 @@ fn leo_ai_export_tests_explicit_icc_is_not_silently_replaced(){
         assert!(prepare(&doc,"profile").err().unwrap().contains("ICC"));
         assert_eq!(serde_json::to_value(&doc).unwrap(),before);
     }
+}
+
+#[test]
+fn leo_ai_export_tests_oversized_global_ink_names_fail_before_export(){
+    let (mut doc,_,_)=fixture("rgb");
+    doc.swatches.push(Swatch{name:"a".repeat(32),paint:Paint::solid(Color::rgb(1.,0.,0.)),global:true,spot:true});
+    let before=serde_json::to_value(&doc).unwrap();
+    assert!(prepare(&doc,"long").err().unwrap().contains("31"));
+    assert_eq!(serde_json::to_value(&doc).unwrap(),before);
 }

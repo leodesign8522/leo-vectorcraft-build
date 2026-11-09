@@ -1,6 +1,7 @@
 //! Editable AI handoff: native geometry/colour/layers plus live point/area type.
 //! Illustrator writes the final AI. User documents are never edited by this job.
 use serde_json::{Value, json};
+use std::hash::{Hash, Hasher};
 use vectorcraft_color::{Color, Paint, Swatch};
 use vectorcraft_doc::{Appearance, CharStyle, Document, Node, NodeKind, TextKind};
 use vectorcraft_geom::{Point, Rect, shapes};
@@ -57,9 +58,14 @@ fn check_text(n: &Node) -> Result<(), String> {
 }
 
 fn prepare(doc: &Document, token: &str) -> Result<Prepared, String> {
+    if doc.swatches.iter().any(|s|(s.global||s.spot)&&s.name.encode_utf16().count()>31) {
+        return Err("全局/专色色板名称超过 31 字符；Illustrator 脚本接口不能创建该名称。请先在副本中缩短色板名称后再导出。".into());
+    }
     let assigned_profile=match doc.color_mode {vectorcraft_doc::ColorMode::Cmyk=>&doc.color_profiles.cmyk,_=>&doc.color_profiles.rgb};
     if assigned_profile.is_some() { return Err("文档指定了 ICC 配置文件；当前可编辑 AI 导出支持 RGB/CMYK 模式和数值，但尚不能保证指定 ICC 的继承。请保留原文件，先在副本中改用工作空间后再导出。".into()); }
     if !doc.text_threads.is_empty() { return Err("串接文字框暂不支持活文字 AI 导出，请先在副本中拆分串接。".into()); }
+    let mut hasher=std::collections::hash_map::DefaultHasher::new();token.hash(&mut hasher);
+    let namespace=hasher.finish() as u32;
     let mut texts=vec![];let mut errors=vec![];
     doc.walk(|n| if matches!(n.kind, NodeKind::Text(_)) {
         if let Err(e)=check_text(n) { errors.push(e); }
@@ -71,7 +77,9 @@ fn prepare(doc: &Document, token: &str) -> Result<Prepared, String> {
                 if children.first().is_some_and(|c|c.id==n.id) {errors.push("作为剪切路径的文字暂不支持活文字 AI 导出。".into());}
             }
         }
-        let marker=format!("LEO_AI_TEXT_{token}_{}",n.id.0);
+        // Illustrator can read longer native ink names, but its scripting name
+        // setter rejects more than 31 UTF-16 units. u64 ids use at most 16 hex digits.
+        let marker=format!("LEO_T_{namespace:08x}_{:x}",n.id.0);
         texts.push(json!({"marker":marker,"node":n}));
     });
     if !errors.is_empty() { return Err(errors.into_iter().take(8).collect::<Vec<_>>().join("\n")); }

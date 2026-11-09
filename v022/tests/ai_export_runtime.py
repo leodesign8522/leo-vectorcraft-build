@@ -13,6 +13,9 @@ with NativeControl(exe) as a:
     def cmd(command,**params):return a.call('engine.execute',{'command':command,'params':params})
     for mode in ['rgb','cmyk']:
         cmd('file.new',width=600,height=500,colorMode=mode)
+        if mode=='cmyk':cmd('artboard.setProps',index=0,x=-100,y=-150,moveArt=False,name='Offset First')
+        menu=next(e for e in a.call('ui.menu.list') if e['command']=='file.leoExportEditableAi')
+        assert menu['enabled'] and '导出可编辑 AI' in menu['label'],'editable AI entry missing or disabled in actual menus'
         cmd('artboard.new',x=650,y=0,width=200,height=150,name='Second')
         layer=a.call('document.inspect')['currentLayer'];cmd('layer.setProps',id=layer,name='Shapes')
         color={'model':'cmyk','c':.1,'m':.2,'y':.3,'k':.4} if mode=='cmyk' else {'model':'rgb','r':.2,'g':.4,'b':.6}
@@ -32,6 +35,13 @@ with NativeControl(exe) as a:
         assert a.call('document.inspect')['selection']==selection,'export changed selection'
         assert not list(root.glob('.leo-ai-export-*')),'owned temporary data was not cleaned'
         a.call('ui.dialog.confirm')
+    # The first real UI check exposed long ink names in text-only documents.
+    cmd('file.new',width=300,height=200)
+    only=cmd('text.create',x=30,y=80,text='Only editable text',font='Arial',size=24)['id']
+    original=a.node(only)
+    a.call('ui.menu.invoke',{'command':'file.leoExportEditableAi','params':{'path':str(root/'TEXT_ONLY.ai'),'wait':True}})
+    assert a.node(only)==original
+    a.call('ui.dialog.confirm')
     # Empty frames must remain empty/editable, retaining their insertion fonts.
     cmd('file.new',width=300,height=250)
     cmd('text.create',x=30,y=80,text='',font='Arial',size=24)
@@ -56,6 +66,6 @@ env['LEO_RUNTIME_SCRIPT']=str(Path(__file__).with_name('ai_export_runtime.jsx').
 code="""$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new();$ai=$null;try{$ai=New-Object -ComObject Illustrator.Application;$js=[IO.File]::ReadAllText($env:LEO_RUNTIME_SCRIPT,[Text.Encoding]::UTF8);$prefix='var LEO_RUNTIME_ROOT = '+(ConvertTo-Json -InputObject $env:LEO_RUNTIME_ROOT -Compress)+';';$ai.DoJavaScript($prefix+$js)}finally{if($ai){[void][Runtime.InteropServices.Marshal]::ReleaseComObject($ai)}}"""
 p=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-STA','-Command',code],env=env,capture_output=True,encoding='utf-8',timeout=300)
 if p.returncode:raise RuntimeError(p.stderr or p.stdout)
-proof={'pass':True,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'actual_export_command':True,'source_nodes_and_selection_unchanged':True,'missing_font_preserves_destination':True,'temporary_data_cleaned':True,'illustrator':p.stdout.strip()}
+proof={'pass':True,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'actual_export_command':True,'menu_visible_and_enabled':True,'text_only_scene':True,'source_nodes_and_selection_unchanged':True,'missing_font_preserves_destination':True,'temporary_data_cleaned':True,'illustrator':p.stdout.strip()}
 (root/'AI_EDITABLE_RUNTIME.json').write_text(json.dumps(proof,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps(proof,ensure_ascii=False))
