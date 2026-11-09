@@ -137,4 +137,42 @@ mod leo_ai_bridge_tests {
         for file in [good.join("selection.ai"),bad.join("selection.ai")] {std::fs::remove_file(file).unwrap();}
         for dir in [&good,&bad,&inbox,&base] {std::fs::remove_dir(dir).unwrap();}
     }
+    #[test]
+    fn incoming_editable_document_is_new_and_keeps_existing_document_untouched(){
+        let mut app=VectorcraftApp::new(Session::new(),crate::Services::default());
+        app.session.execute("file.new",&json!({"width":600,"height":500})).unwrap();
+        let rect=app.session.execute("shape.rectangle",&json!({"x":40,"y":50,"width":120,"height":70})).unwrap()["id"].as_u64().unwrap();
+        app.session.execute("text.create",&json!({"x":60,"y":200,"text":"中文 ABC","size":24,"area":{"width":200,"height":100,"fit":"none"}})).unwrap();
+        let source=app.session.active().unwrap().doc.clone();
+        let before=serde_json::to_value(&*source).unwrap();
+        let (bytes,_)=vectorcraft_engine::cmd::fileio::encode_with_warnings(&source,"ai",
+            &json!({"editingData":true,"pdfCompatible":true})).unwrap();
+        let file=std::env::temp_dir().join(format!("leo-ai-bridge-{}.ai",id()));
+        std::fs::write(&file,&bytes).unwrap();
+        let result=receive(&mut app,&file).unwrap();
+        assert_eq!(result["bridgeDirection"],"illustrator-to-vectorcraft");
+        assert_eq!(app.session.documents().len(),2);
+        let received=app.session.active().unwrap();
+        assert!(received.path.is_none(),"received work must not overwrite the exchange file");
+        assert!(received.doc.node(vectorcraft_doc::NodeId(rect)).is_some());
+        let mut live_text=false;
+        received.doc.walk(|n|if matches!(n.kind,vectorcraft_doc::NodeKind::Text(_)){live_text=true;});
+        assert!(live_text,"native editable text survives the receiver");
+        assert_eq!(serde_json::to_value(&*app.session.documents()[0].doc).unwrap(),before);
+        assert_eq!(std::fs::read(&file).unwrap(),bytes);
+        std::fs::remove_file(file).unwrap();
+    }
+    #[test]
+    fn invalid_incoming_ai_does_not_replace_the_current_document(){
+        let mut app=VectorcraftApp::new(Session::new(),crate::Services::default());
+        app.session.execute("file.new",&json!({})).unwrap();
+        let before=serde_json::to_value(&*app.session.active().unwrap().doc).unwrap();
+        let file=std::env::temp_dir().join(format!("leo-ai-bridge-invalid-{}.ai",id()));
+        std::fs::write(&file,b"not an AI document").unwrap();
+        assert!(receive(&mut app,&file).is_err());
+        assert_eq!(app.session.documents().len(),1);
+        assert_eq!(serde_json::to_value(&*app.session.active().unwrap().doc).unwrap(),before);
+        std::fs::remove_file(file).unwrap();
+    }
+
 }
