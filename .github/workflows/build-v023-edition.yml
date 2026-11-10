@@ -1,0 +1,396 @@
+name: Reusable VectorCraft v0.23 edition build
+on:
+  workflow_call:
+    inputs:
+      flavor:
+        required: true
+        type: string
+      label:
+        required: true
+        type: string
+      artifact:
+        required: true
+        type: string
+      installer:
+        required: true
+        type: string
+      output:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leo-vectorcraft-v023-${{ inputs.flavor }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ inputs.flavor }} (VectorCraft v0.23)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_TEST_OPT_LEVEL: "0"
+      CARGO_PROFILE_TEST_CODEGEN_UNITS: "256"
+    steps:
+      - name: Checkout Leo Design migration source
+        uses: actions/checkout@v4
+      - name: Checkout official VectorCraft v0.23.0
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: v0.23.0
+          path: vectorcraft
+          persist-credentials: false
+      - name: Install Python for compatibility patches
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Python patch syntax before Rust setup
+        shell: pwsh
+        run: |
+          python -m compileall -q v023 scripts
+          if ($LASTEXITCODE -ne 0) { throw "Python patch syntax validation failed" }
+      - name: Validate combined Illustrator sender installer before Rust compilation
+        shell: pwsh
+        run: |
+          $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          New-Item -ItemType Directory -Path installer-fixture -Force | Out-Null
+          Set-Content installer-fixture/vectorcraft.exe "compiler fixture"
+          $stub = (Resolve-Path installer-fixture/vectorcraft.exe).Path
+          & $compiler "/DSourceExe=$stub" "/Oinstaller-fixture-output" "${{ inputs.installer }}"
+          if ($LASTEXITCODE -ne 0) { throw "Combined installer syntax failed" }
+      - name: Install stable Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Cache v0.23 Rust release build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          # Reuse compatible v018 dependency artifacts; Cargo fingerprints
+          # and the new Cargo.lock still invalidate changed crates.
+          shared-key: "leo-vectorcraft-v018-core-windows-release"
+          cache-all-crates: false
+          cache-on-failure: true
+      - name: Verify pinned official v0.23 baseline
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne "5d0e892e2419f63bc0ea3c743ddff2e81e15fd3a") {
+            throw "Unexpected upstream source commit"
+          }
+          # Keep the new official release fixed while validating migrated modules.
+      - name: Apply modular Leo Design Core Bridge
+        shell: pwsh
+        run: |
+          python prepare_v023.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Leo Design v0.23 migration failed" }
+          git -C vectorcraft diff --check
+          if ($LASTEXITCODE -ne 0) { throw "Source whitespace validation failed" }
+          git -C vectorcraft diff --stat
+      - name: Apply pinned craft-ui docked flyout resizing
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo fetch --locked
+          if ($LASTEXITCODE -ne 0) { throw "Unable to fetch pinned craft-ui git dependency" }
+          python ../v021/patch_craft_ui_flyout.py
+          if ($LASTEXITCODE -ne 0) { throw "craft-ui in-place flyout resize patch failed" }
+          # The Rust cache includes a precompiled craft-ui. Cargo did not
+          # recompile it after editing the pinned git checkout in v0.9.7.
+          # Force invalidation so the patched flyout renderer is in the EXE.
+          cargo clean --release -p craft-ui
+          if ($LASTEXITCODE -ne 0) { throw "Unable to invalidate cached craft-ui" }
+      - name: Verify Core and optional Pie separation
+        shell: pwsh
+        run: |
+          python v021/check_pie_separation.py vectorcraft core
+          if ($LASTEXITCODE -ne 0) { throw "Unexpected pie input or UI hooks" }
+      - name: Format migrated Rust source
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test two-way AI Bridge selection, inbox boundaries and JSX syntax
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_ai_bridge -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Two-way AI Bridge regressions failed" }
+          Get-Content ../v023/ai_bridge/Send_to_VectorCraft.jsx -Raw -Encoding UTF8 | node --check
+          if ($LASTEXITCODE -ne 0) { throw "Illustrator sender syntax failed" }
+      - name: Test editable AI export snapshot preflight and color preservation
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          node ../v023/ai_export/test_figure_style.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Editable AI figure style regressions failed" }
+          node ../v023/ai_export/test_geometry_bounds.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Illustrator geometry bounds guard regressions failed" }
+          cargo test --locked -p vectorcraft-ui-egui leo_ai_export_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Editable AI export regressions failed" }
+      - name: Test Leo Snapping Engine node and object movement geometry, hysteresis and zoom
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-tools leo_snapping_engine -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Leo node geometry and hysteresis regression failed" }
+          cargo test --locked -p vectorcraft-tools leo_object_move -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Leo object move, artboard, group, multi-selection, copy and zoom regression failed" }
+          cargo test --locked -p vectorcraft-tools moved_objects_snap_with_smart_guides -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Direct Selection whole-object movement regression failed" }
+          cargo test --locked -p vectorcraft-tools guides::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native snapping regression failed" }
+          cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native Direct Selection click, drag and modifier regression failed" }
+      - name: Test Eyedropper character attributes and transformed text
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-engine tests::eyedropper -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Eyedropper character attributes, affine compensation, range or undo regression failed" }
+      - name: Test dormant optional preferences in Core only
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_optional_prefs_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Core must retain settings without loading Pie Menu" }
+      - name: Test persistent action shortcuts and native Actions compatibility
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_action_shortcut_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Action shortcut regressions failed" }
+          cargo test --locked -p vectorcraft-ui-egui panels::actions::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native Actions regressions failed" }
+      - name: Test live Document Info selection statistics
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui panels::doc_info::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Document Info selection cache and panel regressions failed" }
+          if ("${{ inputs.flavor }}" -eq "core") {
+            cargo test --locked -p vectorcraft-engine cmd::docinfo::tests -- --nocapture
+            if ($LASTEXITCODE -ne 0) { throw "Document Info engine regressions failed" }
+          }
+      - name: Test selected segments clipboard
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-engine leo_whole_selection_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Whole selected group Direct Selection regression failed" }
+          cargo test --locked -p vectorcraft-engine leo_text_modes_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Text modes/defaults/grid regressions failed" }
+          cargo test --locked -p vectorcraft-ui-egui leo_text_mode_ui -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Text mode UI state/migration regressions failed" }
+          cargo test --locked -p vectorcraft-engine leo_glyph_bounds_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Text glyph selection bounds regressions failed" }
+          cargo test --locked -p vectorcraft-engine leo_v023_session_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Group pointer/preview/commit/undo/redo regression failed" }
+          cargo test --locked -p vectorcraft-engine leo_segment_copy -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Selected-segment extraction, Copy/Cut, paste and undo regressions failed" }
+      - name: Test native clipboard guides
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-engine guide_clipboard -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native guide clipboard regressions failed" }
+      - name: Test live corner endpoint movement, regeneration and undo
+        # Shared backend source is identical in both editions; validate it once.
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          cargo test --locked -p vectorcraft-engine leo_open_path_corner_stays_live_after_endpoint_move_and_undo -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Live corner drag regression failed" }
+          cargo test --locked -p vectorcraft-engine leo_move_anchor_endpoint_keeps_live_corner -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Live corner explicit move regression failed" }
+      - name: Test editable AI import and SVG clipboard fonts
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui leo_ai_import_tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "AI import UI regressions failed" }
+          cargo test --locked -p vectorcraft-engine cmd::fileio::tests_aiimport -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "AI native data regressions failed" }
+          cargo test --locked -p vectorcraft-svg leo_svg_clipboard_fonts -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "SVG clipboard font alias regression failed" }
+      - name: Test PDF CJK resolver migration
+        # Shared backend source is identical in both editions; validate it once.
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-pdf leo_pdf -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "PDF CJK resolver regression failed" }
+          cargo test --locked -p vectorcraft-pdf mixed_chinese_and_latin -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Unicode font regression failed" }
+      - name: Test ICO encoder and native segment selection
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-engine leo_ico::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "ICO encoder regression failed" }
+          cargo test --locked -p vectorcraft-tools marquee -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native marquee regression failed" }
+          cargo test --locked -p vectorcraft-ui-egui leo_image_export -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "JPEG/PNG export option regression failed" }
+          cargo test --locked -p vectorcraft-ui-egui leo_core_bridge::workspace_io::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Workspace JSON compatibility regression failed" }
+      - name: Compile Windows x64 native EXE
+        shell: pwsh
+        working-directory: vectorcraft
+        env:
+          CARGO_INCREMENTAL: "0"
+          CARGO_TERM_COLOR: always
+        run: |
+          cargo build --release --locked -p vectorcraft
+          if ($LASTEXITCODE -ne 0) { throw "Core Bridge Windows compilation failed" }
+      - name: Package portable v0.23 experimental build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item "vectorcraft/target/release/vectorcraft.exe" "dist/vectorcraft.exe"
+          New-Item -ItemType File -Path "dist/portable.txt" -Force | Out-Null
+          Copy-Item vectorcraft/LICENSE-MIT, vectorcraft/LICENSE-APACHE, vectorcraft/NOTICE, vectorcraft/ASSETS.md dist/
+          Copy-Item vectorcraft/licenses dist/licenses -Recurse
+          New-Item -ItemType Directory -Path dist/licenses/interface-fonts -Force | Out-Null
+          Copy-Item vectorcraft/assets/fonts/OFL-*.txt dist/licenses/interface-fonts/
+          Copy-Item vectorcraft/assets/icons/LICENSE-lucide.txt dist/licenses/
+          Copy-Item vectorcraft/assets/app-icon/LICENSE.txt dist/licenses/app-icon-LICENSE.txt
+          Copy-Item vectorcraft/docs/brand/LICENSE-brand.txt dist/licenses/
+          @'
+          ${{ inputs.label }} / VectorCraft v0.23.0
+
+          Leo Design Core Bridge v0.17.0 / �ٷ� VectorCraft v0.23.0
+          �޸��ȿ����֣�tnum���������ص��¿ɱ༭ AI ����ʧ�ܣ������ɱ༭���ֺͻ������ָ�ʽ��δ֧��������ʾ�����ֶΡ�
+          ���� AI Bridge v0.1.0���ļ� �� ����ѡ�ж��� Illustrator����װ���Զ����� Illustrator ���ͽű�����׼��װ·���������� AI ���� �ļ� �� �ű� ��ʹ�á�ѡ�����������ͣ�����Ϊ���ĵ���������Դ�壻�Զ����ݼ����� VectorCraft ԭ����ݼ������а󶨷������������ۺ� ICC ������鿴 AI Bridge/README.txt��
+          �������ļ� �� ���� �� �����ɱ༭ AI��ͨ�� Illustrator�������������֡������������ֿ�RGB/CMYK ģʽ��ɫֵ��ͼ�㡢���鼰���壻��Ҫ���� Illustrator ����Ӧ���塣����δ֧���������Ի���ȷ�ܾ���ԭ�� AI ����������
+          �����޸�������ѡ�к� A������·���ڵ������϶����������ƶ��������Կɽ��뵥��༭��Shift+�ո���ȫͣ�ã������ո���ԭ��ƽ�ơ�
+          ������I ���ܸ������ֿ�߶�ģʽ������ѡ�򿪹أ��߶Ȱ�ť��ʾ��ǰ/���״̬���½�����Ĭ�������������ϡ�������������ʱ��ͣ���ܼ���������Shift+�ո�ͣ�ã������ո���ƽ�ơ�
+          �����޸�����������������ѡ�򡱺󣬾��к������������ͳһ�����α߽���㡣
+          �������ַ���塰��������ѡ�򡱰�ť��ֻ�ս�ѡ��򣻱�������λ�á����кͿɱ༭״̬���ٴε���ָ���
+          ������R ��ת���߰���ǰ��Ұ�������������ʵֱ�߷����������Զ������Ĳ���������/ƽ�зֱ���ʾ������ 8px���ͷ� 12.8px������ Shift �̶��Ƕ��� Alt ���ơ�
+          �������߿��м��ֱ����Ž�����������Ŀ�꣬�޸����ĵ�Ŀ����©������/�������ȣ�֧��ֱ�ߡ�Bezier���Բ�̶���Alt �������ż� Shift �������ı߲��� 8px���ͷ� 12.8px��
+          һ����װ����Core Bridge ͨ����ǿ�� Leo Design �ڵ�/����ͳһ�������档
+          ����������ѡ��ѡ���߶θ���/���С������� AI/PDF/SVG ������ݡ�
+          �������ܡ�ͼ��/ICO ���������ߴ硢���������뵼����
+          ��λ/��ɫ�����塢������ݼ�����ѡ����/����������
+          �������ڵ�������ƶ�ͳһʹ�� Leo Design Snapping Engine v2.0��8px ����12.8px �ͷţ���ʵ�ڵ㡢·��/���������ߡ������Ե������߽���롣֧����ͨ���󡢶�ѡ�����顢Direct Selection ����·���ƶ��� Alt ���ơ�
+          ������A ���ߵ��ڵ����������ԭֱ�ߡ������ڱ߼������ɼ�ʸ������ֱ�ߵ�˫���ӳ��ߡ�����ɫ���ߡ������Բ�����ɫ�ס��ӳ�����������ʾֻ������ʱ��ʾ����������������֡��������ʵ�������ȣ�Shift ����ԭ��Ϊ��
+          �ĵ���Ϣ��������ѡ·�����Ⱥʹ�͸���ȵ�����������
+          ���������������ڵ����С����·��/�����Ե���У�����Ŀ��������ˮƽ/��ֱ���룬ֻ����ʵ�������ʾ���б�ǡ�
+          �ڡ���ͼ �� ���ܲο��ߡ����������㡹��ʹ�á������ƶ��� Shift ����Լ��Ҳ�������洦�����������������Ϊ����Լ����
+          ��ɾ�� 34��37 ��ͼճ����ǿ����ͼ���ⲿͼƬճ��ʹ�ùٷ�ʵ�֡�
+          ��ɾ�� 54 Leo ��ݼ����ݲ˵����ٷ���ݼ����ܺ͹��������뵼��������
+          ���˵�����ͣ�á�
+          ��Я�棺��ѹ�����ļ��У����� vectorcraft.exe��
+          ��װ�棺������װ�������ǹٷ��汾����� Leo Design VectorCraft 0.23 Bridge 0.17.0 ��ݷ�ʽ������
+          �����ٷ�������ɰ氲װĿ¼������ʱ���ˡ�
+          �Զ����Բ������û� Windows ʵ���ָ����ա�
+          '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
+          @'
+          Artifact upload requires the release build and every configured regression to pass.
+          Core Bridge v0.17.0 fixes alignment to measure enabled glyph bounds, including horizontal/vertical/both centers and key objects.
+          Includes Character > ��������ѡ��: tight glyph selection controls without changing editable text, position or wrapping. Click again to restore the metric frame.
+          Includes Leo Snapping Engine v2.0: unified node and object movement geometry, finite path/Bezier and artboard edges, bounds alignment, group/multi-object movement, Alt-copy, 8px capture and 12.8px release.
+          Native Actions, custom chords, editable AI import, font matching, selected-segment copy,
+          native guide clipboard, live corners, image/ICO export, workspace JSON, selection statistics,
+          and Leo node/segment/Bezier, artboard, object edge, group, multi-selection, Alt-copy, Shift, zoom and hysteresis tests are checked.
+          Custom screenshot clipboard patches and the shortcut backup menu are not integrated.
+          Windows GUI/manual acceptance remains pending.
+          '@ | Set-Content "dist/BUILD_VALIDATION.txt" -Encoding utf8
+          New-Item -ItemType Directory -Path "dist/AI Bridge" -Force | Out-Null
+          Copy-Item "v023/ai_bridge/Send_to_VectorCraft.jsx" "dist/AI Bridge/"
+          Copy-Item "v023/ai_bridge/README.txt" "dist/AI Bridge/"
+          Copy-Item LEO_DESIGN_FEATURE_REGISTRY.md dist/
+          git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
+          git rev-parse HEAD | Set-Content "dist/BUILD_COMMIT.txt"
+          Get-FileHash "dist/vectorcraft.exe" -Algorithm SHA256 | Format-List | Out-String | Set-Content "dist/SHA256.txt"
+          # GUI-subsystem executables need an explicit wait and stdout handle.
+          # An empty PowerShell pipeline made -notmatch return an empty array,
+          # bypassing the old guard and leaving VERSION.txt absent.
+          $versionFile = Join-Path (Resolve-Path dist).Path "VERSION.txt"
+          $versionProcess = Start-Process -FilePath (Resolve-Path dist/vectorcraft.exe).Path -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
+          $version = [string](Get-Content $versionFile -Raw)
+          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.17.0; Snapping Engine 2.0") { throw "EXE build identity smoke test failed" }
+      - name: Upload experimental Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  overlay-installer:
+    name: Package ${{ inputs.flavor }} installer
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: overlay-source
+      - name: Compile version-checked installer
+        shell: pwsh
+        run: |
+          $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw "Unable to install Inno Setup" }
+          }
+          $source = (Resolve-Path "overlay-source/vectorcraft.exe").Path
+          $outDir = (New-Item -ItemType Directory -Force -Path "overlay-output").FullName
+          & $compiler "/DSourceExe=$source" "/O$outDir" "${{ inputs.installer }}"
+          if ($LASTEXITCODE -ne 0) { throw "Overlay installer compilation failed" }
+          if (-not (Get-ChildItem $outDir -Filter *.exe)) { throw "Installer not created" }
+      - name: Smoke test isolated installer and verify executable hash
+        shell: pwsh
+        run: |
+          # A real script-directory fixture verifies the combined installer,
+          # including Chinese Illustrator locale folder names.
+          $aiFixture = Join-Path $env:ProgramFiles "Adobe/Adobe Illustrator Bridge Test/Presets/zh_CN/�ű�"
+          New-Item -ItemType Directory -Force -Path $aiFixture | Out-Null
+          $installer = (Get-ChildItem overlay-output -Filter *.exe | Select-Object -First 1).FullName
+          $installDir = Join-Path $env:RUNNER_TEMP "Leo-Bridge-022-Smoke"
+          $process = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=`"$installDir`"" -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Installer smoke test failed" }
+          $installed = Join-Path $installDir "vectorcraft.exe"
+          $launchLink = Join-Path $env:LOCALAPPDATA "Leo Design/AI Bridge/LaunchVectorCraft.lnk"
+          if (-not (Test-Path $launchLink)) { throw "Installer omitted isolated receiver launcher" }
+          $link = (New-Object -ComObject WScript.Shell).CreateShortcut($launchLink)
+          if ($link.Arguments -ne "--new-instance") { throw "Receiver must not forward to an official VectorCraft process" }
+          $sender = Join-Path $aiFixture "Leo Design - Send to VectorCraft.jsx"
+          if (-not (Test-Path $sender)) { throw "Combined installer omitted Illustrator sender" }
+          if ((Get-FileHash $sender).Hash -ne (Get-FileHash "overlay-source/AI Bridge/Send_to_VectorCraft.jsx").Hash) { throw "Sender differs from tested source" }
+          $registeredReceiver = (Get-Content (Join-Path $env:LOCALAPPDATA "Leo Design/AI Bridge/receiver.txt") -Raw).Trim()
+          if ($registeredReceiver -ne $installed) { throw "Receiver was not configured" }
+          if ((Get-FileHash $installed).Hash -ne (Get-FileHash overlay-source/vectorcraft.exe).Hash) { throw "Installed EXE differs from tested build" }
+          foreach ($required in @("portable.txt", "LICENSE-MIT", "LICENSE-APACHE", "NOTICE", "VERSION.txt")) {
+            if (-not (Test-Path (Join-Path $installDir $required))) { throw "Installer omitted $required" }
+          }
+          $versionFile = Join-Path $installDir "installed-version.txt"
+          $versionProcess = Start-Process -FilePath $installed -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
+          $version = [string](Get-Content $versionFile -Raw)
+          if ($versionProcess.ExitCode -ne 0 -or $version -notmatch "Core Bridge 0.17.0") { throw "Installed EXE identity check failed" }
+          Get-FileHash $installer -Algorithm SHA256 | Format-List | Out-String | Set-Content overlay-output/SHA256.txt
+          Copy-Item overlay-source/BUILD_COMMIT.txt overlay-output/
+          Copy-Item overlay-source/UPSTREAM_COMMIT.txt overlay-output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.output }}
+          path: overlay-output/
+          if-no-files-found: error
+          retention-days: 30

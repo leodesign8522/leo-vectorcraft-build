@@ -1,0 +1,36 @@
+name: Leo Design Core Bridge v0.17.0
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - leo-v023-snapping
+    paths:
+      - ".github/workflows/build-v023-core.yml"
+      - ".github/workflows/build-v023-edition.yml"
+      - "v023/leo_snapping_engine.rs"
+      - "v023/rotation_*.rs"
+      - "v023/text_glyph_*.rs"
+      - "v023/text_mode_*.rs"
+      - "v023/whole_selection_regressions.rs"
+      - "v023/*regressions.rs"
+      - "v023/patch_*.py"
+      - "v023/ai_export/**"
+      - "v023/ai_bridge/**"
+      - "v023/overlay/**"
+      - "v023/session_regressions.rs"
+      - "v023/selected_segments_clipboard_tests.rs"
+      - "v021/**"
+      - "prepare_v023.py"
+      - "scripts/**"
+
+permissions:
+  contents: read
+jobs:
+  edition:
+    uses: ./.github/workflows/build-v023-edition.yml
+    with:
+      flavor: core
+      label: Leo Design Core Bridge v0.17.0
+      artifact: Leo_Design_Core_Bridge_v0.17.0_Windows_x64
+      installer: v023/overlay/Leo_Design_Core_Bridge_0_17_0.iss
+      output: Leo_Design_Core_Bridge_v0.17.0_Installer
