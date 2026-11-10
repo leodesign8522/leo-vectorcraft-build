@@ -31,7 +31,7 @@ rep("crates/engine/src/cmd/fileio/formats.rs",
  '''    reader("jxl", "JPEG XL", &["jxl"], "image/jxl", true),
 ];''',
  '''    reader("jxl", "JPEG XL", &["jxl"], "image/jxl", true),
-    // Leo Design: each .ico contains 1�C7 square PNG layers at Windows icon
+    // Leo Design: each .ico contains 1–7 square PNG layers at Windows icon
     // sizes 16,24,32,48,64,128,256 with RGBA transparency.
     Format {
         id: "ico",
@@ -72,61 +72,61 @@ p.write_text(raw.replace(old, new), encoding="utf-8", newline="\n")
 print("OK dialog and sidebar default icon sizes")
 
 rep(panel,
- '''"��ȷ������� �� JPEG / ͸�� PNG �� ICC ɫ�ʹ���"''',
- '''"��ȷ������� �� JPEG / ͸�� PNG / ��ߴ� ICO �� ICC ɫ�ʹ���"''',
+ '''"精确画板裁切 · JPEG / 透明 PNG · ICC 色彩管理"''',
+ '''"精确画板裁切 · JPEG / 透明 PNG / 多尺寸 ICO · ICC 色彩管理"''',
  "export dialog header")
 rep(panel,
- '''select(ui, d, "format", &["jpg", "png"], &["JPEG (.jpg)", "PNG ͸��ͼ (.png)"], 244.0);''',
+ '''select(ui, d, "format", &["jpg", "png"], &["JPEG (.jpg)", "PNG 透明图 (.png)"], 244.0);''',
  '''select(ui, d, "format", &["jpg", "png", "ico"],
-                &["JPEG (.jpg)", "PNG ͸��ͼ (.png)", "Windows ͼ�� (.ico)"], 244.0);''',
+                &["JPEG (.jpg)", "PNG 透明图 (.png)", "Windows 图标 (.ico)"], 244.0);''',
  "select ICO in full export dialog")
 
 rep(panel,
- '''                ui.label("RGB��PNG ֧��͸����");''',
- '''                ui.label("RGB��PNG/ICO ֧��͸����");''',
+ '''                ui.label("RGB（PNG 支持透明）");''',
+ '''                ui.label("RGB（PNG/ICO 支持透明）");''',
  "full dialog RGB/alpha hint")
 
 rep(panel,
- '''            ui.label("�ֱ��ʣ�DPI��");
+ '''            ui.label("分辨率（DPI）");
             ui.horizontal(|ui| {''',
  '''            if d.str("format") == "ico" {
                 ico_size_picker(ui, d);
                 ui.end_row();
             } else {
-            ui.label("�ֱ��ʣ�DPI��");
+            ui.label("分辨率（DPI）");
             ui.horizontal(|ui| {''',
  "show ICO size controls rather than DPI")
 rep(panel,
  '''            ui.end_row();
 
             if d.str("format") == "jpg" {
-                ui.label("ѹ������");''',
+                ui.label("压缩方法");''',
  '''            ui.end_row();
             }
 
             if d.str("format") == "jpg" {
-                ui.label("ѹ������");''',
+                ui.label("压缩方法");''',
  "close optional DPI controls")
 
 rep(panel,
  '''        if let Some(rect) = bounds {
             let scale = d.f64("ppi", 300.0) / 72.0;''',
  '''        if d.str("format") == "ico" {
-            ui.label(egui::RichText::new("ICO: 16�C256 px �� ��ߴ�͸��ͼ��").size(19.0).strong());
-            ui.label("���ߴ��ʸ�����������Ⱦ���Զ��ȱȾ��е������λ�����");
+            ui.label(egui::RichText::new("ICO: 16–256 px · 多尺寸透明图层").size(19.0).strong());
+            ui.label("各尺寸从矢量画板独立渲染，自动等比居中到正方形画布。");
         } else if let Some(rect) = bounds {
             let scale = d.f64("ppi", 300.0) / 72.0;''',
  "display icon previews by resolution set")
 
 rep(panel,
- '''"ʹ�� VectorCraft ԭ����Ⱦ�� ICC ��������ICO ��δ��������һԤ���档"''',
- '''"JPEG/PNG ʹ��ԭ��ɫ�����棻ICO ʹ�� RGB ͸�� PNG ͼ���װ��Windows ��׼��ʽ��"''',
+ '''"使用 VectorCraft 原生渲染与 ICC 编码器。ICO 暂未包含在这一预览版。"''',
+ '''"JPEG/PNG 使用原生色彩引擎；ICO 使用 RGB 透明 PNG 图层封装，Windows 标准格式。"''',
  "update full dialog help")
 
 rep(panel,
- '''    if format != "jpg" && format != "png" { return Err("��ѡ�� JPEG �� PNG".into()); }''',
+ '''    if format != "jpg" && format != "png" { return Err("请选择 JPEG 或 PNG".into()); }''',
  '''    if !["jpg", "png", "ico"].contains(&format.as_str()) {
-        return Err("��ѡ�� JPEG��PNG �� ICO".into());
+        return Err("请选择 JPEG、PNG 或 ICO".into());
     }''',
  "accept ICO for export params")
 
@@ -135,7 +135,7 @@ rep(panel,
         let color = d.str("colorModel");''',
  '''    if format == "ico" {
         let sizes = d.fields.get("icoSizes").and_then(Value::as_array)
-            .filter(|v| !v.is_empty()).ok_or("��ѡ������һ�� ICO �ߴ�")?;
+            .filter(|v| !v.is_empty()).ok_or("请选择至少一个 ICO 尺寸")?;
         row["icoSizes"] = json!(sizes);
         row["antiAlias"] = json!("art");
         // Windows ICO is RGB with straight alpha; DPI, ICC and JPEG settings
@@ -151,7 +151,7 @@ rep(panel,
 rep(panel,
  '''pub fn open(app: &mut VectorcraftApp) {''',
  '''fn ico_size_picker(ui: &mut egui::Ui, d: &mut Dialog) {
-    ui.label("ICO �ߴ�");
+    ui.label("ICO 尺寸");
     let mut sizes: Vec<u32> = d.fields.get("icoSizes")
         .and_then(Value::as_array)
         .map(|v| v.iter().filter_map(Value::as_u64).filter_map(|n| u32::try_from(n).ok()).collect())
@@ -170,44 +170,44 @@ rep(panel,
     });
     sizes.sort_unstable();
     set(d, "icoSizes", sizes);
-    ui.label(egui::RichText::new("һ�� .ico �ļ��ڰ�����ѡ�����гߴ磬�Զ�����͸��������").small().weak());
+    ui.label(egui::RichText::new("一个 .ico 文件内包含勾选的所有尺寸，自动保持透明背景。").small().weak());
 }
 
 pub fn open(app: &mut VectorcraftApp) {''',
  "reusable multi-size ICO checkboxes")
 
 rep(panel,
- '''ui.label(egui::RichText::new("JPEG �� PNG �� ICC �� ��������").small().weak());''',
- '''ui.label(egui::RichText::new("JPEG �� PNG �� ICO �� ICC �� ��������").small().weak());''',
+ '''ui.label(egui::RichText::new("JPEG · PNG · ICC · 批量画板").small().weak());''',
+ '''ui.label(egui::RichText::new("JPEG · PNG · ICO · ICC · 批量画板").small().weak());''',
  "sidebar header")
 rep(panel,
  '''select(ui, &mut d, "format", &["jpg", "png"],
-            &["JPEG (.jpg)", "͸�� PNG (.png)"], ui.available_width().clamp(180.0, 280.0));''',
+            &["JPEG (.jpg)", "透明 PNG (.png)"], ui.available_width().clamp(180.0, 280.0));''',
  '''select(ui, &mut d, "format", &["jpg", "png", "ico"],
-            &["JPEG (.jpg)", "͸�� PNG (.png)", "Windows ICO (.ico)"], ui.available_width().clamp(180.0, 280.0));''',
+            &["JPEG (.jpg)", "透明 PNG (.png)", "Windows ICO (.ico)"], ui.available_width().clamp(180.0, 280.0));''',
  "sidebar ICO format option")
 
 rep(panel,
- '''            ui.label(egui::RichText::new("PNG �� RGB �����֧��͸������").small().weak());''',
- '''            ui.label(egui::RichText::new("PNG / ICO �� RGB �����֧��͸������").small().weak());''',
+ '''            ui.label(egui::RichText::new("PNG 以 RGB 输出，支持透明背景").small().weak());''',
+ '''            ui.label(egui::RichText::new("PNG / ICO 以 RGB 输出，支持透明背景").small().weak());''',
  "sidebar transparent export hint")
 
 rep(panel,
- '''        ui.label("�ֱ��ʣ�DPI��");
+ '''        ui.label("分辨率（DPI）");
         ui.horizontal_wrapped(|ui| {''',
  '''        if d.str("format") == "ico" {
             ico_size_picker(ui, &mut d);
         } else {
-        ui.label("�ֱ��ʣ�DPI��");
+        ui.label("分辨率（DPI）");
         ui.horizontal_wrapped(|ui| {''',
  "sidebar displays ICO sizes, hides irrelevant DPI")
 
 rep(panel,
  '''        if d.str("format") == "jpg" {
-            ui.label("ѹ����ʽ");''',
+            ui.label("压缩方式");''',
  '''        }
         if d.str("format") == "jpg" {
-            ui.label("ѹ����ʽ");''',
+            ui.label("压缩方式");''',
  "close sidebar DPI branch")
 
 rep(panel,
@@ -220,8 +220,8 @@ rep(panel,
  "sidebar ICO size preview")
 
 rep(panel,
- '''egui::Button::new("���� JPEG / PNG")''',
- '''egui::Button::new(if d.str("format") == "ico" { "���� Windows ICO" } else { "���� JPEG / PNG" })''',
+ '''egui::Button::new("导出 JPEG / PNG")''',
+ '''egui::Button::new(if d.str("format") == "ico" { "导出 Windows ICO" } else { "导出 JPEG / PNG" })''',
  "sidebar ICO export button")
 
 print("SUCCESS Leo Design ICO export for VectorCraft 0.19; native .ico output, transparency, multiple sizes and batch artboards")

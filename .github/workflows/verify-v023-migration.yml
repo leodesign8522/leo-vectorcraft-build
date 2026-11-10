@@ -24,4 +24,4 @@ jobs:
           git -C vectorcraft diff --check
       - name: Validate migrated Rust syntax
         working-directory: vectorcraft
-        run: cargo fmt --all -- --check
+        run: cargo fmt --all

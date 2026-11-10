@@ -63,8 +63,8 @@ edit('crates/engine/src/cmd/object/bounds.rs',
      'let solved = if glyphs || !(s.prefs.use_preview_bounds && w >= 0.0 && h >= 0.0) {')
 
 edit('crates/engine/src/cmd/typecmd.rs', '    vec![\n', '''    vec![
-        cmd!("type.glyphSelectionBounds", "��������ѡ��", ["Type"], None,
-            "{ids?|id?,on?} toggle tight glyph selection controls without changing layout �� {on,ids}",
+        cmd!("type.glyphSelectionBounds", "贴合字形选框", ["Type"], None,
+            "{ids?|id?,on?} toggle tight glyph selection controls without changing layout → {on,ids}",
             has_selection, leo_glyph_selection_bounds),
 ''')
 p = root / 'crates/engine/src/cmd/typecmd.rs'
@@ -77,7 +77,7 @@ fn leo_glyph_selection_bounds(s: &mut Session, p: &Value) -> Result<Value> {
         NodeKind::Text(t) => Some(t.leo_glyph_bounds), _ => None,
     });
     let on = switch_or(p, "on", !first.unwrap_or(false), C)?;
-    s.edit("��������ѡ��", |d, _| {
+    s.edit("贴合字形选框", |d, _| {
         for id in &ids {
             if let Some(NodeKind::Text(t)) = d.node_mut(*id).map(|n| &mut n.kind) {
                 t.leo_glyph_bounds = on;
@@ -95,8 +95,8 @@ edit('crates/ui-egui/src/panels/character.rs',
      '''    metrics_grid(app, ui, "ch-grid", &s, w, !hidden);
     ui.add_space(4.0);
     let tight = shared_text_flag(app, |t| t.leo_glyph_bounds) == Some(true);
-    if ui.selectable_label(tight, "��������ѡ��")
-        .on_hover_text("ѡ��Ͷ�����밴ʵ�����μ��㣻�����ֺźͻ��С��ٴε���ָ��Ű�������Կɱ༭��")
+    if ui.selectable_label(tight, "贴合字形选框")
+        .on_hover_text("选框和对象对齐按实际字形计算；保留字号和换行。再次点击恢复排版框。文字仍可编辑。")
         .clicked()
     {
         let p = if let Some((id, _, _)) = text_editing(app) {

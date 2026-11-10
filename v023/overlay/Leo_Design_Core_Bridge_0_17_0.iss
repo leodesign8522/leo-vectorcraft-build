@@ -53,8 +53,8 @@ begin
             try
               repeat
                 if (Dirs.Attributes and FILE_ATTRIBUTE_DIRECTORY<>0) and
-                  ((Dirs.Name='Scripts') or (Dirs.Name='�ű�') or (Dirs.Name='ָ��a') or
-                   (Dirs.Name='������ץ�') or (Dirs.Name='Skripten')) then begin
+                  ((Dirs.Name='Scripts') or (Dirs.Name='脚本') or (Dirs.Name='指令碼') or
+                   (Dirs.Name='スクリプト') or (Dirs.Name='Skripten')) then begin
                   Folder:=AddBackslash(Candidate)+Dirs.Name;
                   if FileCopy(ExpandConstant('{app}\AI Bridge\Send_to_VectorCraft.jsx'),
                     AddBackslash(Folder)+'Leo Design - Send to VectorCraft.jsx',False) then begin
@@ -99,8 +99,8 @@ begin
     WriteUtf8(BridgeRoot+'\installed-senders.txt',SenderPaths);
     if SenderPaths='' then begin
       Log('Illustrator script directory was not found. Sender remains available in the installed AI Bridge folder.');
-      if not WizardSilent then MsgBox('δ�ҵ� Illustrator �ű�Ŀ¼��VectorCraft �Ѱ�װ�����ͽű�λ�ڰ�װĿ¼�� AI Bridge �ļ��С��Զ��尲װ�� Illustrator �ɽ��ýű������� Presets/����/�ű�Ŀ¼��',mbInformation,MB_OK);
+      if not WizardSilent then MsgBox('未找到 Illustrator 脚本目录。VectorCraft 已安装；发送脚本位于安装目录的 AI Bridge 文件夹。自定义安装的 Illustrator 可将该脚本放入其 Presets/语言/脚本目录。',mbInformation,MB_OK);
     end else if not WizardSilent then
-      MsgBox('˫������������á������� Illustrator���� �ļ� �� �ű� ���ҵ� Leo Design - Send to VectorCraft��VectorCraft ��ʹ�� �ļ� �� ����ѡ�ж��� Illustrator��',mbInformation,MB_OK);
+      MsgBox('双向发送入口已配置。请重启 Illustrator，在 文件 → 脚本 中找到 Leo Design - Send to VectorCraft。VectorCraft 中使用 文件 → 发送选中对象到 Illustrator。',mbInformation,MB_OK);
   end;
 end;

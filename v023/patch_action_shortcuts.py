@@ -32,7 +32,7 @@ change('panels/actions.rs', '                    crate::i18n::tn(a.steps.len() a
        '''                    if a.leo_shortcut.is_empty() {
                         crate::i18n::tn(a.steps.len() as u64, "{n} step", "{n} steps")
                     } else {
-                        format!("{} �� {}", crate::menus::pretty_shortcut(&a.leo_shortcut),
+                        format!("{} · {}", crate::menus::pretty_shortcut(&a.leo_shortcut),
                             crate::i18n::tn(a.steps.len() as u64, "{n} step", "{n} steps"))
                     },''')
 change('panels/actions.rs', 'pub use files::{ACTIONS_EXT, LOAD_SET, SAVE_SET, load_set, save_set};',
@@ -55,7 +55,7 @@ change('dialogs/action_set_options.rs', '    false\n}', '    crate::leo_action_s
 change('dialogs/action_set_options.rs', '        app.run(crate::panels::actions::ACTION_OPTIONS, p)?;',
        '''        let index = |k| d.fields.get(k).and_then(Value::as_u64).and_then(|n| usize::try_from(n).ok());
         let target = (index("set").ok_or("no such action set")?, index("action").ok_or("no such action")?);
-        if crate::leo_action_shortcuts::recording(app) { return Err("������ɿ�ݼ�¼�롣".into()); }
+        if crate::leo_action_shortcuts::recording(app) { return Err("请先完成快捷键录入。".into()); }
         let custom = if d.fields.contains_key("leo_shortcut") {
             Some(crate::leo_action_shortcuts::validate(app, target, &d.str("leo_shortcut"))?)
         } else { None };
@@ -64,7 +64,7 @@ change('dialogs/action_set_options.rs', '        app.run(crate::panels::actions:
             && key.chord().zip(crate::keymap::vc_chord(text)).is_some_and(|(a,b)| {
                 a.effective(crate::keymap::platform()) == b.effective(crate::keymap::platform())
             })
-        { return Err("�Զ����ݼ��빦�ܼ��ظ����뱣������һ����".into()); }
+        { return Err("自定义快捷键与功能键重复，请保留其中一个。".into()); }
         app.run(crate::panels::actions::ACTION_OPTIONS, p)?;
         if let Some(text) = custom {
             crate::leo_action_shortcuts::assign(app, target, &text)?;
@@ -115,7 +115,7 @@ mod leo_action_pie_conflict_tests {
     fn leo_action_shortcut_tests_recognize_uppercase_pie_special_key_names() {
         let mut app = crate::VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
         app.ui.leo_pies[0].keyboard = "SHIFT+SPACE".into();
-        assert!(super::available(&app, "Shift+Space").unwrap_err().contains("���˵�"));
+        assert!(super::available(&app, "Shift+Space").unwrap_err().contains("饼菜单"));
     }
 }
 ''')
