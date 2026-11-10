@@ -1,3 +1,13 @@
+# 当前版本：Core Bridge 0.17.0 / VectorCraft 0.23.0（2026-11-10）
+
+- 官方基线：`5d0e892e2419f63bc0ea3c743ddff2e81e15fd3a`；保留功能基线为 Core Bridge 0.16.2。
+- **LC-009 Ctrl＋Enter：已由官方 0.23.0 替代，当前配方不再注入自研实现。** 下方旧条目为历史记录。
+- 其他现有增强保留，饼菜单及自定义截图粘贴继续停用。
+- 干净源码迁移、官方 Ctrl＋Enter 和配置的保留回归、Windows 正式编译及安装身份/哈希校验通过。
+- [完整验证范围与下载](v023/RELEASE_0_17_0.md)。启动 **Leo Design VectorCraft 0.23 Bridge 0.17.0**。
+
+---
+
 # Core Bridge 0.16.2 / 等宽数字可编辑 AI 导出修复（CI 与安装校验通过）
 
 - 修复 OpenType `tnum`（等宽数字）被高级字符预检误拦截的问题，映射为 Illustrator 活文字的等宽数字格式。

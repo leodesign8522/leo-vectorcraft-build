@@ -18,6 +18,8 @@ selection and movement, glyph bounds, text modes, image/ICO export, workspace
 settings, action shortcuts, document statistics and the existing AI bridge.
 The deprecated pie-menu and screenshot-paste overrides remain disabled.
 
-Validation status: local patch replay passes against the latest target files.
-This is not a complete local build. Windows compilation and retained regressions
-must pass on a clean official source checkout before installer delivery.
+Validation status: clean-source patch replay, Rust formatting, all configured
+retained regressions, official Ctrl+Enter tests, Windows release compilation and
+isolated installer identity/hash checks passed on GitHub Actions run 42825601622.
+See [the exact build and scope](RELEASE_0_17_0.md). User-desktop mouse behavior and
+live Illustrator COM round trips were not rechecked in this migration.
