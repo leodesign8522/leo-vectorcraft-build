@@ -1,0 +1,27 @@
+name: Verify VectorCraft 0.23 migration
+on:
+  push:
+    branches: [leo-v023-snapping]
+    paths: ["v023/**", "prepare_v023.py", ".github/workflows/*v023*.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: 5d0e892e2419f63bc0ea3c743ddff2e81e15fd3a
+          path: vectorcraft
+          persist-credentials: false
+      - name: Apply all retained features to clean official source
+        run: |
+          python3 prepare_v023.py vectorcraft
+          git -C vectorcraft diff --check
+      - name: Validate migrated Rust syntax
+        working-directory: vectorcraft
+        run: cargo fmt --all -- --check

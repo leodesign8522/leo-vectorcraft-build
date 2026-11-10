@@ -121,6 +121,14 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test official Ctrl Enter text completion and input composition
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-tools cmd_enter_ends_editing_like_escape -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Official Ctrl Enter tool regression failed" }
+          cargo test --locked -p vectorcraft-ui-egui cmd_enter -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Official Ctrl Enter UI, composition or shortcut regression failed" }
       - name: Test two-way AI Bridge selection, inbox boundaries and JSX syntax
         shell: pwsh
         working-directory: vectorcraft
