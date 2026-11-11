@@ -75,9 +75,20 @@
         if(s.kerning!==undefined && s.kerning!==null && range)range.kerning=s.kerning;
         if(s.all_caps)a.capitalization=FontCapsOption.ALLCAPS;
     }
-    function paragraph(a,p,scale){
+    function paragraphJustification(value,kind){
+        // VectorCraft point type has no width to justify to. It uses the
+        // alignment of the last line for the whole paragraph. Illustrator's
+        // full-justify variants instead render point type from its left anchor.
+        if(kind==='point'){
+            if(value==='JustifyCenter')return Justification.CENTER;
+            if(value==='JustifyRight')return Justification.RIGHT;
+            if(value==='JustifyLeft'||value==='JustifyAll')return Justification.LEFT;
+        }
         var j={Auto:Justification.LEFT,Left:Justification.LEFT,Center:Justification.CENTER,Right:Justification.RIGHT,JustifyLeft:Justification.FULLJUSTIFYLASTLINELEFT,JustifyCenter:Justification.FULLJUSTIFYLASTLINECENTER,JustifyRight:Justification.FULLJUSTIFYLASTLINERIGHT,JustifyAll:Justification.FULLJUSTIFY};
-        a.justification=j[p.justify||'Left'];a.leftIndent=(p.left_indent||0)/scale;a.rightIndent=(p.right_indent||0)/scale;
+        return j[value||'Left'];
+    }
+    function paragraph(a,p,scale,kind){
+        a.justification=paragraphJustification(p.justify,kind);a.leftIndent=(p.left_indent||0)/scale;a.rightIndent=(p.right_indent||0)/scale;
         a.firstLineIndent=(p.first_line_indent||0)/scale;a.spaceBefore=(p.space_before||0)/scale;a.spaceAfter=(p.space_after||0)/scale;
         a.hyphenation=!!p.hyphenate;a.everyLineComposer=p.composer!=='singleLine';
         if(p.justification && p.justification.auto_leading!==undefined)a.autoLeadingAmount=p.justification.auto_leading;
@@ -118,7 +129,7 @@
                 at+=tf.characters[i].contents.length;
             }
         }
-        for(i=0;i<tf.paragraphs.length;i++)paragraph(tf.paragraphs[i].paragraphAttributes,(t.paras&&t.paras[i])||t.para||{},scale);
+        for(i=0;i<tf.paragraphs.length;i++)paragraph(tf.paragraphs[i].paragraphAttributes,(t.paras&&t.paras[i])||t.para||{},scale,kind);
         var x=t.xf,m=app.getIdentityMatrix(),anchor=marker.geometricBounds;
         m.mValueA=x[0];m.mValueB=-x[1];m.mValueC=-x[2];m.mValueD=x[3];m.mValueTX=0;m.mValueTY=0;
         tf.transform(m,true,true,true,true,100,Transformation.DOCUMENTORIGIN);
