@@ -38,6 +38,37 @@ mod leo_v022_geometry_tests {
     }
 
     #[test]
+    fn leo_snapping_engine_resize_rejects_distant_and_offscreen_alignment() {
+        let (d, selection) = resize_scene(false);
+        let paint = crate::testutil::paint();
+        let screen = crate::ScreenFrame {
+            origin: Point::new(0.0, 350.0),
+            right: Vec2::new(1.0, 0.0),
+            down: Vec2::new(0.0, 1.0),
+            size: (1000.0, 600.0),
+        };
+        let cx = ToolContext { screen: Some(screen), spacing_guides: false, ..crate::testutil::cx(&d, &selection, &paint) };
+        let bx = OrientedBox::aligned(Rect::new(400.0, 300.0, 700.0, 500.0));
+        let handle = Handle::Left;
+        let raw = crate::bbox::scale_for_drag(bx.rect, handle, Point::new(254.0, 400.0), false, false);
+        let far = Point::new(254.0, 850.0);
+        let offscreen = Point::new(253.0, 340.0);
+        let near = Point::new(250.0, 435.0);
+        let mut targets = Targets::leo_scale_targets(&cx);
+        targets.xs = vec![(offscreen.x, offscreen, Kind::Center), (far.x, far, Kind::Center)];
+        let (next, guides) = targets.leo_resize(&cx, &bx, handle, raw, false, false).unwrap();
+        assert_eq!(next, raw);
+        assert!(guides.is_empty());
+
+        targets.xs.insert(0, (near.x, near, Kind::Center));
+        let (next, guides) = targets.leo_resize(&cx, &bx, handle, raw, false, false).unwrap();
+        assert!(((next * handle.pos(bx.rect)).x - near.x).abs() < 1e-7);
+        assert!(guides.iter().any(|o| matches!(o, Overlay::CurvePoint { p, .. } if *p == near)));
+        assert!(guides.iter().any(|o| matches!(o, Overlay::Label { p, text, .. } if *p == near && text == "center")));
+        assert!(!guides.iter().any(|o| matches!(o, Overlay::Label { text, .. } if text == "align")));
+    }
+
+    #[test]
     fn leo_snapping_engine_resize_release_and_modifier_reset() {
         let (d,s)=resize_scene(false);let paint=crate::testutil::paint();let cx=crate::testutil::cx(&d,&s,&paint);
         let bx=OrientedBox::aligned(Rect::new(400.0,300.0,700.0,500.0));let h=Handle::Left;

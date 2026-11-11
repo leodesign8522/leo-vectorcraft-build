@@ -6,6 +6,7 @@ use std::cell::Cell;
 
 pub(super) const ACQUIRE_PX: f64 = 8.0;
 pub(super) const RELEASE_MULTIPLIER: f64 = 1.6;
+const RESIZE_ALIGNMENT_REACH_PX: f64 = 96.0;
 const ANCHOR_HIT: [u8; 3] = [0x35, 0xc2, 0xfa];
 const PATH_HIT: [u8; 3] = [0xff, 0xb3, 0x3d];
 const EXTENSION_HIT: [u8; 3] = [0xff, 0xd6, 0x00];
@@ -216,17 +217,18 @@ impl LeoScene {
         out.index()
     }
 
-    fn near(&self, query: Rect) -> Targets {
+    fn near_regions(&self, regions: &[Rect]) -> Targets {
         let mut out = Targets::default();
-        if !query.is_finite() { return out; }
-        for entry in self.paths.iter().filter(|e| overlaps(e.bounds, query)) {
+        let contains = |p| regions.iter().any(|r| r.is_finite() && r.contains(p));
+        let intersects = |b| regions.iter().any(|r| r.is_finite() && overlaps(b, *r));
+        for entry in self.paths.iter().filter(|e| intersects(e.bounds)) {
             let Some(path) = entry.node.path_data() else { continue };
-            if self.centers && entry.moving.is_empty() && query.contains(entry.bounds.center()) {
+            if self.centers && entry.moving.is_empty() && contains(entry.bounds.center()) {
                 out.points.push((entry.bounds.center(), Kind::Center));
             }
             for (si, sp) in path.subpaths.iter().enumerate() {
                 for (ai, anchor) in sp.anchors.iter().enumerate() {
-                    if !entry.moving.contains(&(si, ai)) && query.contains(anchor.p) {
+                    if !entry.moving.contains(&(si, ai)) && contains(anchor.p) {
                         out.points.push((anchor.p, Kind::Anchor));
                     }
                 }
@@ -235,20 +237,20 @@ impl LeoScene {
                     if n == 0 || entry.moving.contains(&(si, i)) || entry.moving.contains(&(si, (i + 1) % n)) { continue; }
                     let c = sp.segment(i);
                     let bounds = Rect::from_points(c.p0, c.p1).union_pt(c.p2).union_pt(c.p3);
-                    if overlaps(bounds, query) {
+                    if intersects(bounds) {
                         let segment = if sp.segment_is_line(i) { PathSeg::Line(Line::new(c.p0, c.p3)) } else { PathSeg::Cubic(c) };
                         out.segments.push((bounds, segment));
                     }
                 }
             }
         }
-        for (r, _) in self.rectangles.iter().filter(|(r, _)| overlaps(*r, query)) {
-            if self.centers && query.contains(r.center()) { out.points.push((r.center(),Kind::Center)); }
+        for (r, _) in self.rectangles.iter().filter(|(r, _)| intersects(*r)) {
+            if self.centers && contains(r.center()) { out.points.push((r.center(),Kind::Center)); }
             let corners = [Point::new(r.x0,r.y0),Point::new(r.x1,r.y0),Point::new(r.x1,r.y1),Point::new(r.x0,r.y1)];
             for i in 0..4 {
                 let line = Line::new(corners[i], corners[(i+1)%4]);
                 let bounds = Rect::from_points(line.p0,line.p1);
-                if overlaps(bounds,query) { out.segments.push((bounds,PathSeg::Line(line))); }
+                if intersects(bounds) { out.segments.push((bounds,PathSeg::Line(line))); }
             }
         }
         out
@@ -276,8 +278,15 @@ impl Targets {
             }
         }
         if let Ok(mut held)=self.leo_scale.try_borrow_mut() {*held=None;}
-        let bounds=to_doc.transform_rect_bbox(a.transform_rect_bbox(bx.rect)).inflate(release,release);
-        let nearby=self.leo_near(bounds)?;
+        // Only the grabbed handle and the ends of its moving side are tested.
+        // A query around the whole resized box collects unrelated interior paths.
+        let ends = [handle, Handle::ALL[(handle as usize + 1) % 8], Handle::ALL[(handle as usize + 7) % 8]];
+        let handles = if handle.is_corner() { &ends[..1] } else { &ends[..] };
+        let regions = ends.map(|h| {
+            let p = to_doc * (a * h.pos(bx.rect));
+            Rect::from_points(p, p).inflate(acquire, acquire)
+        });
+        let nearby = self.leo_scene.as_ref()?.near_regions(&regions[..handles.len()]);
         let origin=if from_center {bx.rect.center()} else {handle.opposite().pos(bx.rect)};
         let [sx,_,_,sy,_,_]=a.as_coeffs();
         let valid=|nx: f64,ny: f64| nx.is_finite() && ny.is_finite() && nx*sx>0.0 && ny*sy>0.0 && nx.abs()>=1e-4 && ny.abs()>=1e-4;
@@ -298,8 +307,7 @@ impl Targets {
                 (false,false,true)=>((sy.signum(),1.0),(0.0,0.0),sy),
                 (false,false,false)=>((0.0,1.0),(1.0,0.0),sy),
             };
-            let ends=if handle.is_corner() {vec![handle]} else {vec![handle,Handle::ALL[(handle as usize+1)%8],Handle::ALL[(handle as usize+7)%8]]};
-            for h in ends {
+            for h in handles {
                 let v=h.pos(bx.rect)-origin;
                 let base=to_doc*(origin+Vec2::new(c.0*v.x,c.1*v.y));
                 let dir=to_doc*Point::new(e.0*v.x,e.1*v.y)-to_doc*Point::ORIGIN;
@@ -340,7 +348,10 @@ impl Targets {
             // Bounds and ruler alignment retain the official oriented-box math.
             let rulers=Targets::rulers(cx);
             let alignment=if cx.smart_guides {self} else {&rulers};
-            let (next,guides)=alignment.snap_scale(bx,handle,a,proportional,from_center,acquire);
+            let (next,guides) = alignment.snap_scale_impl(
+                bx, handle, a, proportional, from_center, acquire,
+                Some((cx.tol(RESIZE_ALIGNMENT_REACH_PX), cx.screen.as_ref())),
+            );
             let travel=raw.distance(to_doc*(next*handle.pos(bx.rect)));
             ((travel>1e-9 || !guides.is_empty()) && travel<=acquire).then_some((next,guides))
         };
@@ -356,7 +367,7 @@ impl Targets {
     }
 
     fn leo_near(&self, query: Rect) -> Option<Self> {
-        let mut targets = self.leo_scene.as_ref()?.near(query);
+        let mut targets = self.leo_scene.as_ref()?.near_regions(&[query]);
         targets.style = self.style;
         targets.tangent = self.tangent;
         targets.perpendicular = self.perpendicular;
@@ -1101,6 +1112,23 @@ fn move_hit_guides(targets: &Targets, q: Point, label: &'static str, color: [u8;
     guides
 }
 
+pub(super) fn alignment_marker(targets: &Targets, point: Point, kind: Kind) -> Vec<Overlay> {
+    let label = if kind == Kind::Edge { "edge" } else { kind.label() };
+    move_hit_guides(targets, point, label, targets.style.color)
+}
+
+fn move_alignment_marker(targets: &Targets, lock: AxisLock, is_x: bool, d: Vec2) -> Vec<Overlay> {
+    let moved = lock.source + d;
+    let point = if lock.kind != Kind::Guide {
+        lock.from
+    } else if is_x {
+        Point::new(lock.value, moved.y)
+    } else {
+        Point::new(moved.x, lock.value)
+    };
+    alignment_marker(targets, point, lock.kind)
+}
+
 fn resolve_move_lock(
     _targets: &Targets, lock: MoveLock, d: Vec2, release: f64, direction: Option<Vec2>,
 ) -> Option<(Vec2, Point, &'static str, [u8; 3])> {
@@ -1269,9 +1297,7 @@ fn snap_move_alignment(
                     guides.push(Overlay::Line { a, b, color: targets.style.color, dashed: false });
                 }
             }
-            if targets.style.labels {
-                guides.push(Overlay::Label { p: lock.from, text: if lock.kind == Kind::Guide { "guide" } else { "align" }.into(), color: targets.style.color });
-            }
+            guides.extend(move_alignment_marker(targets, lock, is_x, d));
             return (d, guides);
         }
         x_lock.set(None);
@@ -1314,9 +1340,6 @@ fn snap_move_alignment(
                 });
             }
         }
-        if targets.style.labels {
-            guides.push(Overlay::Label { p: lock.from, text: if lock.kind == Kind::Guide { "guide" } else { "align" }.into(), color: targets.style.color });
-        }
     } else {
         x_lock.set(None);
     }
@@ -1349,12 +1372,11 @@ fn snap_move_alignment(
                 });
             }
         }
-        if targets.style.labels {
-            guides.push(Overlay::Label { p: lock.from, text: if lock.kind == Kind::Guide { "guide" } else { "align" }.into(), color: targets.style.color });
-        }
     } else {
         y_lock.set(None);
     }
+    if let Some(lock) = x { guides.extend(move_alignment_marker(targets, lock, true, d)); }
+    if let Some(lock) = y { guides.extend(move_alignment_marker(targets, lock, false, d)); }
     // Spacing Guides are a separate geometric relationship: apply them only on axes
     // where no point/edge alignment has already won.
     if let Some(base) = bounds {

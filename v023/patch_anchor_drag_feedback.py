@@ -31,6 +31,79 @@ edit("guides.rs",
      "pub use targets::Targets;",
      "pub use targets::Targets;\npub(crate) use targets::ObjectMoveSnap;")
 edit("guides/targets.rs","pub(crate) use leo_snapping_engine::ObjectMoveSnap;","pub(crate) use leo_snapping_engine::{ObjectMoveSnap,LeoRotationSnap};")
+
+# Keep native scaling math and grid snapping. Restrict only the Bridge's
+# fallback to nearby, visible object alignment and mark its actual target.
+edit("guides/targets.rs",
+     """        type Hit = Option<(f64, Point)>;
+        // Where a snap lands: in line with a target's x and/or y, or on an anchor or centre.""",
+     """        self.snap_scale_impl(bx, handle, a, proportional, from_center, tol, None)
+    }
+
+    fn snap_scale_impl(
+        &self, bx: &OrientedBox, handle: Handle, a: Affine, proportional: bool,
+        from_center: bool, tol: f64, local: Option<(f64, Option<&crate::ScreenFrame>)>,
+    ) -> (Affine, Vec<Overlay>) {
+        type Hit = Option<(f64, Point, Kind)>;
+        // Where a snap lands: in line with a target's x and/or y, or on an anchor or centre.""")
+edit("guides/targets.rs",
+     """                .copied()
+                .chain(rulers)
+                .map(|(t, from, _)| (t, from))
+                .filter(|(t, _)| (t - v).abs() <= tol)
+                .min_by(|p, q| (p.0 - v).abs().total_cmp(&(q.0 - v).abs()))""",
+     """                .copied()
+                .filter(|(_, from, _)| local.is_none_or(|(reach, view)| {
+                    let along = if x { (p.y - from.y).abs() } else { (p.x - from.x).abs() };
+                    along <= reach && view.is_none_or(|view| {
+                        view.to_screen(*from).is_some_and(|(x, y)| {
+                            (0.0..=view.size.0).contains(&x) && (0.0..=view.size.1).contains(&y)
+                        })
+                    })
+                }))
+                .chain(rulers.map(|(value, from, kind)| {
+                    let target = if local.is_none() { from } else if x {
+                        Point::new(value, p.y)
+                    } else {
+                        Point::new(p.x, value)
+                    };
+                    (value, target, kind)
+                }))
+                .filter(|(t, _, _)| (t - v).abs() <= tol)
+                .min_by(|a, b| {
+                    (a.0 - v).abs().total_cmp(&(b.0 - v).abs()).then_with(|| {
+                        if local.is_some() { a.1.distance(p).total_cmp(&b.1.distance(p)) }
+                        else { std::cmp::Ordering::Equal }
+                    })
+                })""")
+edit("guides/targets.rs",
+     'let on = self.nearest_point(p, tol).map(|(q, k)| (Some((q.x, q)), Some((q.y, q)), Some((q, k))));',
+     'let on = self.nearest_point(p, tol).map(|(q, k)| (Some((q.x, q, k)), Some((q.y, q, k)), Some((q, k))));')
+edit("guides/targets.rs",
+     """        if let Some((x, from)) = hit_x {
+            ov.extend(self.line(Point::new(x, from.y.min(nr.y0)), Point::new(x, from.y.max(nr.y1))));
+        }
+        if let Some((y, from)) = hit_y {
+            ov.extend(self.line(Point::new(from.x.min(nr.x0), y), Point::new(from.x.max(nr.x1), y)));
+        }
+        if hit_x.is_some() || hit_y.is_some() {
+            ov.extend(self.label(to_doc * (out * handle.pos(r)), "align"));
+        }""",
+     """        if let Some((x, from, kind)) = hit_x {
+            ov.extend(self.line(Point::new(x, from.y.min(nr.y0)), Point::new(x, from.y.max(nr.y1))));
+            if local.is_some() {
+                ov.extend(leo_snapping_engine::alignment_marker(self, from, kind));
+            }
+        }
+        if let Some((y, from, kind)) = hit_y {
+            ov.extend(self.line(Point::new(from.x.min(nr.x0), y), Point::new(from.x.max(nr.x1), y)));
+            if local.is_some() && !hit_x.is_some_and(|(_, point, _)| point == from) {
+                ov.extend(leo_snapping_engine::alignment_marker(self, from, kind));
+            }
+        }
+        if local.is_none() && (hit_x.is_some() || hit_y.is_some()) {
+            ov.extend(self.label(to_doc * (out * handle.pos(r)), "align"));
+        }""")
 edit("guides.rs","pub(crate) use targets::ObjectMoveSnap;","pub(crate) use targets::{ObjectMoveSnap,LeoRotationSnap};")
 edit("xform/transform.rs","use crate::guides::{PointSnap, Targets, snap_pick};","use crate::guides::{PointSnap, Targets, snap_pick, LeoRotationSnap};")
 edit("xform/transform.rs","    snap: Option<PointSnap>,","    snap: Option<PointSnap>,\n    rotation: Option<LeoRotationSnap>,")
