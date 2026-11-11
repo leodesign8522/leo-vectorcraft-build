@@ -217,9 +217,23 @@ fn export_now(app:&mut VectorcraftApp,p:&Value)->Result<Value,String>{
             write(&input.to_string_lossy(),&bytes)?;write(&script.to_string_lossy(),SCRIPT.as_bytes())?;
             let data=json!({"version":1,"mode":mode,"inputAi":input,"outputAi":final_ai,"reportPath":report,"texts":prepared.texts,"openAfter":handoff,"geometryWitness":geometry_witness});
             write(&manifest.to_string_lossy(),&serde_json::to_vec(&data).map_err(|e|e.to_string())?)?;
-            run_illustrator(&script,&manifest)?;
-            let proof:Value=serde_json::from_slice(&std::fs::read(&report).map_err(|e|format!("Illustrator 未返回验证报告：{e}"))?).map_err(|e|e.to_string())?;
-            if proof["pass"]!=true || proof["mode"]!=mode {return Err(format!("AI 导出验证失败：{}",proof["error"]));}
+            let bridge_result=run_illustrator(&script,&manifest);
+            let report_bytes=match std::fs::read(&report) {
+                Ok(bytes)=>bytes,
+                Err(e)=>{
+                    bridge_result?;
+                    return Err(format!("Illustrator 未返回验证报告：{e}"));
+                }
+            };
+            let proof:Value=serde_json::from_slice(&report_bytes).map_err(|e|e.to_string())?;
+            if let Some(error)=proof["error"].as_str().filter(|_|proof["pass"]!=true) {
+                let stage=proof["stage"].as_str().unwrap_or("导出");
+                return Err(format!("Illustrator {stage}失败：{error}"));
+            }
+            bridge_result?;
+            if proof["pass"]!=true || proof["mode"]!=mode {
+                return Err("AI 导出未通过验证。".into());
+            }
             let bytes=std::fs::read(&final_ai).map_err(|e|e.to_string())?;
             if !bytes.starts_with(b"%PDF-") {return Err("Illustrator 未生成 PDF 兼容 AI 文件。".into());}
             // Only the successfully generated, verified result reaches the user's path.

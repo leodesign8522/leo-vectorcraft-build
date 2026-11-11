@@ -93,20 +93,21 @@
         }
         return p;
     }
-    function createText(doc,marker,record,scale){
-        var node=record.node,t=node.kind,kind=t.kind.kind,parent=marker.parent,tf,content='',i;
+    function createText(doc,marker,record,scale,stagingLayer){
+        var node=record.node,t=node.kind,kind=t.kind.kind,tf,content='',i;
         if(kind==='point')tf=doc.textFrames.pointText([0,0],t.vertical?TextOrientation.VERTICAL:TextOrientation.HORIZONTAL);
         else if(kind==='area'){
-            tf=doc.textFrames.areaText(path(parent,t.kind.frame,scale),t.vertical?TextOrientation.VERTICAL:TextOrientation.HORIZONTAL);
+            tf=doc.textFrames.areaText(path(stagingLayer,t.kind.frame,scale),t.vertical?TextOrientation.VERTICAL:TextOrientation.HORIZONTAL);
             var area=t.area||{};tf.columnCount=area.columns||1;tf.rowCount=area.rows||1;
             tf.columnGutter=(area.gutter===undefined?18:area.gutter)/scale;tf.rowGutter=(area.rowGutter===undefined?(area.gutter===undefined?18:area.gutter):area.rowGutter)/scale;
             tf.flowLinksHorizontally=area.flow==='rows';tf.spacing=(area.inset||0)/scale;
         } else throw Error('当前活文字导出暂不支持路径文字');
         tf.move(marker,ElementPlacement.PLACEBEFORE);
         for(i=0;i<t.runs.length;i++)content+=t.runs[i].text.replace(/\n/g,'\r');
-        // Zero-length ranges reject leading/paragraph attributes. Seed a glyph
-        // in this private document, apply the insertion style, then remove it.
-        var empty=content.length===0;tf.contents=empty?'A':content;
+        // Illustrator cannot address a paragraph with no characters at the end
+        // of a frame. Style it with a temporary character before removing it.
+        var empty=content.length===0,trailingBreak=/\r$/.test(content);
+        tf.contents=(empty||trailingBreak)?content+'A':content;
         if(t.runs.length)character(tf.textRange,t.runs[0].style,doc,scale);
         if(t.runs.length>1){
             var ends=[],end=0;for(i=0;i<t.runs.length;i++){end+=t.runs[i].text.length;ends.push(end);}
@@ -131,6 +132,7 @@
             actual=tf.textPath.pathPoints[0].anchor;}
         tf.translate(target[0]-actual[0],target[1]-actual[1]);
         if(empty)tf.contents='';
+        else if(trailingBreak)tf.characters[tf.characters.length-1].remove();
         tf.name=node.name||('Text '+node.id);tf.opacity=(node.opacity===undefined?1:node.opacity)*100;
         tf.hidden=node.visible===false;tf.locked=!!node.locked;marker.remove();return tf;
     }
@@ -157,13 +159,39 @@
         return {pass:true,expected:expected,actual:actual,items:count,scale:scale};
     }
     // LEO_GEOMETRY_VALIDATION_END
-    function freshDocument(src){
+    function placeArtboards(dst,boards){
+        var b=boards[0].rect;
+        var dx=0,dy=0;
+        try{
+            dst.artboards[0].artboardRect=b;
+        }catch(outsideCanvas){
+            if(String(outsideCanvas).indexOf('AOoC')<0)throw outsideCanvas;
+            // Imported editing data may use an origin outside a fresh canvas.
+            // Preserve the board dimensions and every object's board-relative position.
+            var first=dst.artboards[0].artboardRect;
+            dx=first[0]-b[0];dy=first[1]-b[1];
+            if(Math.abs((first[2]-first[0])-(b[2]-b[0]))>0.01 ||
+               Math.abs((first[1]-first[3])-(b[1]-b[3]))>0.01){
+                dst.artboards[0].artboardRect=[b[0]+dx,b[1]+dy,b[2]+dx,b[3]+dy];
+            }
+        }
+        for(var i=1;i<boards.length;i++){
+            var rect=boards[i].rect;
+            dst.artboards.add([rect[0]+dx,rect[1]+dy,rect[2]+dx,rect[3]+dy]);
+        }
+        return [dx,dy];
+    }
+    function activateSourceArtboard(src){
         var activeBoard=0;
         try{activeBoard=src.artboards.getActiveArtboardIndex();}catch(uninitializedBoard){}
         if(activeBoard<0||activeBoard>=src.artboards.length)activeBoard=0;
         // Some native editing-data imports expose artboards but no valid active
         // board. Initialize it before reading ruler or artwork coordinates.
         src.artboards.setActiveArtboardIndex(activeBoard);
+        return activeBoard;
+    }
+    function freshDocument(src){
+        var activeBoard=activateSourceArtboard(src);
         var boards=[];for(var index=0;index<src.artboards.length;index++){
             var original=src.artboards[index],bounds=original.artboardRect;
             boards.push({name:String(original.name),rect:[bounds[0],bounds[1],bounds[2],bounds[3]]});
@@ -194,8 +222,7 @@
         var dst=app.documents.add(src.documentColorSpace,width,height),initial=dst.layers[0];
         try{
             if((Number(dst.scaleFactor)||1)!==scale)throw Error('Illustrator 大画布比例不一致，已停止导出');
-            dst.artboards[0].artboardRect=b;
-            for(var i=1;i<boards.length;i++)dst.artboards.add(boards[i].rect);
+            var shift=placeArtboards(dst,boards);
             for(i=0;i<boards.length;i++)dst.artboards[i].name=boards[i].name;
             dst.artboards.setActiveArtboardIndex(activeBoard);dst.rulerOrigin=ruler;
             // Preserve spot/process definitions before cross-document duplication.
@@ -212,7 +239,7 @@
                 for(j=0;j<record.entries.length;j++){
                     var e=record.entries[j];if(e.layer)layer(e.data,to);
                     else {e.item.locked=false;e.item.hidden=false;var copy=e.item.duplicate(to,ElementPlacement.PLACEATBEGINNING);
-                        dst.activate();var box=copy.geometricBounds;copy.translate(e.position[0]-box[0],e.position[1]-box[1]);
+                        dst.activate();var box=copy.geometricBounds;copy.translate(e.position[0]+shift[0]-box[0],e.position[1]+shift[1]-box[1]);
                         copy.hidden=e.hidden;copy.locked=e.locked;}
                 }
                 to.opacity=record.opacity;to.blendingMode=record.blend;to.printable=record.printable;to.color=record.color;
@@ -234,30 +261,53 @@
     try{
         app.userInteractionLevel=UserInteractionLevel.DONTDISPLAYALERTS;
         app.coordinateSystem=CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
+        report.stage='检查字体';
         for(var n=0;n<manifest.texts.length;n++)for(var r=0;r<manifest.texts[n].node.kind.runs.length;r++)font(manifest.texts[n].node.kind.runs[r].style);
+        report.stage='打开中间 AI';
         sourceDoc=app.open(new File(manifest.inputAi));
-        doc=freshDocument(sourceDoc);sourceDoc.close(SaveOptions.DONOTSAVECHANGES);sourceDoc=null;doc.activate();
+        if(manifest.openAfter){
+            report.stage='重建发送文档';
+            doc=freshDocument(sourceDoc);
+            sourceDoc.close(SaveOptions.DONOTSAVECHANGES);
+        }else{
+            // The source is a disposable native export. Keep its artboards and
+            // layer stack intact and save the edited document to the output path.
+            doc=sourceDoc;sourceDoc=null;doc.activate();activateSourceArtboard(doc);
+        }
+        sourceDoc=null;doc.activate();
         var cmyk=doc.documentColorSpace===DocumentColorSpace.CMYK;
         if(cmyk!==(manifest.mode==='cmyk'))throw Error('导入后的文档颜色模式不一致，已停止导出');
         var scale=Number(doc.scaleFactor)||1,markers={},expected={};
         for(n=0;n<manifest.texts.length;n++)expected['$'+manifest.texts[n].marker]=true;
-        for(var p=0;p<doc.pathItems.length;p++){
-            var item=doc.pathItems[p];if(item.filled && item.fillColor.typename==='SpotColor'){
+        report.stage='查找文字标记';
+        var paths=doc.pathItems,pathCount=paths.length;
+        for(var p=0;p<pathCount;p++){
+            var item=paths[p];if(item.filled && item.fillColor.typename==='SpotColor'){
                 var key='$'+item.fillColor.spot.name;if(expected.hasOwnProperty(key)){if(markers.hasOwnProperty(key))throw Error('Duplicate text marker');markers[key]=item;}
             }
         }
+        report.stage='恢复可编辑文字';
+        // Text creation targets the active layer. An imported layer can reject
+        // creation even after unlocking, but accepts the new item at the marker.
+        var stagingLayer=manifest.texts.length?doc.layers.add():null;
         for(n=0;n<manifest.texts.length;n++){
-            var rec=manifest.texts[n],marker=markers['$'+rec.marker];if(!marker)throw Error('文字位置标记缺失：'+rec.marker);
-            unlock(marker.parent);marker.locked=false;marker.hidden=false;var tf=createText(doc,marker,rec,scale);
-            report.texts.push({id:rec.node.id,name:tf.name,kind:String(tf.kind),contents:tf.contents,font:tf.contents.length?tf.textRange.characterAttributes.textFont.name:null,paragraphs:tf.contents.length?tf.paragraphs.length:0,lines:tf.contents.length?tf.lines.length:0,layer:tf.layer.name});
+            var rec=manifest.texts[n],marker=markers['$'+rec.marker];
+            if(!marker)throw Error('文字位置标记缺失：'+rec.marker);
+            unlock(marker.parent);marker.locked=false;marker.hidden=false;
+            doc.activeLayer=stagingLayer;
+            var tf=createText(doc,marker,rec,scale,stagingLayer);
+            report.texts.push({id:rec.node.id,name:tf.name,kind:String(tf.kind),contents:tf.contents,font:tf.contents.length?tf.characters[0].characterAttributes.textFont.name:null,paragraphs:tf.contents.length?tf.paragraphs.length:0,lines:tf.contents.length?tf.lines.length:0,layer:tf.layer.name});
         }
+        if(stagingLayer)stagingLayer.remove();
+        report.stage='恢复图层状态';
         for(n=0;n<manifest.texts.length;n++){try{doc.spots.getByName(manifest.texts[n].marker).remove();}catch(ignore){}}
         for(n=unlocked.length-1;n>=0;n--){var state=unlocked[n];if(state.layer)state.item.visible=!state.hidden;else state.item.hidden=state.hidden;state.item.locked=state.locked;}
+        report.stage='验证对象位置';
         report.geometry=validateGeometryBounds(doc,manifest.geometryWitness);
-        report.stage='save';
+        report.stage='保存 AI';
         var options=new IllustratorSaveOptions();options.pdfCompatible=true;options.compressed=true;options.embedICCProfile=true;options.embedLinkedFiles=true;
         doc.saveAs(new File(manifest.outputAi),options);
-        report.stage='saved';
+        report.stage='保存后验证';
         report.mode=cmyk?'cmyk':'rgb';report.artboards=doc.artboards.length;report.layers=[];
         for(n=0;n<doc.layers.length;n++)report.layers.push(doc.layers[n].name);
         doc.close(SaveOptions.DONOTSAVECHANGES);doc=null;
