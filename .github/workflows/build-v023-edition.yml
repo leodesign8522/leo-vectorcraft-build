@@ -145,6 +145,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Editable AI figure style regressions failed" }
           node ../v023/ai_export/test_geometry_bounds.cjs
           if ($LASTEXITCODE -ne 0) { throw "Illustrator geometry bounds guard regressions failed" }
+          node ../v023/ai_export/test_layer_order.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Illustrator layer order regressions failed" }
           cargo test --locked -p vectorcraft-ui-egui leo_ai_export_tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Editable AI export regressions failed" }
       - name: Test Leo Snapping Engine node and object movement geometry, hysteresis and zoom

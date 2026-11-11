@@ -173,9 +173,13 @@
         // reads and duplicate() can otherwise use different ruler/artboard origins.
         function capture(from){
             var r={item:from,name:String(from.name),locked:from.locked,visible:from.visible,opacity:from.opacity,blend:from.blendingMode,printable:from.printable,color:from.color,entries:[]},j;
+            var hasSublayers=from.layers.length>0;
             for(j=0;j<from.layers.length;j++)r.entries.push({layer:true,data:capture(from.layers[j]),z:from.layers[j].zOrderPosition});
             for(j=0;j<from.pageItems.length;j++)if(from.pageItems[j].parent===from){var item=from.pageItems[j],box=item.geometricBounds;
-                r.entries.push({layer:false,item:item,locked:item.locked,hidden:item.hidden,position:[box[0],box[1]],z:item.zOrderPosition});}
+                // Illustrator can throw when reading zOrderPosition on imported paths.
+                // A single collection already provides the front-to-back order.
+                var z=hasSublayers?item.zOrderPosition:j;
+                r.entries.push({layer:false,item:item,locked:item.locked,hidden:item.hidden,position:[box[0],box[1]],z:z});}
             r.entries.sort(function(a,b){return b.z-a.z;});return r;
         }
         var layers=[];for(index=0;index<src.layers.length;index++)layers.push(capture(src.layers[index]));
