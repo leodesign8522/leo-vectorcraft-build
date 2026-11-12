@@ -281,12 +281,12 @@ jobs:
           Copy-Item vectorcraft/assets/app-icon/LICENSE.txt dist/licenses/app-icon-LICENSE.txt
           Copy-Item vectorcraft/docs/brand/LICENSE-brand.txt dist/licenses/
           @'
-          Leo Design Core Bridge 0.20.0 / VectorCraft 0.24.1
+          Leo Design Core Bridge 0.20.1 / VectorCraft 0.24.1
 
           首选项 → 智能参考线 → Leo Design 吸附，默认启用，关闭后切回官方吸附。标尺参考线沿用官方图层管理。
           保留：Illustrator 双向发送和可编辑 AI 导出、文字框与字形选框、吸管、组内选择、整组拖动、活动圆角、工作区、动作快捷键、文档统计、图像与 ICO 导出。
           选中线段的复制与剪切、图标飞出面板缩放、Ctrl+Enter 结束文字编辑使用官方实现。
-          安装程序同时部署 Illustrator 发送脚本。请启动 Leo Design VectorCraft 0.24 Bridge 0.20.0。
+          安装程序同时部署 Illustrator 发送脚本。请启动 Leo Design VectorCraft 0.24 Bridge 0.20.1。
           '@ | Set-Content "dist/README_FIRST.txt" -Encoding utf8
           @'
           Packaging requires a successful Windows build and all configured regression checks.
@@ -296,7 +296,7 @@ jobs:
           New-Item -ItemType Directory -Path "dist/AI Bridge" -Force | Out-Null
           Copy-Item "v023/ai_bridge/Send_to_VectorCraft.jsx" "dist/AI Bridge/"
           Copy-Item "v023/ai_bridge/README.txt" "dist/AI Bridge/"
-          Copy-Item v024/RELEASE_0_20_0.md dist/
+          Copy-Item v024/RELEASE_0_20_1.md dist/
           git -C vectorcraft rev-parse HEAD | Set-Content "dist/UPSTREAM_COMMIT.txt"
           git rev-parse HEAD | Set-Content "dist/BUILD_COMMIT.txt"
           Get-FileHash "dist/vectorcraft.exe" -Algorithm SHA256 | Format-List | Out-String | Set-Content "dist/SHA256.txt"
@@ -306,7 +306,7 @@ jobs:
           $versionFile = Join-Path (Resolve-Path dist).Path "VERSION.txt"
           $versionProcess = Start-Process -FilePath (Resolve-Path dist/vectorcraft.exe).Path -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
           $version = [string](Get-Content $versionFile -Raw)
-          if ($versionProcess.ExitCode -ne 0 -or $version.Trim() -ne "vectorcraft 0.24.1 (Leo Design Core Bridge 0.20.0; Leo Snapping)") { throw "EXE build identity smoke test failed" }
+          if ($versionProcess.ExitCode -ne 0 -or $version.Trim() -ne "vectorcraft 0.24.1 (Leo Design Core Bridge 0.20.1; Leo Snapping)") { throw "EXE build identity smoke test failed" }
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
@@ -367,7 +367,7 @@ jobs:
           $versionFile = Join-Path $installDir "installed-version.txt"
           $versionProcess = Start-Process -FilePath $installed -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
           $version = [string](Get-Content $versionFile -Raw)
-          if ($versionProcess.ExitCode -ne 0 -or $version.Trim() -ne "vectorcraft 0.24.1 (Leo Design Core Bridge 0.20.0; Leo Snapping)") { throw "Installed EXE identity check failed" }
+          if ($versionProcess.ExitCode -ne 0 -or $version.Trim() -ne "vectorcraft 0.24.1 (Leo Design Core Bridge 0.20.1; Leo Snapping)") { throw "Installed EXE identity check failed" }
           Get-FileHash $installer -Algorithm SHA256 | Format-List | Out-String | Set-Content overlay-output/SHA256.txt
           Copy-Item overlay-source/BUILD_COMMIT.txt overlay-output/
           Copy-Item overlay-source/UPSTREAM_COMMIT.txt overlay-output/

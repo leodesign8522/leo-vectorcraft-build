@@ -2,6 +2,7 @@
 enum ExtensionTarget {
     Anchor,
     Edge(PathSeg, f64),
+    Alignment { anchor: Point, vertical: bool },
 }
 
 #[derive(Clone, Copy)]
@@ -11,11 +12,68 @@ pub(in crate::guides) struct LeoExtensionContact {
     target: ExtensionTarget,
 }
 
+impl LeoExtensionIndex {
+    fn index_alignment_anchors(&mut self, scene: &LeoScene, source: NodeId) {
+        // The edited path already supplies the supporting line. Other paths
+        // supply visible reference anchors for horizontal/vertical alignment.
+        self.anchors_by_x = scene.paths.iter()
+            .filter(|entry| entry.node.id != source)
+            .filter_map(|entry| entry.node.path_data())
+            .flat_map(|path| &path.subpaths)
+            .flat_map(|subpath| &subpath.anchors)
+            .map(|anchor| anchor.p)
+            .filter(|point| point.is_finite())
+            .collect();
+        self.anchors_by_y = self.anchors_by_x.clone();
+        self.anchors_by_x.sort_unstable_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+        self.anchors_by_y.sort_unstable_by(|a, b| a.y.total_cmp(&b.y).then(a.x.total_cmp(&b.x)));
+        self.anchors_by_x.dedup();
+        self.anchors_by_y.dedup();
+    }
+
+    fn alignment(
+        &self, line: LeoExtension, query: Point, acquire: f64, view: Option<&crate::ScreenFrame>,
+    ) -> Option<LeoExtensionContact> {
+        let foot = line.at + line.dir * (query - line.at).dot(line.dir);
+        let mut best: Option<(LeoExtensionContact, f64, f64)> = None;
+        for (vertical, anchors, component) in [
+            (true, &self.anchors_by_x, line.dir.x),
+            (false, &self.anchors_by_y, line.dir.y),
+        ] {
+            if component.abs() <= 1e-9 { continue; }
+            let axis = |p: Point| if vertical { p.x } else { p.y };
+            let tolerance = acquire * component.abs();
+            for &anchor in super::within(anchors, |p| axis(*p), axis(foot), tolerance) {
+                if !alignment_anchor_visible(anchor, view) { continue; }
+                let mut point = foot + line.dir * ((axis(anchor) - axis(foot)) / component);
+                // Make the guide exactly horizontal or vertical even after rounding.
+                if vertical { point.x = anchor.x; } else { point.y = anchor.y; }
+                let distance = point.distance(query);
+                let span = point.distance(anchor);
+                if !distance.is_finite() || distance > acquire || span <= 1e-7 { continue; }
+                if best.is_none_or(|(_, old_distance, old_span)| {
+                    distance < old_distance - 1e-7 || ((distance - old_distance).abs() <= 1e-7 && span < old_span)
+                }) {
+                    let target = ExtensionTarget::Alignment { anchor, vertical };
+                    best = Some((LeoExtensionContact { line, point, target }, distance, span));
+                }
+            }
+        }
+        best.map(|(contact, _, _)| contact)
+    }
+}
+
+fn alignment_anchor_visible(anchor: Point, view: Option<&crate::ScreenFrame>) -> bool {
+    view.is_none_or(|view| view.to_screen(anchor).is_some_and(|(x, y)| {
+        (0.0..=view.size.0).contains(&x) && (0.0..=view.size.1).contains(&y)
+    }))
+}
+
 impl Targets {
     /// Keep one supporting line during this drag. Alt extends its hold while
     /// still measuring target capture and release along the constrained line.
     pub(in crate::guides) fn leo_snap_extension_contact(
-        &self, p: Point, acquire: f64, release: f64, alt: bool,
+        &self, p: Point, acquire: f64, release: f64, alt: bool, view: Option<&crate::ScreenFrame>,
     ) -> Option<(Point, Vec<Overlay>)> {
         let held = self.leo_extension.get().filter(|line| {
             p.is_finite() && (alt || line.project(p, release).is_some())
@@ -24,9 +82,13 @@ impl Targets {
             self.leo_extension_contact.set(None);
         }
         let query = held.filter(|_| alt).map_or(p, |line| line.at + line.dir * (p - line.at).dot(line.dir));
-        if let Some(hit) = self.leo_extension_contact.get()
-            && Some(hit.line) == held && hit.point.distance(query) <= release
-        {
+        let previous = self.leo_extension_contact.get()
+            .filter(|hit| Some(hit.line) == held && hit.point.distance(query) <= release)
+            .filter(|hit| match hit.target {
+                ExtensionTarget::Alignment { anchor, .. } => alignment_anchor_visible(anchor, view),
+                _ => true,
+            });
+        if let Some(hit) = previous.filter(|hit| !matches!(hit.target, ExtensionTarget::Alignment { .. })) {
             return Some((hit.point, self.extension_feedback(hit.line, hit.point, acquire, Some(hit.target))));
         }
         self.leo_extension_contact.set(None);
@@ -59,6 +121,11 @@ impl Targets {
                 choose_extension_contact(&mut best, LeoExtensionContact { line, point, target: ExtensionTarget::Edge(segment, t) }, query);
             }
         }
+        // Physical contact has priority. Only add an alignment once the
+        // extension is active so isolated axis targets cannot trigger it.
+        let best = best.or(previous).or_else(|| {
+            self.leo_extension_index.as_ref()?.alignment(held?, query, acquire, view)
+        });
         if let Some(hit) = best {
             self.leo_extension.set(Some(hit.line));
             self.leo_extension_contact.set(Some(hit));
@@ -83,6 +150,8 @@ impl Targets {
             None => ("延长线吸附", EXTENSION_HIT),
             Some(ExtensionTarget::Anchor) => ("延长线 · 命中锚点", ANCHOR_HIT),
             Some(ExtensionTarget::Edge(..)) => ("延长线 · 命中边缘", PATH_HIT),
+            Some(ExtensionTarget::Alignment { vertical: true, .. }) => ("延长线 · 垂直对齐锚点", ANCHOR_HIT),
+            Some(ExtensionTarget::Alignment { vertical: false, .. }) => ("延长线 · 水平对齐锚点", ANCHOR_HIT),
         };
         let mut guides = vec![];
         if self.style.lines {
@@ -100,6 +169,11 @@ impl Targets {
                 path.push(part.as_path_el());
                 guides.push(Overlay::Path { path: path.clone(), color: [0x20, 0x24, 0x2b], width: 6.0, dashed: false });
                 guides.push(Overlay::Path { path, color: PATH_HIT, width: 3.5, dashed: false });
+            }
+            if let Some(ExtensionTarget::Alignment { anchor, .. }) = target {
+                guides.push(Overlay::Line { a: q, b: anchor, color: ANCHOR_HIT, dashed: true });
+                guides.push(Overlay::CurvePoint { p: anchor, color: [0x20, 0x24, 0x2b], filled: true, size: 16.0 });
+                guides.push(Overlay::CurvePoint { p: anchor, color: ANCHOR_HIT, filled: false, size: 14.0 });
             }
             let size = if target.is_some() { 14.0 } else { 10.0 };
             guides.push(Overlay::CurvePoint { p: q, color: [0x20, 0x24, 0x2b], filled: true, size: size + 2.0 });
@@ -128,6 +202,20 @@ mod leo_extension_contact_tests {
     use super::*;
 
     #[test]
+    fn leo_snapping_engine_extension_aligns_vertically_within_capture_distance() {
+        let scene = LeoScene { paths: vec![], rectangles: vec![], centers: false };
+        let mut index = LeoExtensionIndex::new(&scene, Point::ORIGIN);
+        let anchor = Point::new(60.0, 220.0);
+        index.anchors_by_x.push(anchor);
+        index.anchors_by_y.push(anchor);
+        let line = LeoExtension::new(Point::ORIGIN, Point::new(100.0, 100.0)).unwrap();
+        let hit = index.alignment(line, Point::new(57.0, 58.0), 8.0, None).unwrap();
+        assert!(hit.point.distance(Point::new(60.0, 60.0)) < 1e-8);
+        assert!(matches!(hit.target, ExtensionTarget::Alignment { anchor: p, vertical: true } if p == anchor));
+        assert!(index.alignment(line, Point::new(51.0, 51.0), 8.0, None).is_none());
+    }
+
+    #[test]
     fn leo_snapping_engine_extension_highlights_real_cubic_at_crossing() {
         use vectorcraft_geom::kurbo::{CubicBez, ParamCurveExtrema};
         let mut targets = Targets::default();
@@ -135,7 +223,7 @@ mod leo_extension_contact_tests {
         let curve = CubicBez::new((-20.0, 100.0), (0.0, 130.0), (20.0, 130.0), (40.0, 100.0));
         targets.segments.push((ParamCurveExtrema::bounding_box(&curve), PathSeg::Cubic(curve)));
         let want = curve.eval(0.5);
-        let (point, guides) = targets.leo_snap_extension_contact(Point::new(13.0, 120.0), 8.0, 12.8, false).unwrap();
+        let (point, guides) = targets.leo_snap_extension_contact(Point::new(13.0, 120.0), 8.0, 12.8, false, None).unwrap();
         assert!(point.distance(want) < 1e-8);
         assert!(guides.iter().any(|guide| matches!(guide, Overlay::Path { path, color, dashed: false, .. }
             if *color == PATH_HIT && path.elements().iter().any(|element| matches!(element, vectorcraft_geom::kurbo::PathEl::CurveTo(..))))));
@@ -150,17 +238,17 @@ mod leo_extension_contact_tests {
         targets.points.push((Point::new(10.0, 140.0), Kind::Anchor));
         targets.points.push((Point::new(12.0, 175.0), Kind::Anchor));
 
-        let (p, edge_guides) = targets.leo_snap_extension_contact(Point::new(12.0, 98.0), 8.0, 12.8, false).unwrap();
+        let (p, edge_guides) = targets.leo_snap_extension_contact(Point::new(12.0, 98.0), 8.0, 12.8, false, None).unwrap();
         assert!(p.distance(Point::new(10.0, 100.0)) < 1e-8);
         assert!(edge_guides.iter().any(|o| matches!(o, Overlay::Line { color, dashed: true, .. } if *color == EXTENSION_HIT)));
         assert!(edge_guides.iter().any(|o| matches!(o, Overlay::Path { color, dashed: false, .. } if *color == PATH_HIT)));
 
-        let (p, anchor_guides) = targets.leo_snap_extension_contact(Point::new(40.0, 138.0), 8.0, 12.8, true).unwrap();
+        let (p, anchor_guides) = targets.leo_snap_extension_contact(Point::new(40.0, 138.0), 8.0, 12.8, true, None).unwrap();
         assert_eq!(p, Point::new(10.0, 140.0));
         assert!(anchor_guides.iter().any(|o| matches!(o, Overlay::CurvePoint { p, color, .. } if *p == Point::new(10.0, 140.0) && *color == ANCHOR_HIT)));
-        let (p, guides) = targets.leo_snap_extension_contact(Point::new(40.0, 175.0), 8.0, 12.8, true).unwrap();
+        let (p, guides) = targets.leo_snap_extension_contact(Point::new(40.0, 175.0), 8.0, 12.8, true, None).unwrap();
         assert_eq!(p, Point::new(10.0, 175.0));
         assert!(guides.iter().any(|o| matches!(o, Overlay::Label { text, .. } if text == "延长线吸附")));
-        assert!(targets.leo_snap_extension_contact(Point::new(40.0, 175.0), 8.0, 12.8, false).is_none());
+        assert!(targets.leo_snap_extension_contact(Point::new(40.0, 175.0), 8.0, 12.8, false, None).is_none());
     }
 }

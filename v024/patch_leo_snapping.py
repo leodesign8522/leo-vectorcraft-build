@@ -170,7 +170,7 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
             if shift || !cx.smart_guides {
                 targets.leo_extension.set(None);
                 targets.leo_extension_contact.set(None);
-            } else if let Some(hit) = targets.leo_snap_extension_contact(p, cx.tol(8.0), cx.tol(12.8), lock_extension) {
+            } else if let Some(hit) = targets.leo_snap_extension_contact(p, cx.tol(8.0), cx.tol(12.8), lock_extension, cx.screen.as_ref()) {
                 return hit;
             }
             if cx.smart_guides {
