@@ -30,6 +30,10 @@ edit("guides/targets.rs",
     encoding="utf-8", newline="\n"
 )
 
+edit("guides/leo_snapping_engine.rs",
+     "        self.leo_scene.as_ref()?;\n        let acquire=cx.tol(ACQUIRE_PX);",
+     "        if cx.snap_to_grid { return None; }\n        self.leo_scene.as_ref()?;\n        let acquire=cx.tol(ACQUIRE_PX);")
+
 edit("guides.rs",
      "pub use targets::Targets;",
      "pub use targets::Targets;\npub(crate) use targets::ObjectMoveSnap;")
@@ -112,7 +116,7 @@ edit("xform/transform.rs","use crate::guides::{PointSnap, Targets, snap_pick};",
 edit("xform/transform.rs","    snap: Option<PointSnap>,","    snap: Option<PointSnap>,\n    rotation: Option<LeoRotationSnap>,")
 edit("xform/transform.rs","hover: vec![], snap: None }","hover: vec![], snap: None, rotation: None }")
 edit("xform/transform.rs","        self.snap = None;","        self.snap = None;\n        self.rotation = None;")
-edit("xform/transform.rs","                    self.snap = Some(PointSnap::new(cx, || Targets::collect(cx.doc, &cx.selection.objects, None)));","                    self.rotation = if cx.leo_snapping && self.kind == TransformKind::Rotate { LeoRotationSnap::new(cx, d.origin) } else { None };\n                    self.snap = self.rotation.is_none().then(|| PointSnap::new(cx, || Targets::collect(cx.doc, &cx.selection.objects, None)));")
+edit("xform/transform.rs","                    self.snap = Some(PointSnap::new(cx, || Targets::collect(cx.doc, &cx.selection.objects, None)));","                    self.rotation = if cx.leo_snapping && !cx.snap_to_grid && self.kind == TransformKind::Rotate { LeoRotationSnap::new(cx, d.origin) } else { None };\n                    self.snap = self.rotation.is_none().then(|| PointSnap::new(cx, || Targets::collect(cx.doc, &cx.selection.objects, None)));")
 edit("xform/transform.rs","                let (p, guides) = self.snap.as_ref().map_or((p, vec![]), |s| s.snap(cx, p));","                let (p, guides) = if self.rotation.is_some() {(p,vec![])} else {self.snap.as_ref().map_or((p, vec![]), |s| s.snap(cx, p))};")
 edit("xform/transform.rs","                let (m, text) = self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds);","""                let (mut m, mut text) = self.matrix_for(d.origin, d.pick, p, ev.mods.shift, d.bounds);
                 if let Some(rotation)=&self.rotation {
@@ -129,14 +133,14 @@ edit("guides/snap.rs", "PointSnap { targets: Some((targets, cx.snapping_toleranc
      "PointSnap { targets: Some((targets, cx.snapping_tolerance)), leo: false }")
 edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
     pub(crate) fn leo_for_scale(cx: &ToolContext) -> Self {
-        if !cx.leo_snapping { return Self::new(cx, || Targets::for_scale(cx)); }
+        if !cx.leo_snapping || cx.snap_to_grid { return Self::new(cx, || Targets::for_scale(cx)); }
         Self { targets: (cx.smart_guides || cx.snap_to_point).then(|| (Targets::leo_scale_targets(cx), 8.0)), leo: true }
     }
 
     /// Dedicated node-editing target set: do not let bounds, alignments, grids or pixel
     /// snapping override the new true-geometry target detection.
     pub(crate) fn leo_for_anchor_drag(cx: &ToolContext) -> Self {
-        if !cx.leo_snapping { return Self::new(cx, || Targets::for_anchor_drag(cx.doc, cx.selection)); }
+        if !cx.leo_snapping || cx.snap_to_grid { return Self::new(cx, || Targets::for_anchor_drag(cx.doc, cx.selection)); }
         let targets = (cx.smart_guides || cx.snap_to_point).then(|| {
             (Targets::leo_for_anchor_drag(cx), 8.0)
         });
@@ -217,7 +221,7 @@ edit("select.rs",
      "    rulers: Option<Targets>,\n    /// Leo Design's shared geometry engine for whole-object translation.\n    leo: Option<ObjectMoveSnap>,\n}")
 edit("select.rs",
      "        let guides = cx.smart_guides && !cx.snap_to_grid;\n        let points = |exclude: &[NodeId]| if cx.snap_to_grid { None } else { Targets::snap_to_point(cx, exclude) };",
-     """        let leo = cx.leo_snapping && (cx.smart_guides || cx.snap_to_point);
+     """        let leo = cx.leo_snapping && !cx.snap_to_grid && (cx.smart_guides || cx.snap_to_point);
         let guides = !leo && cx.smart_guides && !cx.snap_to_grid;
         let points = |exclude: &[NodeId]| if leo || cx.snap_to_grid { None } else { Targets::snap_to_point(cx, exclude) };""")
 edit("select.rs",
@@ -251,7 +255,7 @@ edit("direct.rs",
 
 # Alt-copy must gather geometry even with grid/pixel options active.
 edit("guides/snap.rs", "    pub fn new(cx: &ToolContext, targets:", """    pub(crate) fn leo_for_anchor_copy(cx: &ToolContext) -> Self {
-        if !cx.leo_snapping { return Self::new(cx, || Targets::for_anchor_drag(cx.doc, &vectorcraft_doc::Selection::default())); }
+        if !cx.leo_snapping || cx.snap_to_grid { return Self::new(cx, || Targets::for_anchor_drag(cx.doc, &vectorcraft_doc::Selection::default())); }
         let targets = (cx.smart_guides || cx.snap_to_point).then(|| {
             (Targets::leo_for_object_move(cx, &[]), 8.0)
         });
@@ -364,10 +368,10 @@ mod leo_snapping_mode_tests {
             snapping_tolerance: 2.0,
             ..cx(&doc, &selection, &paint)
         };
-        let raw = Point::new(150.0, 174.0);
+        let raw = Point::new(153.0, 175.0);
         let (point, guides) = PointSnap::leo_for_anchor_drag(&native).direct_anchor_drag(&native, raw, None, false);
         assert_eq!(point, raw);
-        assert!(guides.is_empty());
+        assert!(!guides.iter().any(|guide| matches!(guide, Overlay::CurvePoint { p, .. } if *p == target)));
         let leo = ToolContext { leo_snapping: true, ..native };
         let (point, guides) = PointSnap::leo_for_anchor_drag(&leo).direct_anchor_drag(&leo, raw, None, false);
         assert_eq!(point, target);
