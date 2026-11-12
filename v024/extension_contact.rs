@@ -133,7 +133,7 @@ mod leo_extension_contact_tests {
         let mut targets = Targets::default();
         targets.extensions.push((Point::new(10.0, 10.0), Vec2::new(0.0, 1.0)));
         let curve = CubicBez::new((-20.0, 100.0), (0.0, 130.0), (20.0, 130.0), (40.0, 100.0));
-        targets.segments.push((curve.bounding_box(), PathSeg::Cubic(curve)));
+        targets.segments.push((ParamCurveExtrema::bounding_box(&curve), PathSeg::Cubic(curve)));
         let want = curve.eval(0.5);
         let (point, guides) = targets.leo_snap_extension_contact(Point::new(13.0, 120.0), 8.0, 12.8, false).unwrap();
         assert!(point.distance(want) < 1e-8);
