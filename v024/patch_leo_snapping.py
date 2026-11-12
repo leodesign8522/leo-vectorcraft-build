@@ -21,10 +21,10 @@ def edit(rel, old, new, expected=1):
 
 edit("guides/targets.rs",
      "pub struct Targets {",
-     "pub struct Targets {\n    pub(super) leo_scale: std::cell::RefCell<Option<LeoScaleLock>>,\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_intersection: std::cell::Cell<Option<LeoIntersectionLock>>,\n    pub(super) leo_drag_origin: Option<Point>,\n    pub(super) leo_extension: std::cell::Cell<Option<LeoExtension>>,\n    pub(super) leo_extension_index: Option<LeoExtensionIndex>,\n    pub(super) leo_scene: Option<LeoScene>,")
+     "pub struct Targets {\n    pub(super) leo_scale: std::cell::RefCell<Option<LeoScaleLock>>,\n    pub(super) leo_snap: std::cell::Cell<Option<SnapLock>>,\n    pub(super) leo_intersection: std::cell::Cell<Option<LeoIntersectionLock>>,\n    pub(super) leo_drag_origin: Option<Point>,\n    pub(super) leo_extension: std::cell::Cell<Option<LeoExtension>>,\n    pub(super) leo_extension_contact: std::cell::Cell<Option<LeoExtensionContact>>,\n    pub(super) leo_extension_index: Option<LeoExtensionIndex>,\n    pub(super) leo_scene: Option<LeoScene>,")
 edit("guides/targets.rs",
      "use super::snap::",
-     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex, LeoScaleLock, LeoIntersectionLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
+     '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex, LeoScaleLock, LeoIntersectionLock, LeoExtensionContact};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
 (root / "guides/leo_snapping_engine.rs").write_text(
     (legacy / "leo_snapping_engine.rs").read_text(encoding="utf-8")+"\n"+(Path(__file__).with_name("rotation_snapping.rs")).read_text(encoding="utf-8"),
     encoding="utf-8", newline="\n"
@@ -33,6 +33,15 @@ edit("guides/targets.rs",
 edit("guides/leo_snapping_engine.rs",
      "        self.leo_scene.as_ref()?;\n        let acquire=cx.tol(ACQUIRE_PX);",
      "        if cx.snap_to_grid { return None; }\n        self.leo_scene.as_ref()?;\n        let acquire=cx.tol(ACQUIRE_PX);")
+
+edit("guides/leo_snapping_engine.rs",
+     "        // Infinite supporting lines can start far outside the viewport. Bound\n        // painted dash count, without bounding the mathematical snap target.\n        let span=(acquire*64.0).min(1e9);\n        let at=if line.at.distance(q)>span {\n            let sign=if (q-line.at).dot(line.dir)<0.0 {-1.0} else {1.0};\n            q-line.dir*(sign*span)\n        } else {line.at};\n        let mut guides = vec![];\n        if self.style.lines {\n            let mut outline=BezPath::new(); outline.move_to(at); outline.line_to(q);\n            guides.push(Overlay::Path {path:outline,color:[0x20,0x24,0x2b],width:3.5,dashed:true});\n            guides.push(Overlay::Line { a:at,b:q,color:EXTENSION_HIT,dashed:true });\n            guides.push(Overlay::CurvePoint { p:q,color:[0x20,0x24,0x2b],filled:true,size:12.0 });\n            guides.push(Overlay::CurvePoint { p:q,color:EXTENSION_HIT,filled:false,size:10.0 });\n        }\n        if self.style.labels { guides.push(Overlay::Label { p:q,text:\"延长线吸附\".into(),color:EXTENSION_HIT }); }\n        Some((q,guides))",
+     "        Some((q, self.extension_feedback(line, q, acquire, None)))")
+edit("guides/leo_snapping_engine.rs",
+     "fn guide_path_intersections(targets: &Targets, p: Point, at: Point, dir: Vec2, reach: f64) -> Vec<Point> {\n    if !p.is_finite() || !at.is_finite() || !dir.x.is_finite() || !dir.y.is_finite()\n        || !reach.is_finite() || reach <= 0.0 { return vec![]; }\n    let length = dir.hypot();\n    if length <= 1e-9 || !length.is_finite() { return vec![]; }\n    let u = dir / length;\n    let foot = at + u * (p - at).dot(u);\n    if !foot.is_finite() || foot.distance(p) > reach { return vec![]; }\n    let cutter = Line::new(foot - u * reach, foot + u * reach);\n    let mut out = Vec::new();\n    for (bounds, segment) in &targets.segments {\n        if !overlaps(*bounds, Rect::from_points(p, p).inflate(reach, reach)) { continue; }\n        if let PathSeg::Line(edge) = segment {\n            let v = edge.p1 - edge.p0;\n            let edge_length = v.hypot();\n            // Coincident edges are path contacts, not an isolated crossing.\n            if edge_length <= 1e-9 || (v.x * u.y - v.y * u.x).abs() <= 1e-9 * edge_length {\n                continue;\n            }\n        }\n        for hit in segment.intersect_line(cutter) {\n            let q = cutter.eval(hit.line_t);\n            if q.is_finite() && q.distance(p) <= reach + 1e-8 {\n                push_unique(&mut out, q);\n            }\n        }\n    }\n    out\n}",
+     "fn guide_path_intersections(targets: &Targets, p: Point, at: Point, dir: Vec2, reach: f64) -> Vec<Point> {\n    let mut points = Vec::new();\n    for (point, _, _) in guide_path_hits(targets, p, at, dir, reach) {\n        push_unique(&mut points, point);\n    }\n    points\n}\n\nfn guide_path_hits(targets: &Targets, p: Point, at: Point, dir: Vec2, reach: f64) -> Vec<(Point, PathSeg, f64)> {\n    if !p.is_finite() || !at.is_finite() || !dir.x.is_finite() || !dir.y.is_finite()\n        || !reach.is_finite() || reach <= 0.0 { return vec![]; }\n    let length = dir.hypot();\n    if length <= 1e-9 || !length.is_finite() { return vec![]; }\n    let u = dir / length;\n    let foot = at + u * (p - at).dot(u);\n    if !foot.is_finite() || foot.distance(p) > reach { return vec![]; }\n    let cutter = Line::new(foot - u * reach, foot + u * reach);\n    let mut out = Vec::new();\n    for (bounds, segment) in &targets.segments {\n        if !overlaps(*bounds, Rect::from_points(p, p).inflate(reach, reach)) { continue; }\n        if let PathSeg::Line(edge) = segment {\n            let v = edge.p1 - edge.p0;\n            let edge_length = v.hypot();\n            // Coincident edges are path contacts, not an isolated crossing.\n            if edge_length <= 1e-9 || (v.x * u.y - v.y * u.x).abs() <= 1e-9 * edge_length {\n                continue;\n            }\n        }\n        for hit in segment.intersect_line(cutter) {\n            let q = cutter.eval(hit.line_t);\n            if q.is_finite() && q.distance(p) <= reach + 1e-8 {\n                out.push((q, *segment, hit.segment_t.clamp(0.0, 1.0)));\n            }\n        }\n    }\n    out\n}")
+with (root / "guides/leo_snapping_engine.rs").open("a", encoding="utf-8") as engine:
+    engine.write("\n" + Path(__file__).with_name("extension_contact.rs").read_text(encoding="utf-8"))
 
 edit("guides.rs",
      "pub use targets::Targets;",
@@ -153,11 +162,17 @@ edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
         self.targets.as_ref().is_some_and(|(targets, _)| targets.leo_snap.get().is_some() || targets.leo_extension.get().is_some() || targets.leo_intersection.get().is_some())
     }
 
-    pub(crate) fn direct_anchor_drag(&self, cx: &ToolContext, p: Point, from: Option<&Leave>, shift: bool) -> (Point, Vec<Overlay>) {
+    pub(crate) fn direct_anchor_drag(&self, cx: &ToolContext, p: Point, from: Option<&Leave>, shift: bool, lock_extension: bool) -> (Point, Vec<Overlay>) {
         if !self.leo { return self.snap_from(cx, p, from); }
         let constrained = if shift { from.and_then(|f| f.constrained(p)) } else { None };
         let p = constrained.unwrap_or(p);
         if let Some((targets, _)) = &self.targets {
+            if shift || !cx.smart_guides {
+                targets.leo_extension.set(None);
+                targets.leo_extension_contact.set(None);
+            } else if let Some(hit) = targets.leo_snap_extension_contact(p, cx.tol(8.0), cx.tol(12.8), lock_extension) {
+                return hit;
+            }
             if cx.smart_guides {
                 if let Some(hit)=targets.leo_snap_path_intersection(p,from,shift,cx.tol(8.0),cx.tol(12.8)) {return hit;}
             }
@@ -242,16 +257,16 @@ edit("direct.rs",
      "PointSnap::leo_for_anchor_drag(cx)", expected=3)
 edit("direct.rs",
      "snap.snap_from(cx, grab + (p - start), shift.as_ref().or(self.line_end.as_ref()))",
-     "snap.direct_anchor_drag(cx, grab + (p - start), shift.as_ref().or(self.line_end.as_ref()), ev.mods.shift)")
+     "snap.direct_anchor_drag(cx, grab + (p - start), shift.as_ref().or(self.line_end.as_ref()), ev.mods.shift, ev.mods.alt && !segment)")
 edit("direct.rs",
      "snap.snap_from(cx, held + (p - start), shift.as_ref())",
-     "snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift)")
+     "snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift, false)")
 # When a whole path is selected, pressing one of its anchors enters
 # MoveObject (not MoveAnchors). This path previously fell through to
 # PointSnap::snap_from and completely bypassed our new geometry engine.
 edit("direct.rs",
      "snap.snap_from(cx, grab + (p - start), shift.as_ref())",
-     "snap.direct_anchor_drag(cx, grab + (p - start), shift.as_ref(), ev.mods.shift)")
+     "snap.direct_anchor_drag(cx, grab + (p - start), shift.as_ref(), ev.mods.shift, false)")
 
 # Alt-copy must gather geometry even with grid/pixel options active.
 edit("guides/snap.rs", "    pub fn new(cx: &ToolContext, targets:", """    pub(crate) fn leo_for_anchor_copy(cx: &ToolContext) -> Self {
@@ -269,13 +284,13 @@ edit("direct.rs", '''            if let Some(grid) = &self.partial_grid {
                 (d, self.guides) = if ev.mods.shift { grid.snap_along(cx, held, d, false) } else { grid.snap(cx, held, d, false) };
             } else {
                 let shift = ev.mods.shift.then(|| Leave::segment(cx, held, true));
-                let (q, guides) = snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift);
+                let (q, guides) = snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift, false);
                 (d, self.guides) = (q - held, guides);
             }''', '''            if let Some(grid) = &self.partial_grid && !snap.uses_leo() {
                 (d, self.guides) = if ev.mods.shift { grid.snap_along(cx, held, d, false) } else { grid.snap(cx, held, d, false) };
             } else {
                 let shift = ev.mods.shift.then(|| Leave::segment(cx, held, true));
-                let (q, guides) = snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift);
+                let (q, guides) = snap.direct_anchor_drag(cx, held + (p - start), shift.as_ref(), ev.mods.shift, false);
                 (d, self.guides) = (q - held, guides);
                 if !snap.leo_captured() && let Some(grid) = &self.partial_grid {
                     let raw = move_delta(start, p, ev.mods.shift, cx.constrain_angle);
@@ -319,7 +334,7 @@ ui_path=Path(sys.argv[1]) / "crates/ui-egui/src/canvas/overlays.rs"
 ui_source=ui_path.read_text(encoding="utf-8")
 ui_anchor='                let sp = xf.to_screen(*pt) + vec2(8.0, -14.0);'
 if ui_source.count(ui_anchor)!=1: raise SystemExit("FAIL extension label background anchor")
-ui_source=ui_source.replace(ui_anchor,ui_anchor+'\n                if text == "延长线吸附" || text.starts_with("旋转吸附") {\n                    let galley=p.layout_no_wrap(text.to_owned(),egui::FontId::proportional(11.0),c32(*color));\n                    let backdrop=egui::Rect::from_min_size(sp-vec2(3.0,2.0),galley.size()+vec2(6.0,4.0));\n                    p.rect_filled(backdrop,CornerRadius::same(3),Color32::from_rgba_unmultiplied(0x20,0x24,0x2b,235));\n                }\n')
+ui_source=ui_source.replace(ui_anchor,ui_anchor+'\n                if text.starts_with("延长线") || text.starts_with("旋转吸附") {\n                    let galley=p.layout_no_wrap(text.to_owned(),egui::FontId::proportional(11.0),c32(*color));\n                    let backdrop=egui::Rect::from_min_size(sp-vec2(3.0,2.0),galley.size()+vec2(6.0,4.0));\n                    p.rect_filled(backdrop,CornerRadius::same(3),Color32::from_rgba_unmultiplied(0x20,0x24,0x2b,235));\n                }\n')
 ui_path.write_text(ui_source,encoding="utf-8",newline="\n")
 
 # Keep the upstream assertions in native mode. Exercise Leo through its existing
@@ -369,11 +384,11 @@ mod leo_snapping_mode_tests {
             ..cx(&doc, &selection, &paint)
         };
         let raw = Point::new(153.0, 175.0);
-        let (point, guides) = PointSnap::leo_for_anchor_drag(&native).direct_anchor_drag(&native, raw, None, false);
+        let (point, guides) = PointSnap::leo_for_anchor_drag(&native).direct_anchor_drag(&native, raw, None, false, false);
         assert_eq!(point, raw);
         assert!(!guides.iter().any(|guide| matches!(guide, Overlay::CurvePoint { p, .. } if *p == target)));
         let leo = ToolContext { leo_snapping: true, ..native };
-        let (point, guides) = PointSnap::leo_for_anchor_drag(&leo).direct_anchor_drag(&leo, raw, None, false);
+        let (point, guides) = PointSnap::leo_for_anchor_drag(&leo).direct_anchor_drag(&leo, raw, None, false, false);
         assert_eq!(point, target);
         assert!(guides.iter().any(|guide| matches!(guide, Overlay::CurvePoint { p, .. } if *p == target)));
     }
