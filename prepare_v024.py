@@ -16,7 +16,7 @@ patches = ['core_bridge', 'essential_features', 'ai_import', 'svg_clipboard_font
            'smart_interactions', 'live_corner_geometry_link',
            'quick_settings',
            'optional_pie_prefs', 'doc_info_selection', 'action_shortcuts', 'eyedropper_text']
-ported = {'ai_import', 'live_corner_geometry_link'}
+ported = {'ai_import', 'live_corner_geometry_link', 'panel_usability'}
 for name in patches:
     folder = root / 'v024' if name in ported else dest
     subprocess.run([sys.executable, str(folder / f'patch_{name}.py'), sys.argv[1]], check=True)
@@ -26,7 +26,7 @@ for patch in (root / 'v024' / 'patch_text_glyph_bounds.py',
               dest / 'patch_view_navigation.py',
               root / 'v024' / 'patch_direct_whole_selection.py',
               dest / 'patch_ai_export.py',
-              dest / 'patch_ai_bridge.py'):
+              root / 'v024' / 'patch_ai_bridge.py'):
     subprocess.run([sys.executable, str(patch), sys.argv[1]], check=True)
 
 # Keep upstream's partial-geometry clipboard implementation and verify it.
