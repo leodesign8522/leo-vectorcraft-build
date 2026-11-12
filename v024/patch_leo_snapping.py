@@ -125,6 +125,8 @@ edit("xform/transform.rs","                let (m, text) = self.matrix_for(d.ori
 
 edit("guides/snap.rs", "    targets: Option<(Targets, f64)>,\n}", "    targets: Option<(Targets, f64)>,\n    leo: bool,\n}")
 edit("guides/snap.rs", "        Self { targets }", "        Self { targets, leo: false }")
+edit("guides/snap.rs", "PointSnap { targets: Some((targets, cx.snapping_tolerance)) }",
+     "PointSnap { targets: Some((targets, cx.snapping_tolerance)), leo: false }")
 edit("guides/snap.rs", "impl PointSnap {", """impl PointSnap {
     pub(crate) fn leo_for_scale(cx: &ToolContext) -> Self {
         if !cx.leo_snapping { return Self::new(cx, || Targets::for_scale(cx)); }
@@ -249,7 +251,7 @@ edit("direct.rs",
 
 # Alt-copy must gather geometry even with grid/pixel options active.
 edit("guides/snap.rs", "    pub fn new(cx: &ToolContext, targets:", """    pub(crate) fn leo_for_anchor_copy(cx: &ToolContext) -> Self {
-        if !cx.leo_snapping { return Self::new(cx, || Targets::for_anchor_drag(cx.doc, &Selection::default())); }
+        if !cx.leo_snapping { return Self::new(cx, || Targets::for_anchor_drag(cx.doc, &vectorcraft_doc::Selection::default())); }
         let targets = (cx.smart_guides || cx.snap_to_point).then(|| {
             (Targets::leo_for_object_move(cx, &[]), 8.0)
         });
