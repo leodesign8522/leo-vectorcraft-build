@@ -22,19 +22,15 @@ edit('crates/engine/src/cmd/textedit.rs', '        optical_margin: false,', '   
 
 p = root / 'crates/effects/src/preview.rs'
 with p.open('a', encoding='utf-8') as f:
-    f.write('\n' + (here / 'text_glyph_bounds.rs').read_text(encoding='utf-8'))
+    f.write('\n' + Path(__file__).with_name('text_glyph_bounds.rs').read_text(encoding='utf-8'))
 
-for rel in ['crates/tools/src/select.rs', 'crates/engine/src/cmd/object/align.rs']:
-    p = root / rel
-    s = p.read_text(encoding='utf-8')
-    # These two files measure selection controls, not rendering/layout geometry.
-    if rel.endswith('align.rs'):
-        s = s.replace('preview::bounds_of(&self.doc()', 'preview::leo_selection_bounds(&self.doc()')
-        s = s.replace('preview::oriented_bounds(&self.doc()', 'preview::leo_selection_box(&self.doc()')
-    else:
-        s = s.replace('preview::bounds_of(', 'preview::leo_selection_bounds(')
-        s = s.replace('preview::oriented_bounds(', 'preview::leo_selection_box(')
-    p.write_text(s, encoding='utf-8', newline='\n')
+# Core Bridge text controls use the same measurement for selection and transform.
+for rel, count_bounds, count_box in (
+    ('crates/tools/src/select.rs', 2, 1),
+    ('crates/engine/src/cmd/object/align.rs', 1, 1),
+):
+    edit(rel, 'preview::bounds_of_with(', 'preview::leo_selection_bounds_with(', count_bounds)
+    edit(rel, 'preview::oriented_bounds_with(', 'preview::leo_selection_box_with(', count_box)
 
 edit('crates/engine/src/cmd/object/align.rs',
      'return effects::preview::bounds_of(d, ids, self.preview);',
@@ -52,29 +48,17 @@ edit('crates/engine/src/cmd/object/align.rs',
 edit('crates/tools/src/select.rs',
      'let is_area = |id: &NodeId| cx.doc.node(*id).is_some_and(is_area_type);',
      'let is_area = |id: &NodeId| cx.doc.node(*id).is_some_and(|n| is_area_type(n) && !matches!(&n.kind, vectorcraft_doc::NodeKind::Text(t) if t.leo_glyph_bounds));')
-# Preserve the upstream document-wide point-type preference. The per-object
-# setting also applies to area type and mixed/grouped selections.
+# Preserve upstream point-type measurement and honor the per-object area-type option.
 edit('crates/engine/src/cmd/object/bounds.rs',
      'let frame = effects::preview::oriented_bounds_with(d, &ids, geometric).ok_or_else',
      '''let leo_glyphs = effects::preview::leo_has_glyph_bounds(d, &ids);
-    let frame = (if leo_glyphs {
-        effects::preview::leo_selection_box(d, &ids, false)
-    } else {
-        effects::preview::oriented_bounds_with(d, &ids, geometric)
-    }).ok_or_else''')
+    let frame = effects::preview::leo_selection_box_with(d, &ids, geometric).ok_or_else''')
 edit('crates/engine/src/cmd/object/bounds.rs',
      '        let v = effects::preview::oriented_bounds_with(d, &ids, how).map_or(g, |b| b.rect);',
-     '''        let v = if leo_glyphs {
-            effects::preview::leo_selection_box(d, &ids, true)
-        } else {
-            effects::preview::oriented_bounds_with(d, &ids, how)
-        }.map_or(g, |b| b.rect);
-        if leo_glyphs { (v, v) } else {
-            (v, if by_glyphs { v } else { scaling_box(d, &ids, &frame).unwrap_or(g) })
-        }''')
+     '        let v = effects::preview::leo_selection_box_with(d, &ids, how).map_or(g, |b| b.rect);')
 edit('crates/engine/src/cmd/object/bounds.rs',
-     '\n        }\n        (v, if by_glyphs { v } else { scaling_box(d, &ids, &frame).unwrap_or(g) })',
-     '\n        }')
+     '(v, if by_glyphs { v } else { scaling_box(d, &ids, &frame).unwrap_or(g) })',
+     '(v, if by_glyphs || leo_glyphs { v } else { scaling_box(d, &ids, &frame).unwrap_or(g) })')
 edit('crates/engine/src/cmd/object/bounds.rs',
      'let solved = if !(s.prefs.use_preview_bounds && w >= 0.0 && h >= 0.0) {',
      'let solved = if leo_glyphs || !(s.prefs.use_preview_bounds && w >= 0.0 && h >= 0.0) {')
