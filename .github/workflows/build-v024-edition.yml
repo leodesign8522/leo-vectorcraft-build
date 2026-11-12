@@ -192,12 +192,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Text glyph selection bounds regressions failed" }
           cargo test --locked -p vectorcraft-engine leo_segment_copy -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Selected-segment extraction, Copy/Cut, paste and undo regressions failed" }
-      - name: Test native clipboard guides
+      - name: Test native ruler guide layers and clipboard
         shell: pwsh
         working-directory: vectorcraft
         run: |
           cargo test --locked -p vectorcraft-engine guide_clipboard -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native guide clipboard regressions failed" }
+          cargo test --locked -p vectorcraft-engine --test it ruler_guide_nodes -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native ruler guide layer regressions failed" }
       - name: Test live corner endpoint movement, regeneration and undo
         # Shared backend source is identical in both editions; validate it once.
         shell: pwsh

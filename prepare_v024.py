@@ -29,6 +29,8 @@ for patch in (root / 'v024' / 'patch_text_glyph_bounds.py',
               root / 'v024' / 'patch_ai_bridge.py'):
     subprocess.run([sys.executable, str(patch), sys.argv[1]], check=True)
 
+subprocess.run([sys.executable, str(root / 'v024' / 'patch_ruler_guide_consumers.py'), sys.argv[1]], check=True)
+
 # Keep upstream's partial-geometry clipboard implementation and verify it.
 clipboard = upstream / 'crates/engine/src/tests/clipboard.rs'
 with clipboard.open('a', encoding='utf-8') as file:
