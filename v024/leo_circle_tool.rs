@@ -51,7 +51,7 @@ impl Pick {
         if !(1e-6..1.0 - 1e-6).contains(&t) { return None; }
         let original = cx.doc.node(self.id)?.path_data()?.subpaths.get(self.sub)?.segment(self.index);
         let t = if matches!(self.segment, PathSeg::Line(_)) {
-            use vectorcraft_geom::ParamCurveNearest;
+            use vectorcraft_geom::kurbo::ParamCurveNearest;
             original.nearest(self.point(t), 1e-9).t
         } else { t };
         (1e-6..1.0 - 1e-6).contains(&t).then_some((self, t))
