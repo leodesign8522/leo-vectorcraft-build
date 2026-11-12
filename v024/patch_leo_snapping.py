@@ -350,6 +350,17 @@ for source, destination in (
     if source in {"direct_regressions.rs", "select_regressions.rs", "rotation_tool_regressions.rs"}:
         source_text = re.sub(r"\bcx\(", "crate::testutil::leo_cx(", source_text)
         source_text = source_text.replace("use crate::testutil::{cx,paint};", "use crate::testutil::paint;")
+    if source == "direct_regressions.rs":
+        old_label = '        assert!(labels == vec!["path".to_string()] || labels == vec!["参考线交点".to_string()], "unexpected label: {labels:?}");'
+        new_label = '''        if shift {
+            assert!(labels == ["path"] || labels == ["参考线交点"], "{labels:?}");
+        } else {
+            assert_eq!(labels, ["延长线 · 命中边缘"]);
+        }'''
+        if source_text.count(old_label) != 2:
+            raise SystemExit("Unexpected dense drag regression fixture")
+        source_text = source_text.replace(old_label, new_label, 1)
+        source_text += "\n" + Path(__file__).with_name("extension_tool_regressions.rs").read_text(encoding="utf-8")
     with (root / destination).open("a", encoding="utf-8") as file:
         file.write("\n" + source_text)
 
