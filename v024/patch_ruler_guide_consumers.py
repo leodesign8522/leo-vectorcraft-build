@@ -37,7 +37,7 @@ replace(
     '''    assert!(prepare(&framed,"far-rotated").is_ok());
 
     let mut with_guide = framed.clone();
-    let guide = vectorcraft_doc::guides::Guide::new(true, 14200.0);
+    let guide = vectorcraft_doc::Guide::new(true, 14200.0);
     with_guide.add_ruler_guide(&guide);
     assert_eq!(simple_geometry_witness(&with_guide), Some(witness));''',
 )
