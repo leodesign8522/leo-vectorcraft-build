@@ -26,7 +26,7 @@ edit("guides/targets.rs",
      "use super::snap::",
      '#[path = "leo_snapping_engine.rs"]\nmod leo_snapping_engine;\nuse leo_snapping_engine::{LeoScene, SnapLock, LeoExtension, LeoExtensionIndex, LeoScaleLock, LeoIntersectionLock};\npub(crate) use leo_snapping_engine::ObjectMoveSnap;\n\nuse super::snap::')
 (root / "guides/leo_snapping_engine.rs").write_text(
-    (legacy / "leo_snapping_engine.rs").read_text(encoding="utf-8")+"\n"+(legacy / "rotation_snapping.rs").read_text(encoding="utf-8"),
+    (legacy / "leo_snapping_engine.rs").read_text(encoding="utf-8")+"\n"+(Path(__file__).with_name("rotation_snapping.rs")).read_text(encoding="utf-8"),
     encoding="utf-8", newline="\n"
 )
 

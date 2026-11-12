@@ -25,13 +25,13 @@ edit("crates/engine/src/cmd/prefscmds.rs",
      '    p!("smartGuideColor", "Smart Guides", "Display Options", "Color", color),')
 edit("crates/tools/src/context.rs",
      "    pub smart_guides: bool,",
-     "    pub smart_guides: bool,\n    /// Use the Leo Design geometry engine for supported drag gestures.\n    pub leo_snapping: bool,")
+     "    pub smart_guides: bool,\n    /// Use the Leo Design geometry engine for supported drag gestures.\n    pub leo_snapping: bool,\n    /// Show ruler guides as rotation targets even when guides are locked.\n    pub leo_ruler_guides_visible: bool,")
 edit("crates/engine/src/tooling.rs",
      "            smart_guides,\n            guides:",
-     "            smart_guides,\n            leo_snapping: self.prefs.leo_snapping,\n            guides:")
+     "            smart_guides,\n            leo_snapping: self.prefs.leo_snapping,\n            leo_ruler_guides_visible: view.guides,\n            guides:")
 edit("crates/tools/src/lib.rs",
      "            smart_guides: true,\n            guides: true,",
-     "            smart_guides: true,\n            leo_snapping: false,\n            guides: true,")
+     "            smart_guides: true,\n            leo_snapping: false,\n            leo_ruler_guides_visible: true,\n            guides: true,")
 edit("crates/tools/src/lib.rs",
      "    pub fn cx<'a>(d: &'a Document, s: &'a Selection, p: &'a PaintDefaults) -> ToolContext<'a> {",
      """    pub fn leo_cx<'a>(d: &'a Document, s: &'a Selection, p: &'a PaintDefaults) -> ToolContext<'a> {
