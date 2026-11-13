@@ -23,6 +23,7 @@ for name in patches:
 subprocess.run([sys.executable, str(root / 'scripts/patch_color_panel_lock.py'), sys.argv[1]], check=True)
 for patch in (root / 'v024' / 'patch_text_glyph_bounds.py',
               root / 'v024' / 'patch_text_modes.py',
+              root / 'v024' / 'patch_ai_script_positions.py',
               dest / 'patch_view_navigation.py',
               root / 'v024' / 'patch_direct_whole_selection.py',
               dest / 'patch_ai_export.py',
@@ -51,7 +52,7 @@ s = p.read_text(encoding='utf-8')
 old = 'println!("vectorcraft {}", env!("CARGO_PKG_VERSION"));'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.24 executable version identity anchor')
-s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.24.1 (Leo Design Core Bridge 0.20.1; Leo Snapping)\\n");')
+s = s.replace(old, 'let _ = std::io::Write::write_all(&mut std::io::stdout(), b"vectorcraft 0.24.1 (Leo Design Core Bridge 0.20.2; Leo Snapping)\\n");')
 p.write_text(s, encoding='utf-8', newline='\n')
 
 p = Path(sys.argv[1]) / 'crates/ui-egui/src/dialogs/about.rs'
@@ -59,5 +60,5 @@ s = p.read_text(encoding='utf-8')
 old = '    crate::community::links(app, ui);'
 if s.count(old) != 1:
     raise SystemExit('FAIL v0.24 About build identity anchor')
-s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.20.1");\n' + old)
+s = s.replace(old, '    ui.label("Leo Design Core Bridge 0.20.2");\n' + old)
 p.write_text(s, encoding='utf-8', newline='\n')
