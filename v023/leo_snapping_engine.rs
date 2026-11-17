@@ -67,6 +67,8 @@ pub(in crate::guides) struct LeoExtensionIndex {
     origin: Point,
     buckets: Vec<ExtensionBucket>,
     angular_error: f64,
+    anchors_by_x: Vec<Point>,
+    anchors_by_y: Vec<Point>,
 }
 
 impl LeoExtensionIndex {
@@ -74,7 +76,7 @@ impl LeoExtensionIndex {
 
     fn new(scene: &LeoScene, origin: Point) -> Self {
         let width=std::f64::consts::PI/Self::COUNT as f64;
-        let mut out=Self {origin,angular_error:2.0*(width/4.0).sin(),
+        let mut out=Self {origin,anchors_by_x: vec![], anchors_by_y: vec![], angular_error:2.0*(width/4.0).sin(),
             buckets:(0..Self::COUNT).map(|i| {
                 let angle=(i as f64+0.5)*width;
                 ExtensionBucket {normal:Vec2::new(angle.cos(),angle.sin()),entries:vec![]}
@@ -451,7 +453,11 @@ impl Targets {
         if n < 2 || ai >= n { return; }
         if let Some(origin)=sp.anchors.get(ai).map(|a| a.p).filter(|p| p.is_finite()) {
             self.leo_drag_origin=Some(origin);
-            self.leo_extension_index=self.leo_scene.as_ref().map(|scene| LeoExtensionIndex::new(scene,origin));
+            self.leo_extension_index=self.leo_scene.as_ref().map(|scene| {
+                let mut index = LeoExtensionIndex::new(scene, origin);
+                index.index_alignment_anchors(scene, id);
+                index
+            });
         }
         let previous = if ai > 0 { Some(ai - 1) } else if sp.closed { Some(n - 1) } else { None };
         for seg in [previous, (ai < sp.segment_count()).then_some(ai)].into_iter().flatten() {
