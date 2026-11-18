@@ -39,7 +39,7 @@ jobs:
         working-directory: vectorcraft
         shell: pwsh
         run: |
-          cargo test --locked -p vectorcraft-tools leo_path_tools_handle_hover_pick_release_and_clear -- --nocapture
+          cargo test --locked -p vectorcraft-tools leo_path_tools_ -- --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
           exit $LASTEXITCODE
