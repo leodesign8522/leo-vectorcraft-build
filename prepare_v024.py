@@ -48,6 +48,7 @@ subprocess.run([sys.executable, str(root / 'v024' / 'patch_glyph_move.py'), sys.
 subprocess.run([sys.executable, str(root / 'v024' / 'patch_move_crossings.py'), sys.argv[1]], check=True)
 
 subprocess.run([sys.executable, str(root / 'v024' / 'patch_geometry_tools.py'), sys.argv[1]], check=True)
+subprocess.run([sys.executable, str(root / 'v024' / 'path_tools' / 'patch_handle_feedback.py'), sys.argv[1]], check=True)
 
 p = Path(sys.argv[1]) / 'apps/vectorcraft/src/main.rs'
 s = p.read_text(encoding='utf-8')

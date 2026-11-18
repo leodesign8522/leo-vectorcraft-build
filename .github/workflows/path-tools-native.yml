@@ -1,0 +1,45 @@
+name: Leo Path Tools native integration
+on:
+  push:
+    branches: [leo-v024-path-tools]
+    paths:
+      - 'v024/path_tools/**'
+      - 'prepare_v024.py'
+      - '.github/workflows/path-tools-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/vectorcraft
+          ref: f4922aa7ac99a4f6d56fc68a83a44945207ec610
+          path: vectorcraft
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply full Core Bridge migration
+        shell: pwsh
+        run: |
+          python prepare_v024.py vectorcraft
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C vectorcraft diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "vectorcraft -> target"
+          shared-key: "leo-vectorcraft-v018-core-windows-release"
+      - name: Test native direct tool feedback and gestures
+        working-directory: vectorcraft
+        shell: pwsh
+        run: |
+          cargo test --locked -p vectorcraft-tools leo_path_tools_handle_hover_pick_release_and_clear -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
+          exit $LASTEXITCODE
