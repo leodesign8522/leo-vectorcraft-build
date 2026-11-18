@@ -8,7 +8,7 @@ selected handles on one anchor move directly; noncollinear results become
 corners. Engine command validates the whole batch before editing and records
 one undo transaction. Multi-pick requires native multiple-handle visibility.
 Text-on-path handles retain the native single-handle workflow.
-Development additions (native CI verified): press H in Direct Selection, then
+Development additions (core tests passed; revised UI routing pending verification): press H in Direct Selection, then
 drag a handle marquee; Shift toggles enclosed handles. The mode ends on release
 or Escape. L sets selected handle lengths to the first picked handle's length;
 S mirrors each picked handle about its anchor (first pick wins if both sides
@@ -26,8 +26,11 @@ Remaining: dedicated toolbar, numeric input, handle rotation/scaling, extension
 endpoint snapping/direction lock, Smart Remove Brush gesture, Reposition Point
 drag gesture, closed-path support and manual desktop interaction validation.
 The existing Core Bridge single-installer pipeline is retained; no pie menu
-is restored. A single Windows x64 Preview 1 installer is available from
-https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44324563379/artifacts/14440179511
+is restored. Preview 1 is withdrawn from delivery: the actual desktop check
+showed that idle H/L/S presses were not dispatched to Direct Selection, despite
+passing tool-level tests. Do not use artifact 14440179511 as the working preview.
+Preview 2 adds idle UI key routing and real egui key+text frame regressions;
+its installer and desktop checks are pending.
 
 Validation on 2026-11-18, source commit 579562772dd9c850e75968208b97a32f37f66167:
 - Windows native run 44317336544: 3 Path Tools tests, 88 Direct Selection
@@ -37,10 +40,10 @@ Validation on 2026-11-18, source commit 579562772dd9c850e75968208b97a32f37f66167
 - Application GUI, complete application build and installer were not validated
   by these focused test workflows.
 
-Preview packaging, source ae8fd08e2b770dd5156f3a8686e97771b0d3ca4b:
+Historical Preview 1 packaging, source ae8fd08e2b770dd5156f3a8686e97771b0d3ca4b:
 - Run 44324563379 passed the full configured Core Bridge/Path Tools regressions,
   release EXE compilation, version identity check and installer generation.
 - Automatic installation passed: installed EXE hash and version, required files,
   receiver launcher/configuration, and Illustrator sender placement/hash checked.
-- Artifact 14440179511 contains the installer and build/hash records (30-day
-  retention). This remains a preview, not the complete four-tool interface.
+- Artifact 14440179511 passed installer checks, but failed the later desktop
+  H/L interaction check; installation success did not prove keyboard usability.

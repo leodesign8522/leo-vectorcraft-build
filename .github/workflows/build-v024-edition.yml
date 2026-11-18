@@ -112,6 +112,15 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test actual idle Path Tools keyboard routing before packaging
+        if: inputs.path_tools_preview
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui --lib leo_path_tools_ -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Path Tools real keyboard routing regression failed" }
+          cargo test --locked -p vectorcraft-ui-egui --lib shortcuts::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native shortcut compatibility regression failed" }
       - name: Test Leo circle and arc geometry and canvas interaction
         shell: pwsh
         working-directory: vectorcraft
@@ -332,7 +341,7 @@ jobs:
         run: |
           Copy-Item v024/path_tools/README.md dist/PATH_TOOLS_STATUS.md
           @'
-          Leo Design Core Bridge 0.20.4 + Path Tools Preview 1 / VectorCraft 0.24.1
+          ${{ inputs.label }} / VectorCraft 0.24.1
 
           This is a development preview, not the complete four-tool release.
           In Direct Selection, select an artwork path with visible handles.

@@ -13,10 +13,18 @@ def edit(a, b):
 
 edit('    leo_handle_dragged: bool,', '    leo_handle_dragged: bool,\n    leo_marquee: Option<(Point, Point, bool)>,\n    leo_marquee_mode: bool,')
 edit('            leo_handle_dragged: false,', '            leo_handle_dragged: false,\n            leo_marquee: None,\n            leo_marquee_mode: false,')
+edit('fn leo_handle_marker(out: &mut Vec<Overlay>, p: Point, selected: bool) {', '''fn leo_marquee_available(cx: &ToolContext) -> bool {
+    handle_anchors(cx).into_iter().any(|(id,si,ai,_)| {
+        cx.doc.node(id).is_some_and(|n|matches!(&n.kind,NodeKind::Path{guide:false,..}))
+            && (leo_handle_position(cx,(id,si,ai,false)).is_some() || leo_handle_position(cx,(id,si,ai,true)).is_some())
+    })
+}
+
+fn leo_handle_marker(out: &mut Vec<Overlay>, p: Point, selected: bool) {''')
 edit('        !matches!(self.state, State::Idle) || self.guide.busy()',
      '        self.leo_marquee_mode || self.leo_marquee.is_some() || !matches!(self.state, State::Idle) || self.guide.busy()')
 edit('        if key == ToolKey::Escape {', '''        // L equalizes to the first picked handle; S mirrors each picked handle.
-        if !self.group && matches!(self.state, State::Idle) && key == ToolKey::Letter('h') {
+        if !self.group && matches!(self.state, State::Idle) && key == ToolKey::Letter('h') && leo_marquee_available(cx) {
             self.leo_marquee_mode = !self.leo_marquee_mode;
             self.leo_marquee = None;
             return vec![];
@@ -27,6 +35,7 @@ edit('        if key == ToolKey::Escape {', '''        // L equalizes to the fir
             let mut handles = Vec::new();
             let mut length = None;
             for (key, old) in &self.leo_handles {
+                if !cx.doc.node(key.0).is_some_and(|n|matches!(&n.kind,NodeKind::Path{guide:false,..})) {return vec![];}
                 let Some(q) = leo_handle_position(cx, *key) else { return vec![]; };
                 if q.distance(*old) > 1e-6 { return vec![]; }
                 let Some((_, _, _, a)) = handle_anchors(cx).into_iter()
@@ -55,9 +64,10 @@ edit('        if key == ToolKey::Escape {', '''        // L equalizes to the fir
         if key == ToolKey::Escape {
             self.leo_marquee_mode = false;
             self.leo_marquee = None;''')
-edit('        (matches!(self.state, State::Corner(_))', '''        (!self.group && matches!(self.state, State::Idle) && key == ToolKey::Letter('h'))
+edit('        (matches!(self.state, State::Corner(_))', '''        (!self.group && matches!(self.state, State::Idle) && key == ToolKey::Letter('h') && leo_marquee_available(cx))
             || (!self.group && matches!(self.state, State::Idle) && self.leo_handle_revision == cx.revision.1
-            && !self.leo_handles.is_empty() && matches!(key, ToolKey::Letter('l' | 's')))
+            && !self.leo_handles.is_empty() && matches!(key, ToolKey::Letter('l' | 's'))
+            && self.leo_handles.iter().all(|(k,_)|cx.doc.node(k.0).is_some_and(|n|matches!(&n.kind,NodeKind::Path{guide:false,..}))))
             || (matches!(self.state, State::Corner(_))''')
 edit('        self.bracket_hover = (ev.kind == PointerKind::Move).then_some(ev.pos);', '''        // H mode: drag selects visible artwork handles only. Shift toggles.
         if !self.group && ev.kind == PointerKind::Down && self.leo_marquee_mode && !ev.mods.cmd

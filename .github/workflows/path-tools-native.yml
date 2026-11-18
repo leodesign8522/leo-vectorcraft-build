@@ -44,4 +44,6 @@ jobs:
           cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p vectorcraft-ui-egui --lib leo_path_tools_ -- --nocapture
           exit $LASTEXITCODE
