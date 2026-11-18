@@ -10,11 +10,13 @@ fn leo_path_tools_handle_marquee_toggle_and_batch_operations() {
     let mut tool=DirectSelectionTool::new(false);
     let marquee=|tool:&mut DirectSelectionTool,shift| {
         tool.key(&c,ToolKey::Letter('h'),Mods::default());
+        assert!(tool.busy());
         let mods=Mods{shift,..Mods::default()};
         tool.pointer(&c,&PointerEvent::new(PointerKind::Down,90.,240.).with_mods(mods));
         tool.pointer(&c,&PointerEvent::new(PointerKind::Drag,210.,290.).with_mods(mods));
         assert!(tool.overlays(&c).iter().any(|o|matches!(o,Overlay::Marquee(_))));
         tool.pointer(&c,&PointerEvent::new(PointerKind::Up,210.,290.).with_mods(mods));
+        assert!(!tool.busy());
     };
     marquee(&mut tool,false);
     assert_eq!(tool.leo_handles.len(),2);

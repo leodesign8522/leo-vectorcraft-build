@@ -43,5 +43,5 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test --locked -p vectorcraft-engine leo_path_tools_batch_handles_is_atomic_and_undoable -- --nocapture
+          cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
           exit $LASTEXITCODE

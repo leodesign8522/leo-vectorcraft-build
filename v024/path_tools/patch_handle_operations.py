@@ -14,7 +14,7 @@ def edit(a, b):
 edit('    leo_handle_dragged: bool,', '    leo_handle_dragged: bool,\n    leo_marquee: Option<(Point, Point, bool)>,\n    leo_marquee_mode: bool,')
 edit('            leo_handle_dragged: false,', '            leo_handle_dragged: false,\n            leo_marquee: None,\n            leo_marquee_mode: false,')
 edit('        !matches!(self.state, State::Idle) || self.guide.busy()',
-     '        self.leo_marquee.is_some() || !matches!(self.state, State::Idle) || self.guide.busy()')
+     '        self.leo_marquee_mode || self.leo_marquee.is_some() || !matches!(self.state, State::Idle) || self.guide.busy()')
 edit('        if key == ToolKey::Escape {', '''        // L equalizes to the first picked handle; S mirrors each picked handle.
         if !self.group && matches!(self.state, State::Idle) && key == ToolKey::Letter('h') {
             self.leo_marquee_mode = !self.leo_marquee_mode;
