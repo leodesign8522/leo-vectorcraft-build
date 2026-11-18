@@ -1,0 +1,24 @@
+name: Leo Path Tools geometry tests
+on:
+  push:
+    branches: [leo-v024-path-tools]
+    paths:
+      - 'v024/path_tools/**'
+      - '.github/workflows/path-tools-geometry.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  geometry:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated geometry tests
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustc +stable --edition=2021 --test v024/path_tools/geometry.rs -o path_tools_tests.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\path_tools_tests.exe
+          exit $LASTEXITCODE
