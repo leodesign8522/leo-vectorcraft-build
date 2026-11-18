@@ -11,11 +11,16 @@ def edit(a, b):
         raise SystemExit('Unexpected handle operations anchor: ' + a)
     s = s.replace(a, b, 1)
 
-edit('    leo_handle_dragged: bool,', '    leo_handle_dragged: bool,\n    leo_marquee: Option<(Point, Point, bool)>,')
-edit('            leo_handle_dragged: false,', '            leo_handle_dragged: false,\n            leo_marquee: None,')
+edit('    leo_handle_dragged: bool,', '    leo_handle_dragged: bool,\n    leo_marquee: Option<(Point, Point, bool)>,\n    leo_marquee_mode: bool,')
+edit('            leo_handle_dragged: false,', '            leo_handle_dragged: false,\n            leo_marquee: None,\n            leo_marquee_mode: false,')
 edit('        !matches!(self.state, State::Idle) || self.guide.busy()',
      '        self.leo_marquee.is_some() || !matches!(self.state, State::Idle) || self.guide.busy()')
 edit('        if key == ToolKey::Escape {', '''        // L equalizes to the first picked handle; S mirrors each picked handle.
+        if !self.group && matches!(self.state, State::Idle) && key == ToolKey::Letter('h') {
+            self.leo_marquee_mode = !self.leo_marquee_mode;
+            self.leo_marquee = None;
+            return vec![];
+        }
         if !self.group && self.leo_marquee.is_none() && matches!(self.state, State::Idle) && !self.leo_handles.is_empty()
             && self.leo_handle_revision == cx.revision.1
             && matches!(key, ToolKey::Letter('l' | 's')) && !mods.cmd && !mods.alt {
@@ -48,12 +53,14 @@ edit('        if key == ToolKey::Escape {', '''        // L equalizes to the fir
             return vec![Action::Exec("path.leoSetHandles".into(),json!({"handles":changes,"independent":!symmetry}))];
         }
         if key == ToolKey::Escape {
+            self.leo_marquee_mode = false;
             self.leo_marquee = None;''')
-edit('        (matches!(self.state, State::Corner(_))', '''        (!self.group && matches!(self.state, State::Idle) && self.leo_handle_revision == cx.revision.1
+edit('        (matches!(self.state, State::Corner(_))', '''        (!self.group && matches!(self.state, State::Idle) && key == ToolKey::Letter('h'))
+            || (!self.group && matches!(self.state, State::Idle) && self.leo_handle_revision == cx.revision.1
             && !self.leo_handles.is_empty() && matches!(key, ToolKey::Letter('l' | 's')))
             || (matches!(self.state, State::Corner(_))''')
-edit('        self.bracket_hover = (ev.kind == PointerKind::Move).then_some(ev.pos);', '''        // Ctrl+Alt drag selects visible artwork handles only. Shift toggles.
-        if !self.group && ev.kind == PointerKind::Down && ev.mods.cmd && ev.mods.alt
+edit('        self.bracket_hover = (ev.kind == PointerKind::Move).then_some(ev.pos);', '''        // H mode: drag selects visible artwork handles only. Shift toggles.
+        if !self.group && ev.kind == PointerKind::Down && self.leo_marquee_mode && !ev.mods.cmd
             && matches!(self.state, State::Idle) {
             if self.leo_handle_revision != cx.revision.1 { self.leo_handles.clear(); }
             self.leo_marquee = Some((ev.pos,ev.pos,ev.mods.shift));
@@ -78,6 +85,7 @@ edit('        self.bracket_hover = (ev.kind == PointerKind::Move).then_some(ev.p
                 }
                 self.leo_handle_revision=cx.revision.1;
                 self.leo_marquee=None;
+                self.leo_marquee_mode=false;
             }
             return vec![];
         }
