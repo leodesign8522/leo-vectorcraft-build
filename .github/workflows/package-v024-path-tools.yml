@@ -1,0 +1,18 @@
+name: Leo Design Path Tools Preview 1 installer
+on:
+  workflow_dispatch:
+  push:
+    branches: [leo-v024-path-tools]
+    paths: ['.github/workflows/package-v024-path-tools.yml']
+permissions:
+  contents: read
+jobs:
+  edition:
+    uses: ./.github/workflows/build-v024-edition.yml
+    with:
+      flavor: core
+      label: Leo Design Core Bridge 0.20.4 + Path Tools Preview 1
+      artifact: Leo_Design_Path_Tools_Preview_1_Windows_x64_Build
+      installer: v024/Leo_Design_Path_Tools_Preview_1.iss
+      output: Leo_Design_Path_Tools_Preview_1_Installer
+      path_tools_preview: true

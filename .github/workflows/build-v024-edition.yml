@@ -17,6 +17,10 @@ on:
       output:
         required: true
         type: string
+      path_tools_preview:
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -124,6 +128,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Leo object movement regression failed" }
           cargo test --locked -p vectorcraft-engine leo_v022_ -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Leo snapping interaction, undo or commit regression failed" }
+      - name: Test Path Tools preview geometry and native editing
+        if: inputs.path_tools_preview
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          rustc --edition=2021 --test ../v024/path_tools/geometry.rs -o path_tools_tests.exe
+          if ($LASTEXITCODE -ne 0) { throw "Path Tools geometry compilation failed" }
+          ./path_tools_tests.exe
+          if ($LASTEXITCODE -ne 0) { throw "Path Tools geometry regression failed" }
+          cargo test --locked -p vectorcraft-tools --lib leo_path_tools_ -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Path Tools native editing regression failed" }
+          cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Path Tools engine regression failed" }
       - name: Test official Ctrl Enter text completion and input composition
         shell: pwsh
         working-directory: vectorcraft
@@ -309,6 +326,24 @@ jobs:
           $versionProcess = Start-Process -FilePath (Resolve-Path dist/vectorcraft.exe).Path -ArgumentList "--version" -RedirectStandardOutput $versionFile -Wait -PassThru -WindowStyle Hidden
           $version = [string](Get-Content $versionFile -Raw)
           if ($versionProcess.ExitCode -ne 0 -or $version.Trim() -ne "vectorcraft 0.24.1 (Leo Design Core Bridge 0.20.4; Leo Snapping)") { throw "EXE build identity smoke test failed" }
+      - name: Include Path Tools preview scope and usage
+        if: inputs.path_tools_preview
+        shell: pwsh
+        run: |
+          Copy-Item v024/path_tools/README.md dist/PATH_TOOLS_STATUS.md
+          @'
+          Leo Design Core Bridge 0.20.4 + Path Tools Preview 1 / VectorCraft 0.24.1
+
+          This is a development preview, not the complete four-tool release.
+          In Direct Selection, select an artwork path with visible handles.
+          H then drag: select handles in a box. Shift toggles enclosed handles.
+          L: equalize picked handle lengths to the first pick. S: mirror handles.
+          Shift-click and batch dragging remain available; Escape clears picks.
+          Extend, Smart Remove and Reposition currently have engine commands only.
+          Their dedicated toolbar, brush and sliding gestures are not available.
+          Core Bridge and the Illustrator sender are included in this one installer.
+          No pie menu is included. See PATH_TOOLS_STATUS.md for remaining work.
+          '@ | Set-Content dist/README_FIRST.txt -Encoding utf8
       - name: Upload experimental Windows artifact
         uses: actions/upload-artifact@v4
         with:
