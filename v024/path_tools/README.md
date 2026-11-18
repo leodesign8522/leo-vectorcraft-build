@@ -24,9 +24,10 @@ unchanged. These commands are not interactive brush or slide tools.
 
 Remaining: dedicated toolbar, numeric input, handle rotation/scaling, extension
 endpoint snapping/direction lock, Smart Remove Brush gesture, Reposition Point
-drag gesture, closed-path support and Windows application/installer validation.
+drag gesture, closed-path support and manual desktop interaction validation.
 The existing Core Bridge single-installer pipeline is retained; no pie menu
-is restored. No Path Tools installer has been produced.
+is restored. A single Windows x64 Preview 1 installer is available from
+https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44324563379/artifacts/14440179511
 
 Validation on 2026-11-18, source commit 579562772dd9c850e75968208b97a32f37f66167:
 - Windows native run 44317336544: 3 Path Tools tests, 88 Direct Selection
@@ -35,3 +36,11 @@ Validation on 2026-11-18, source commit 579562772dd9c850e75968208b97a32f37f66167
 - Full migration, Python syntax and core/no-pie separation checks passed.
 - Application GUI, complete application build and installer were not validated
   by these focused test workflows.
+
+Preview packaging, source ae8fd08e2b770dd5156f3a8686e97771b0d3ca4b:
+- Run 44324563379 passed the full configured Core Bridge/Path Tools regressions,
+  release EXE compilation, version identity check and installer generation.
+- Automatic installation passed: installed EXE hash and version, required files,
+  receiver launcher/configuration, and Illustrator sender placement/hash checked.
+- Artifact 14440179511 contains the installer and build/hash records (30-day
+  retention). This remains a preview, not the complete four-tool interface.
