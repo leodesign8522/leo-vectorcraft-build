@@ -172,3 +172,6 @@ fn set_handle(s: &mut Session, p: &Value) -> Result<Value> {''')
 path.write_text(s,encoding="utf-8",newline="\n")
 with (root/"crates/tools/src/direct/tests.rs").open("a",encoding="utf-8") as f:
     f.write((Path(__file__).parent/"multi_handle_tests.rs").read_text(encoding="utf-8"))
+
+with (root/"crates/engine/src/tests.rs").open("a",encoding="utf-8") as f:
+    f.write((Path(__file__).parent/"multi_handle_engine_tests.rs").read_text(encoding="utf-8"))
