@@ -62,6 +62,23 @@ mod leo_path_tools_trim_join_regressions {
         assert!(s.doc().unwrap().doc.node(a).is_some() && s.doc().unwrap().doc.node(b).is_some());
     }
     #[test]
+    fn closed_and_locked_paths_are_preserved_and_no_hit_has_no_history() {
+        let mut s=session();let (a,b)=cross(&mut s);
+        s.execute("object.lock",&json!({"ids":[b.0]})).unwrap();
+        let before_a=path(&s,a);let before_b=path(&s,b);let n=s.doc().unwrap().history.undo.len();
+        assert_eq!(trim(&mut s,false)["trimmed"],0);
+        assert_eq!(path(&s,a),before_a);assert_eq!(path(&s,b),before_b);
+        assert_eq!(s.doc().unwrap().history.undo.len(),n);
+        let mut s=session();
+        let closed=NodeId(s.execute("path.create",&json!({"anchors":[
+            {"x":100,"y":100},{"x":300,"y":100},{"x":300,"y":300},{"x":100,"y":300}],"closed":true})).unwrap()["id"].as_u64().unwrap());
+        line(&mut s,[200.,0.],[200.,400.]);
+        s.execute("select.set",&json!({"ids":[closed.0]})).unwrap();
+        let before=path(&s,closed);let n=s.doc().unwrap().history.undo.len();
+        let r=s.execute("path.leoTrimJoin",&json!({"points":[[50,150],[350,150]],"preferSelected":true})).unwrap();
+        assert_eq!(r["trimmed"],0);assert_eq!(path(&s,closed),before);assert_eq!(s.doc().unwrap().history.undo.len(),n);
+    }
+    #[test]
     fn native_trim_tool_drag_cancel_then_commit_and_force_no_join() {
         let mut s=session();let(a,b)=cross(&mut s);s.execute("select.set",&json!({"ids":[]})).unwrap();
         let view=vectorcraft_tools::ViewInfo{zoom:1.,..Default::default()};

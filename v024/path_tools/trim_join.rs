@@ -97,8 +97,9 @@ pub(super) fn run(s:&mut Session,p:&Value)->Result<Value> {
     let prefer=switch_or(p,"preferSelected",true,C)?;
     if points.len()<2 {return Ok(json!({"trimmed":0,"joined":0}));}
     let state=s.doc()?;let d=&state.doc;
-    let editable=d.editable();
     let mut ids=vec![];
+    {
+    let editable=d.editable();
     d.walk(|n| {
         if !editable(n.id) || !within(d,state.isolation,n.id) {return;}
         // Width/brush profiles and live effects need separate style-preserving splitting.
@@ -110,6 +111,7 @@ pub(super) fn run(s:&mut Session,p:&Value)->Result<Value> {
         });
         if plain {if let NodeKind::Path{guide:false,live:None,clipping:false,..}=&n.kind {ids.push(n.id);}}
     });
+    } // Release the artboard-lock cache before taking mutable document access.
     let selected=|id:NodeId|state.selection.objects.iter().any(|root|within(d,Some(*root),id));
     // Selection limits what is trimmed, while other editable artwork still supplies boundaries.
     let selected_only=prefer && ids.iter().any(|id|selected(*id));
