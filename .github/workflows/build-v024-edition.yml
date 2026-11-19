@@ -150,6 +150,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Path Tools native editing regression failed" }
           cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Path Tools engine regression failed" }
+          cargo test --locked -p vectorcraft-engine --lib cmd::addons::pathtools::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Native path tool gesture, fitting or undo regression failed" }
+          cargo test --locked -p vectorcraft-tools --lib addons::extend_path::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Extend Path gesture regression failed" }
+          cargo test --locked -p vectorcraft-tools --lib addons::anchor_eraser::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Smart Remove Brush gesture regression failed" }
+          cargo test --locked -p vectorcraft-tools --lib addons::slide_anchor::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Reposition Point gesture regression failed" }
       - name: Test official Ctrl Enter text completion and input composition
         shell: pwsh
         working-directory: vectorcraft

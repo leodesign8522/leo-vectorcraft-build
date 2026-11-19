@@ -82,3 +82,58 @@ fn join(s:&mut Session,p:&Value,reposition:bool)->Result<Value> {
 }
 pub(super) fn remove(s:&mut Session,p:&Value)->Result<Value>{join(s,p,false)}
 pub(super) fn reposition(s:&mut Session,p:&Value)->Result<Value>{join(s,p,true)}
+
+pub(super) fn transform_handles(s:&mut Session,p:&Value)->Result<Value> {
+    const C:&str="path.leoTransformHandles";
+    let operation=str_param(p,"operation").unwrap_or("rotate");
+    if !matches!(operation,"rotate"|"scale"|"equal"|"symmetric") {return Err(bad(C,"invalid operation"));}
+    let angle=number_or(p,"angle",0.,C)?.to_radians();
+    let scale=number_or(p,"scale",1.,C)?;
+    if !angle.is_finite() || !scale.is_finite() || !(0.0..=100.0).contains(&scale) {return Err(bad(C,"invalid angle or scale"));}
+    let items=p.get("handles").and_then(Value::as_array).filter(|a|!a.is_empty() && a.len()<=50_000).ok_or_else(||bad(C,"select handles first"))?;
+    let state=s.doc()?;
+    if let Some(value)=p.get("revision") {
+        let revision=value.as_u64().ok_or_else(||bad(C,"invalid revision"))?;
+        if revision!=state.revision {return Err(bad(C,"handle selection is stale; select again"));}
+    }
+    let d=&state.doc;
+    let mut seen=BTreeSet::new();
+    let mut anchors=BTreeSet::new();
+    let mut target_length=None;
+    let mut changes=Vec::new();
+    for item in items {
+        let id=id_param(item,"id").ok_or_else(||bad(C,"missing id"))?;
+        let si=usize_opt(item,"subpath",C)?.unwrap_or(0);
+        let ai=usize_opt(item,"anchor",C)?.ok_or_else(||bad(C,"missing anchor"))?;
+        let side=match str_param(item,"which") {Some("in")=>false,Some("out")=>true,_=>return Err(bad(C,"invalid handle side"))};
+        if !seen.insert((id,si,ai,side)) {return Err(bad(C,"duplicate handle"));}
+        let n=d.node(id).filter(|_|d.is_editable(id)).ok_or_else(||bad(C,"path not editable"))?;
+        let NodeKind::Path{path,guide:false,..}=&n.kind else {return Err(bad(C,"not an artwork path"));};
+        let a=path.subpaths.get(si).and_then(|sp|sp.anchors.get(ai)).ok_or_else(||bad(C,"no such anchor"))?;
+        let q=if side {a.h_out} else {a.h_in};
+        if let (Some(x),Some(y))=(item.get("x"),item.get("y")) {
+            let old=Point::new(x.as_f64().ok_or_else(||bad(C,"invalid x"))?,y.as_f64().ok_or_else(||bad(C,"invalid y"))?);
+            if !old.is_finite() || old.distance(q)>1e-6 {return Err(bad(C,"handle selection is stale; select again"));}
+        }
+        let v=q-a.p;
+        let length=v.hypot();
+        let equal=*target_length.get_or_insert(length);
+        let to=match operation {
+            "rotate"=>a.p+Vec2::new(v.x*angle.cos()-v.y*angle.sin(),v.x*angle.sin()+v.y*angle.cos()),
+            "scale"=>a.p+v*scale,
+            "equal" if length>1e-12=>a.p+v*(equal/length),
+            "equal" if equal<=1e-12=>a.p,
+            "equal"=>return Err(bad(C,"a zero handle has no direction")),
+            _=>q,
+        };
+        if !to.is_finite() {return Err(bad(C,"handle result is not finite"));}
+        if operation=="symmetric" && !anchors.insert((id,si,ai)) {continue;}
+        changes.push(json!({"id":id.0,"subpath":si,"anchor":ai,"which":if side {"out"} else {"in"},"x":to.x,"y":to.y}));
+        if operation=="symmetric" {
+            let other=a.p+(a.p-to);
+            if !other.is_finite() {return Err(bad(C,"handle result is not finite"));}
+            changes.push(json!({"id":id.0,"subpath":si,"anchor":ai,"which":if side {"in"} else {"out"},"x":other.x,"y":other.y}));
+        }
+    }
+    super::leo_set_handles(s,&json!({"handles":changes,"independent":operation!="symmetric"}))
+}

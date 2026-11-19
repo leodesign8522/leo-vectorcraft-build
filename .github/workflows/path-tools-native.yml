@@ -12,7 +12,11 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_TEST_OPT_LEVEL: "0"
+      CARGO_PROFILE_TEST_CODEGEN_UNITS: "256"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -35,15 +39,27 @@ jobs:
         with:
           workspaces: "vectorcraft -> target"
           shared-key: "leo-vectorcraft-v018-core-windows-release"
+      - name: Test four visible tool buttons and actual UI shortcuts
+        working-directory: vectorcraft
+        shell: pwsh
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui --lib leo_path_tools_ -- --nocapture
+          exit $LASTEXITCODE
       - name: Test native direct tool feedback and gestures
         working-directory: vectorcraft
         shell: pwsh
         run: |
-          cargo test --locked -p vectorcraft-tools leo_path_tools_ -- --nocapture
+          cargo test --locked -p vectorcraft-tools --lib leo_path_tools_ -- --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test --locked -p vectorcraft-tools direct::tests -- --nocapture
+          cargo test --locked -p vectorcraft-tools --lib direct::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test --locked -p vectorcraft-ui-egui --lib leo_path_tools_ -- --nocapture
+          cargo test --locked -p vectorcraft-engine --lib cmd::addons::pathtools::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p vectorcraft-tools --lib addons::extend_path::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p vectorcraft-tools --lib addons::anchor_eraser::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked -p vectorcraft-tools --lib addons::slide_anchor::tests -- --nocapture
           exit $LASTEXITCODE

@@ -1,5 +1,13 @@
 # Leo Design Path Tools — development branch
 Baseline: VectorCraft 0.24.1 / Core Bridge 0.20.4.
+Current source work (not yet compiled or packaged): a native dockable four-tool
+panel, shown once on upgrade and available from Window > Leo Design Path Tools;
+batch handle rotation/scaling; endpoint snap and tangent-axis drag lock for the
+native Extend Path; and a fit-error threshold for native Slide Anchor.
+Smart Remove Brush uses the existing native Anchor Eraser Brush (select paths,
+then paint); Reposition Point uses native Slide Anchor. Their shape preservation
+uses curve refitting within an estimated tolerance, not exact invariance on
+arbitrary curves. Preview 2 does not contain this new panel or these additions.
 Not a release. The native Direct Selection tool supports gold hollow hover and
 cyan filled selected handle marks, Shift-click additive/toggle picks and batch
 drag of selected artwork-path handles. Shift during drag remains the original

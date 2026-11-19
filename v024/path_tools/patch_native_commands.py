@@ -17,6 +17,7 @@ anchor='    vec![\n'
 if s.count(anchor)<1: raise SystemExit('Missing path specs list')
 specs=''
 for command,label,params,run in (
+    ('leoTransformHandles','Transform Handles','{handles:[{id,subpath?,anchor,which,x?,y?}], operation?:rotate|scale|equal|symmetric, angle?:degrees, scale?:number, revision?:number}','transform_handles'),
     ('leoExtend','Extend Path','{id, subpath?:usize, mode?:tangent|cubic, length?:number, amount?:number}','extend'),
     ('leoSmartRemove','Remove Join Within Tolerance','{id, subpath?:usize, anchor:usize, tolerance?:number}','remove'),
     ('leoReposition','Reposition Join','{id, subpath?:usize, anchor:usize, t?:number, tolerance?:number}','reposition'),
@@ -26,3 +27,4 @@ s=s.replace(anchor,anchor+specs,1)
 p.write_text(s,encoding='utf-8',newline='\n')
 with (root/'crates/engine/src/tests.rs').open('a',encoding='utf-8') as f:
     f.write((source/'native_commands_tests.rs').read_text(encoding='utf-8'))
+    f.write((source/'four_tools_engine_tests.rs').read_text(encoding='utf-8'))

@@ -53,6 +53,8 @@ subprocess.run([sys.executable, str(root / 'v024' / 'path_tools' / 'patch_multi_
 subprocess.run([sys.executable, str(root / 'v024' / 'path_tools' / 'patch_handle_operations.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(root / 'v024' / 'path_tools' / 'patch_native_commands.py'), sys.argv[1]], check=True)
 subprocess.run([sys.executable, str(root / 'v024' / 'path_tools' / 'patch_ui_keys.py'), sys.argv[1]], check=True)
+subprocess.run([sys.executable, str(root / 'v024' / 'path_tools' / 'patch_panel.py'), sys.argv[1]], check=True)
+subprocess.run([sys.executable, str(root / 'v024' / 'path_tools' / 'patch_native_interactions.py'), sys.argv[1]], check=True)
 
 p = Path(sys.argv[1]) / 'apps/vectorcraft/src/main.rs'
 s = p.read_text(encoding='utf-8')
