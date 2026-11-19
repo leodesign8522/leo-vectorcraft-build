@@ -17,3 +17,4 @@ jobs:
       output: Leo_Design_Path_Tools_Preview_4_Installer
       path_tools_preview: true
 # Rebuild after releasing the trim target cache before editing.
+# Include bounded junction checks and atomic limit regression.
