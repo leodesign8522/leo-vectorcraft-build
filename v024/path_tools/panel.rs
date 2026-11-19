@@ -5,11 +5,12 @@ use vectorcraft_tools::{Action,Mods,ToolKey};
 use crate::VectorcraftApp;
 
 pub const ID:&str="leoPathTools";
-pub const TOOLS:[(&str,&str);4]=[
+pub const TOOLS:[(&str,&str);5]=[
     ("directSelection","1 · PathScribe 手柄编辑"),
     ("extendPath","2 · Extend Path 路径延长"),
     ("anchorEraserBrush","3 · Smart Remove Brush 智能删点"),
     ("slideAnchor","4 · Reposition Point 节点滑移"),
+    ("leoTrimJoin","5 · Trim and Join 修剪与连接"),
 ];
 
 #[derive(Clone)]
@@ -60,6 +61,17 @@ pub fn show(app:&mut VectorcraftApp,ui:&mut Ui) {
     if !ready {ui.label("请先新建或打开文档。");return;}
     ui.separator();
     match app.session.tool_id() {
+        "leoTrimJoin"=>{
+            ui.label("划过要删除的线段，按路径交点修剪。开放路径预览版。");
+            let o=app.session.tool_options();
+            let mut join=o["join"].as_bool().unwrap_or(true);
+            let mut prefer=o["preferSelected"].as_bool().unwrap_or(true);
+            if ui.checkbox(&mut join,"修剪后自动连接").changed() {option(app,"join",json!(join));}
+            if ui.checkbox(&mut prefer,"优先修剪已选路径").changed() {option(app,"preferSelected",json!(prefer));}
+            ui.label("拖动中：J 强制连接；N 禁止连接；C 切换虚线颜色；Esc 取消。");
+            ui.label("Alt 直线橡皮筋；Alt+Shift 约束 45° 方向。");
+            ui.label("连接仅限同组同样式且只有两个端点的交点。闭合路径不修剪；笔刷、变宽及实时效果路径不参与；上限 512 个可编辑线段。");
+        },
         "directSelection"=>{
             ui.label("点选手柄；Shift 增选；拖动已选手柄可一起移动。");
             if ui.button("框选手柄 (H)").clicked() {

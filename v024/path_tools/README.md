@@ -1,5 +1,13 @@
 # Leo Design Path Tools — Preview 3
 
+Development after Preview 3: an independent intersection-based Trim and Join
+tool is being added. It is not in the linked Preview 3 installer. Its initial
+scope is expanded open paths with plain appearances, exact cubic subdivision,
+optional joining at unambiguous compatible endpoints, dashed stroke previews,
+Alt rubberband / Shift angle constraint, J/N/C and Escape. Closed-path trimming,
+variable-width/brush profile splitting and cross-style/layer joins are excluded.
+Native compilation and interaction regressions for this addition are pending.
+
 Baseline: VectorCraft 0.24.1 / Leo Design Core Bridge 0.20.4.
 Preview 3 is built from 565d9aac7a5b571b161468b5a416226a64c8ce08.
 Core Bridge is retained. No pie menu is restored.
