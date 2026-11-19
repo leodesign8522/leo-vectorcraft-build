@@ -120,6 +120,7 @@ pub(super) fn run(s:&mut Session,p:&Value)->Result<Value> {
     if count>MAX_SEGMENTS {return Err(bad(C,"preview supports at most 512 editable path segments"));}
     let refs:Vec<&PathData>=paths.iter().collect();
     let places=pt::crossings(&refs,true).ok_or_else(||bad(C,"intersection complexity limit exceeded"))?;
+    if places.iter().map(Vec::len).sum::<usize>()>8192 {return Err(bad(C,"too many intersections for this preview"));}
     let gesture=PathData::single(SubPath::polyline(&points,false));
     let mut pieces=vec![];let mut trimmed=0;
     for (index,path) in paths.iter().enumerate() {
@@ -154,6 +155,10 @@ pub(super) fn run(s:&mut Session,p:&Value)->Result<Value> {
         }
     }
     if trimmed==0 {return Ok(json!({"trimmed":0,"joined":0}));}
+    // Endpoint ambiguity checks scan remaining pieces; bound that work before editing.
+    if pieces.len()>2048 || (join && pieces.len()>256) {
+        return Err(bad(C,"too many remaining pieces for this preview; disable joining or work on a smaller drawing"));
+    }
     let joined=if join {join_pieces(d,&mut pieces)} else {0};
     let mut updates=vec![];
     for (id,old) in ids.iter().zip(paths.iter()) {

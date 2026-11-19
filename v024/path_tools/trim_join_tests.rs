@@ -79,6 +79,15 @@ mod leo_path_tools_trim_join_regressions {
         assert_eq!(r["trimmed"],0);assert_eq!(path(&s,closed),before);assert_eq!(s.doc().unwrap().history.undo.len(),n);
     }
     #[test]
+    fn segment_budget_refuses_without_editing() {
+        let mut s=session();
+        let anchors:Vec<_>=(0..514).map(|x|json!({"x":x,"y":0})).collect();
+        s.execute("path.create",&json!({"anchors":anchors,"closed":false})).unwrap();
+        let before=s.doc().unwrap().doc.clone();let n=s.doc().unwrap().history.undo.len();
+        assert!(s.execute("path.leoTrimJoin",&json!({"points":[[50,-10],[50,10]]})).is_err());
+        assert_eq!(s.doc().unwrap().doc,before);assert_eq!(s.doc().unwrap().history.undo.len(),n);
+    }
+    #[test]
     fn native_trim_tool_drag_cancel_then_commit_and_force_no_join() {
         let mut s=session();let(a,b)=cross(&mut s);s.execute("select.set",&json!({"ids":[]})).unwrap();
         let view=vectorcraft_tools::ViewInfo{zoom:1.,..Default::default()};
