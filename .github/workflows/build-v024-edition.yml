@@ -112,6 +112,13 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test Path Tools engine and trim gestures before UI compilation
+        if: inputs.path_tools_preview
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Path Tools engine or trim gesture regression failed" }
       - name: Test actual idle Path Tools keyboard routing before packaging
         if: inputs.path_tools_preview
         shell: pwsh
@@ -148,8 +155,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Path Tools geometry regression failed" }
           cargo test --locked -p vectorcraft-tools --lib leo_path_tools_ -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Path Tools native editing regression failed" }
-          cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
-          if ($LASTEXITCODE -ne 0) { throw "Path Tools engine regression failed" }
           cargo test --locked -p vectorcraft-engine --lib cmd::addons::pathtools::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Native path tool gesture, fitting or undo regression failed" }
           cargo test --locked -p vectorcraft-tools --lib addons::extend_path::tests -- --nocapture

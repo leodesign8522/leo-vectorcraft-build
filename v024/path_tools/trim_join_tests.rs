@@ -90,7 +90,7 @@ mod leo_path_tools_trim_join_regressions {
     #[test]
     fn native_trim_tool_drag_cancel_then_commit_and_force_no_join() {
         let mut s=session();let(a,b)=cross(&mut s);s.execute("select.set",&json!({"ids":[]})).unwrap();
-        let view=vectorcraft_tools::ViewInfo{zoom:1.,..Default::default()};
+        let view=crate::ViewInfo{zoom:1.,..Default::default()};
         s.select_tool("leoTrimJoin",view).unwrap();let before=s.doc().unwrap().doc.clone();
         let history=s.doc().unwrap().history.undo.len();
         for kind in [PointerKind::Down,PointerKind::Drag] {
