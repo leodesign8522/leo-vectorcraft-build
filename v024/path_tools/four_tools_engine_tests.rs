@@ -64,3 +64,32 @@ fn leo_path_tools_native_extend_snaps_and_direction_lock_projects_drag() {
     assert!(end.distance(Point::new(250.,100.))<1e-6,"{end:?}");
     s.execute("edit.undo",&json!({})).unwrap();assert_eq!(read(&s),before);
 }
+
+#[test]
+fn leo_path_tools_reposition_guard_refuses_excess_error_and_drag_is_undoable() {
+    use vectorcraft_tools::{PointerEvent,PointerKind};
+    let mut s=session();
+    let id=NodeId(s.execute("path.create",&json!({"anchors":[
+        {"x":0,"y":100},{"x":100,"y":100,"out":[155,100]},
+        {"x":200,"y":200,"in":[200,145]}
+    ],"closed":false})).unwrap()["id"].as_u64().unwrap());
+    let read=|s:&Session|s.doc().unwrap().doc.node(id).unwrap().path_data().unwrap().clone();
+    let before=read(&s);let history=s.doc().unwrap().history.undo.len();
+    assert!(s.execute("addon.pathtools.slideAnchor",&json!({"id":id.0,"anchor":1,"t":0.5,"maxError":0.})).is_err());
+    assert_eq!(read(&s),before);assert_eq!(s.doc().unwrap().history.undo.len(),history);
+    let view=crate::ViewInfo{smart_guides:false,..Default::default()};
+    s.select_tool("slideAnchor",view).unwrap();
+    s.set_tool_option("guardShape",&json!(true));
+    s.set_tool_option("tolerance",&json!(0.001));
+    for kind in [PointerKind::Down,PointerKind::Drag,PointerKind::Up] {
+        let p=if kind==PointerKind::Down {Point::new(100.,100.)} else {Point::new(170.,132.)};
+        s.pointer(&PointerEvent::new(kind,p.x,p.y),view).unwrap();
+    }
+    let after=read(&s);let p=after.subpaths[0].anchors[1].p;
+    assert!(p.distance(Point::new(100.,100.))>1e-6,"the guarded tool must still slide where feasible");
+    let t=vectorcraft_pathops::addons::pathtools::slide_t_at(&before.subpaths[0],1,p).unwrap();
+    let (_,error)=vectorcraft_pathops::addons::pathtools::slide_anchor(&before.subpaths[0],1,t).unwrap();
+    assert!(error<=0.0010001,"{error}");
+    assert_eq!(s.doc().unwrap().history.undo.len(),history+1);
+    s.execute("edit.undo",&json!({})).unwrap();assert_eq!(read(&s),before);
+}

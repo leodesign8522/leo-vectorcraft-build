@@ -53,6 +53,7 @@ pub fn show(app:&mut VectorcraftApp,ui:&mut Ui) {
                 let changed=app.session.tool_id()!=id;
                 app.select_tool(id);
                 if changed && id=="extendPath" {option(app,"mode",json!("bezier"));}
+                if id=="slideAnchor" {option(app,"guardShape",json!(true));}
             }
         }
     });
@@ -114,8 +115,10 @@ pub fn show(app:&mut VectorcraftApp,ui:&mut Ui) {
             ui.label("拖动中间锚点沿相邻曲线滑移；开放路径端点保持不动。");
             let o=app.session.tool_options();
             let mut tolerance=o["tolerance"].as_f64().unwrap_or(0.2);
+            let mut guarded=o["guardShape"].as_bool().unwrap_or(false);
+            if ui.checkbox(&mut guarded,"限制拟合误差").changed() {option(app,"guardShape",json!(guarded));}
             ui.horizontal(|ui| {ui.label("拟合误差上限");if ui.add(egui::DragValue::new(&mut tolerance).range(0.001..=10.0).speed(0.01).suffix(" pt")).changed() {option(app,"tolerance",json!(tolerance));}});
-            ui.label("超过误差上限时限制滑移距离；Shift 吸附切线角度。");
+            ui.label("启用限制时优先保形；Shift 吸附切线角度。曲线按容差近似重拟合。");
         },
         _=>{ui.label("点击上方按钮选择工具。");}
     }
@@ -149,6 +152,7 @@ mod tests {
             frame(&mut app,&ctx,vec![egui::Event::PointerMoved(pos),egui::Event::PointerButton{pos,button:egui::PointerButton::Primary,pressed:true,modifiers:egui::Modifiers::NONE}]);
             frame(&mut app,&ctx,vec![egui::Event::PointerButton{pos,button:egui::PointerButton::Primary,pressed:false,modifiers:egui::Modifiers::NONE}]);
             assert_eq!(app.session.tool_id(),id);
+            if id=="slideAnchor" {assert_eq!(app.session.tool_options()["guardShape"],json!(true));}
         }
         assert!(crate::state::ICON_PANELS.iter().any(|(id,_,_)|*id==ID));
         assert!(crate::state::ICON_PANEL_GROUPS.iter().any(|group|group.contains(&ID)));

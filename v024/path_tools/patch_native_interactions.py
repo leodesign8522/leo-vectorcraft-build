@@ -61,8 +61,8 @@ fn endpoint_target(cx:&ToolContext,end:&End,p:Point,locked:bool,axis:vectorcraft
 /// The length of `sp` (pt).''')
 slide='crates/tools/src/addons/slide_anchor.rs'
 edit(slide,'    cx.doc.walk(|n| {','    cx.doc.walk(|n| {\n        if !editable(n.id) || !crate::direct::in_scope(cx.doc,cx.isolation,n.id) {return;}')
-edit(slide,'#[derive(Default)]\npub struct SlideAnchorTool {','pub struct SlideAnchorTool {\n    tolerance:f64,')
-edit(slide,'/// The anchor of an editable path nearest `p` within the point tolerance that can slide.','''impl Default for SlideAnchorTool {fn default()->Self{Self{tolerance:0.2,hover:None,drag:None}}}
+edit(slide,'#[derive(Default)]\npub struct SlideAnchorTool {','pub struct SlideAnchorTool {\n    tolerance:f64,\n    guard_shape:bool,')
+edit(slide,'/// The anchor of an editable path nearest `p` within the point tolerance that can slide.','''impl Default for SlideAnchorTool {fn default()->Self{Self{tolerance:0.2,guard_shape:false,hover:None,drag:None}}}
 
 fn bounded_slide(g:&Grip,t:f64,tolerance:f64)->f64 {
     let n=g.sp.anchors.len();
@@ -79,10 +79,16 @@ fn bounded_slide(g:&Grip,t:f64,tolerance:f64)->f64 {
 }
 
 /// The anchor of an editable path nearest `p` within the point tolerance that can slide.''')
-edit(slide,'                let t = slide_to(cx, &g, ev.pos, ev.mods);','                let t = bounded_slide(&g,slide_to(cx, &g, ev.pos, ev.mods),self.tolerance*0.999999);')
-edit(slide,'"anchor": g.anchor, "t": t','"anchor": g.anchor, "t": t, "maxError":self.tolerance')
-edit(slide,'    fn cursor(&self, _cx: &ToolContext, _p: Point, _mods: Mods) -> Cursor {','''    fn options(&self)->serde_json::Value {json!({"tolerance":self.tolerance})}
+edit(slide,'                let t = slide_to(cx, &g, ev.pos, ev.mods);','''                let requested=slide_to(cx,&g,ev.pos,ev.mods);
+                let t=if self.guard_shape {
+                    let safe=bounded_slide(&g,requested,self.tolerance*0.999999);
+                    if ev.mods.shift && (safe-requested).abs()>1e-9 {0.} else {safe}
+                } else {requested};''')
+edit(slide,'                let params = json!({ "id": g.id.0, "subpath": g.subpath, "anchor": g.anchor, "t": t });','''                let mut params = json!({ "id": g.id.0, "subpath": g.subpath, "anchor": g.anchor, "t": t });
+                if self.guard_shape {params["maxError"]=json!(self.tolerance);}''')
+edit(slide,'    fn cursor(&self, _cx: &ToolContext, _p: Point, _mods: Mods) -> Cursor {','''    fn options(&self)->serde_json::Value {json!({"tolerance":self.tolerance,"guardShape":self.guard_shape})}
     fn set_option(&mut self,key:&str,value:&serde_json::Value) {
+        if key=="guardShape" {self.guard_shape=value.as_bool().unwrap_or(self.guard_shape);}
         if key=="tolerance" && let Some(n)=value.as_f64().filter(|n|n.is_finite()) {self.tolerance=n.clamp(0.001,10.);}
     }
     fn cursor(&self, _cx: &ToolContext, _p: Point, _mods: Mods) -> Cursor {''')

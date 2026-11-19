@@ -158,6 +158,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Smart Remove Brush gesture regression failed" }
           cargo test --locked -p vectorcraft-tools --lib addons::slide_anchor::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Reposition Point gesture regression failed" }
+          cargo test --locked -p vectorcraft-pathops --lib addons::pathtools -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Bezier extension and shape refitting regression failed" }
       - name: Test official Ctrl Enter text completion and input composition
         shell: pwsh
         working-directory: vectorcraft
@@ -352,12 +354,15 @@ jobs:
           ${{ inputs.label }} / VectorCraft 0.24.1
 
           This is a development preview, not the complete four-tool release.
-          In Direct Selection, select an artwork path with visible handles.
-          H then drag: select handles in a box. Shift toggles enclosed handles.
-          L: equalize picked handle lengths to the first pick. S: mirror handles.
-          Shift-click and batch dragging remain available; Escape clears picks.
-          Extend, Smart Remove and Reposition currently have engine commands only.
-          Their dedicated toolbar, brush and sliding gestures are not available.
+          The Path Tools panel opens once on upgrade; reopen it from Window > Leo Design Path Tools.
+          PathScribe: pick handles or use H then drag a box; Shift toggles picks.
+          Use the panel for equal length, symmetry, numeric rotation and scaling.
+          Extend Path: drag an open end; choose Bezier, Straight or Arc in the panel.
+          Nearby editable path ends snap; Shift or the checkbox locks the drag to the end tangent axis.
+          Smart Remove Brush: select paths, then paint across anchors; set diameter and tolerance in the panel.
+          Reposition Point: drag an interior anchor along its adjacent curve; set the refit tolerance in the panel.
+          Brush and sliding preserve shape by tolerance-based curve refitting, not exact invariance on arbitrary curves.
+          Each gesture or batch edit is undoable; Escape cancels a live drag.
           Core Bridge and the Illustrator sender are included in this one installer.
           No pie menu is included. See PATH_TOOLS_STATUS.md for remaining work.
           '@ | Set-Content dist/README_FIRST.txt -Encoding utf8
