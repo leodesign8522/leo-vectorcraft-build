@@ -18,3 +18,4 @@ jobs:
       path_tools_preview: true
 # Rebuild after releasing the trim target cache before editing.
 # Include bounded junction checks and atomic limit regression.
+# Rebuild with corrected engine ViewInfo test reference.
