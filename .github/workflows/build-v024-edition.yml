@@ -353,7 +353,7 @@ jobs:
           @'
           ${{ inputs.label }} / VectorCraft 0.24.1
 
-          This is a development preview, not the complete four-tool release.
+          This is a development preview with the original four tools and an initial Trim and Join tool.
           The Path Tools panel opens once on upgrade; reopen it from Window > Leo Design Path Tools.
           PathScribe: pick handles or use H then drag a box; Shift toggles picks.
           Use the panel for equal length, symmetry, numeric rotation and scaling.
@@ -362,6 +362,13 @@ jobs:
           Smart Remove Brush: select paths, then paint across anchors; set diameter and tolerance in the panel.
           Reposition Point: drag an interior anchor along its adjacent curve; set the refit tolerance in the panel.
           Brush and sliding preserve shape by tolerance-based curve refitting, not exact invariance on arbitrary curves.
+          Trim and Join: choose its panel button and drag across unwanted open-path portions.
+          Cuts occur at artwork intersections, not where the gesture crosses the artwork.
+          Optional joining requires same-parent, same-style endpoints with no branching ambiguity.
+          J forces joining, N disables joining, C cycles the dashed gesture color, Escape cancels.
+          Alt makes a straight rubberband section; Alt+Shift constrains it to 45-degree directions.
+          This initial trim tool skips closed paths, live/brush/variable-width/effect paths and clips.
+          It supports up to 512 eligible artwork segments and 512 gesture points.
           Each gesture or batch edit is undoable; Escape cancels a live drag.
           Core Bridge and the Illustrator sender are included in this one installer.
           No pie menu is included. See PATH_TOOLS_STATUS.md for remaining work.

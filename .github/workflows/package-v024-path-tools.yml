@@ -1,4 +1,4 @@
-name: Leo Design Path Tools Preview 3 installer
+name: Leo Design Path Tools Preview 4 installer
 on:
   workflow_dispatch:
   push:
@@ -11,8 +11,8 @@ jobs:
     uses: ./.github/workflows/build-v024-edition.yml
     with:
       flavor: core
-      label: Leo Design Core Bridge 0.20.4 + Path Tools Preview 3
-      artifact: Leo_Design_Path_Tools_Preview_3_Windows_x64_Build
-      installer: v024/Leo_Design_Path_Tools_Preview_3.iss
-      output: Leo_Design_Path_Tools_Preview_3_Installer
+      label: Leo Design Core Bridge 0.20.4 + Path Tools Preview 4
+      artifact: Leo_Design_Path_Tools_Preview_4_Windows_x64_Build
+      installer: v024/Leo_Design_Path_Tools_Preview_4.iss
+      output: Leo_Design_Path_Tools_Preview_4_Installer
       path_tools_preview: true
