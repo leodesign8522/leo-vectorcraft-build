@@ -1,57 +1,80 @@
-# Leo Design Path Tools — development branch
-Baseline: VectorCraft 0.24.1 / Core Bridge 0.20.4.
-Current source work (not yet compiled or packaged): a native dockable four-tool
-panel, shown once on upgrade and available from Window > Leo Design Path Tools;
-batch handle rotation/scaling; endpoint snap and tangent-axis drag lock for the
-native Extend Path; and a fit-error threshold for native Slide Anchor.
-Smart Remove Brush uses the existing native Anchor Eraser Brush (select paths,
-then paint); Reposition Point uses native Slide Anchor. Their shape preservation
-uses curve refitting within an estimated tolerance, not exact invariance on
-arbitrary curves. Preview 2 does not contain this new panel or these additions.
-Not a release. The native Direct Selection tool supports gold hollow hover and
-cyan filled selected handle marks, Shift-click additive/toggle picks and batch
-drag of selected artwork-path handles. Shift during drag remains the original
-angle constraint; Alt retains independent handle editing. Both explicitly
-selected handles on one anchor move directly; noncollinear results become
-corners. Engine command validates the whole batch before editing and records
-one undo transaction. Multi-pick requires native multiple-handle visibility.
-Text-on-path handles retain the native single-handle workflow.
-Development additions (core tests passed; revised UI routing pending verification): press H in Direct Selection, then
-drag a handle marquee; Shift toggles enclosed handles. The mode ends on release
-or Escape. L sets selected handle lengths to the first picked handle's length;
-S mirrors each picked handle about its anchor (first pick wins if both sides
-are picked). Each batch uses the existing atomic undo command and clears picks.
-Only visible, editable artwork handles participate; text-on-path is excluded.
+# Leo Design Path Tools — Preview 3
 
-Conservative engine adapters (native CI verified): path.leoExtend appends a
-tangent or polynomial cubic continuation at an open path's final endpoint;
-path.leoSmartRemove merges an interior join only within the supplied tolerance;
-path.leoReposition moves a join on a recoverable source cubic. These require
-expanded, editable, open artwork paths. Rejected operations leave art/history
-unchanged. These commands are not interactive brush or slide tools.
+Baseline: VectorCraft 0.24.1 / Leo Design Core Bridge 0.20.4.
+Preview 3 is built from 565d9aac7a5b571b161468b5a416226a64c8ce08.
+Core Bridge is retained. No pie menu is restored.
 
-Remaining: dedicated toolbar, numeric input, handle rotation/scaling, extension
-endpoint snapping/direction lock, Smart Remove Brush gesture, Reposition Point
-drag gesture, closed-path support and manual desktop interaction validation.
-The existing Core Bridge single-installer pipeline is retained; no pie menu
-is restored. Preview 1 is withdrawn from delivery: the actual desktop check
-showed that idle H/L/S presses were not dispatched to Direct Selection, despite
-passing tool-level tests. Do not use artifact 14440179511 as the working preview.
-Preview 2 adds idle UI key routing and real egui key+text frame regressions;
-its installer and desktop checks are pending.
+## Download and entry point
 
-Validation on 2026-11-18, source commit 579562772dd9c850e75968208b97a32f37f66167:
-- Windows native run 44317336544: 3 Path Tools tests, 88 Direct Selection
-  regressions, 2 engine command regressions passed.
-- Windows geometry run 44317336520 passed.
-- Full migration, Python syntax and core/no-pie separation checks passed.
-- Application GUI, complete application build and installer were not validated
-  by these focused test workflows.
+[Single Windows x64 installer](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44514167023/artifacts/14526728092).
+Extract the ZIP and run Leo_Design_Path_Tools_Preview_3_Windows_x64_Setup.exe.
+Open Window > Leo Design Path Tools. The panel also opens once on upgrade.
+The panel uses native docking. If its flyout is short near the bottom of the
+window, scroll its contents or drag its title/tab into the main right sidebar.
+The new icon may be below the visible icon strip on shorter windows; the Window
+menu remains available. This is a preview UI limitation.
 
-Historical Preview 1 packaging, source ae8fd08e2b770dd5156f3a8686e97771b0d3ca4b:
-- Run 44324563379 passed the full configured Core Bridge/Path Tools regressions,
-  release EXE compilation, version identity check and installer generation.
-- Automatic installation passed: installed EXE hash and version, required files,
-  receiver launcher/configuration, and Illustrator sender placement/hash checked.
-- Artifact 14440179511 passed installer checks, but failed the later desktop
-  H/L interaction check; installation success did not prove keyboard usability.
+## Implemented workflows
+
+- PathScribe: native Direct Selection handle picks, Shift additive/toggle picks,
+  batch dragging, H one-shot handle marquee (Shift toggles), L equal lengths and
+  S one-shot mirrored symmetry. The panel offers equal length, symmetry,
+  numeric rotation in degrees and numeric scaling in percent. Numeric panel
+  transforms retain picks and refresh their document revision. Only visible,
+  editable artwork-path handles participate; text-on-path keeps its native
+  single-handle workflow. Multiple-anchor handle visibility must be enabled.
+  Symmetry is a geometric operation, not a persistent coupling constraint.
+- Extend Path: drag either endpoint of an editable open path. Native Bézier,
+  straight and arc modes remain available. Added snapping to other editable
+  open-path endpoints and a terminal-tangent drag-axis lock (checkbox or Shift).
+  When locked, only endpoints on that axis qualify for snapping. Lock constrains
+  drag direction; curved Bézier extension need not have a straight endpoint locus.
+- Smart Remove Brush: select paths, choose the panel tool, then paint over
+  anchors. Uses native Anchor Eraser Brush, with brush diameter and tolerance
+  controls. A stroke is one undo transaction.
+- Reposition Point: drag an interior anchor along its neighboring curves using
+  native Slide Anchor. Choosing it from this panel enables the estimated
+  fit-error guard. A tight tolerance can limit or refuse movement. Native
+  Slide Anchor outside the panel preserves its existing default behavior.
+
+Brush removal and slide operations refit curves within estimated tolerances.
+They do not guarantee exact invariance for arbitrary complex curves. Arbitrary
+curve families, every zoom and every closed-path topology have not been manually
+validated. Extend Path requires open endpoints. The conservative engine commands
+path.leoExtend, path.leoSmartRemove and path.leoReposition remain available, but
+are separate from the native interactive brush/slide workflows.
+
+## Verified on 2026-11-19
+
+[Packaging run 44514167023](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44514167023)
+passed all configured regression gates, Windows release compilation, installer
+generation and isolated installation. Gates include real egui four-button and
+idle H/L/S frame tests, full shortcut regressions, Path Tools engine/geometry
+tests, original native Extend/Brush/Slide tests, Direct Selection, and the
+configured Core Bridge regressions. This is not a claim that every repository
+test or every real Illustrator installation was exercised.
+
+The installer smoke checked installed EXE hash and version, required files,
+receiver launcher/configuration and sender placement/hash in a synthetic
+Chinese Illustrator installation directory. It did not interact with a person's
+live Illustrator document.
+
+The downloaded release EXE was separately SHA256-verified and exercised through
+its local control interface in an isolated desktop instance with synthetic art:
+- Visible four-tool panel and its controls inspected in native screenshots.
+- H marquee, L equal lengths, S symmetry, SVG changes, undo and redo passed.
+- Numeric panel input/clicks: 90 degree rotation and 200 percent scale changed
+  both selected handles to expected coordinates; revision refresh and undo passed.
+- Actual native canvas gestures: Bézier extension, endpoint snapping,
+  tangent-axis lock, brush anchor removal and guarded node slide passed.
+  Each gesture's undo behavior was checked.
+
+EXE SHA256: 8b942bb28dc0950da4c8520038f02c5384c7f80208b2d93ad78ad989ffad8276
+Installer SHA256: 476728e053e4f7f2d5b2c6bf2d64e6d7b942e6f2bb90ae82f168e178dbc8e2ee
+
+Historical run 44512372140 failed an original Shift-slide regression after a
+global guard change. Preview 3 fixes it by enabling the guard from the new panel,
+while preserving the native default; its packaging run passed the original
+regression. Preview 1 artifact 14440179511 is withdrawn because the later actual
+EXE check found broken idle H/L/S routing. Preview 2 did not include the new
+four-tool panel. Neither is the four-tool delivery.
