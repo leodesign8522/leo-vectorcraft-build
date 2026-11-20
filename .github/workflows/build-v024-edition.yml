@@ -117,6 +117,8 @@ jobs:
         shell: pwsh
         working-directory: vectorcraft
         run: |
+          cargo test --locked -p vectorcraft-engine --lib reopened_native_thumbnail_follows_edits_and_respects_opt_out
+          if ($LASTEXITCODE -ne 0) { throw "Reopen and resave thumbnail regression failed" }
           cargo test --locked -p vectorcraft-engine --lib leo_path_tools_ -- --nocapture
           if ($LASTEXITCODE -ne 0) { throw "Path Tools engine or trim gesture regression failed" }
       - name: Test actual idle Path Tools keyboard routing before packaging
