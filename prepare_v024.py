@@ -114,3 +114,11 @@ fn reopened_native_thumbnail_follows_edits_and_respects_opt_out() {
     }
 }
 ''')
+
+# Imported formats do not carry a native thumbnail preference.
+p = upstream / 'crates/engine/src/cmd/fileio/importer.rs'
+s = p.read_text(encoding='utf-8')
+before = 'native_pdf_compatible: None,'
+if s.count(before) != 1:
+    raise SystemExit('Unexpected custom importer initializer')
+p.write_text(s.replace(before, before + '\n        native_preview: None,'), encoding='utf-8', newline='\n')
