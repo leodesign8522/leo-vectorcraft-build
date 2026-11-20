@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [leo-v024-path-tools, fix/preview4-retain-native-thumbnail]
-    paths: ['.github/workflows/package-v024-path-tools.yml']
+    paths: ['.github/workflows/package-v024-path-tools.yml', 'prepare_v024.py']
 permissions:
   contents: read
 jobs:
