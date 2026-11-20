@@ -28,7 +28,7 @@ fn leo_render_live_move_and_scale_do_not_wait_for_old_worker_pixels() {
                 assert_eq!(key.revision,app.session.doc().unwrap().revision,"{tool}: artwork and overlays must be the same revision");
                 assert!(!app.canvas.from_worker);
                 let art=app.canvas.texture.as_ref().unwrap().id();
-                let upload=delta.set.iter().find(|e|e.0==art).and_then(|e|e.1.last()).expect("each transform uploads its current pixels");
+                let upload=delta.set.iter().find(|e|e.0.eq(&art)).and_then(|e|e.1.last()).expect("each transform uploads its current pixels");
                 assert!(upload.pos.is_none(),"a complete live image, never a partial write into a draft");
                 let egui::ImageData::Color(image)=&upload.image;
                 if last_ms>8. {assert!(app.canvas.live_draft);assert!(image.size[0]*image.size[1]<=262144);}
@@ -75,14 +75,14 @@ fn leo_render_draft_restores_full_resolution_and_rejects_late_drag_frame() {
     assert!(!app.canvas.live_draft);
     let key=app.canvas.key.clone().unwrap();assert!(!key.interacting);
     let art=app.canvas.texture.as_ref().unwrap().id();
-    let upload=delta.set.iter().find(|e|e.0==art).and_then(|e|e.1.last()).expect("full-resolution texture restored");
+    let upload=delta.set.iter().find(|e|e.0.eq(&art)).and_then(|e|e.1.last()).expect("full-resolution texture restored");
     let egui::ImageData::Color(img)=&upload.image;
     assert_eq!(img.size,[key.w as usize,key.h as usize]);assert!(upload.pos.is_none());delta.clear();
     let mut late=draft;late.revision=key.revision;
     done.send(crate::render_worker::Done{key:late,doc:draft_doc,opts:Default::default(),
         img:vectorcraft_render::Rendered{width:1,height:1,pixels:vec![255;4]},ms:1.,moved:0,reused:false}).unwrap();
     let (_,mut delta)=frame_output(&mut app,&ctx);
-    assert!(!delta.set.iter().any(|e|e.0==art),"a late drag preview must not replace the settled full frame");
+    assert!(!delta.set.iter().any(|e|e.0.eq(&art)),"a late drag preview must not replace the settled full frame");
     assert!(!app.canvas.key.as_ref().unwrap().interacting);delta.clear();
 }
 
