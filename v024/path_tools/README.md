@@ -1,15 +1,58 @@
-# Leo Design Path Tools — Preview 5 development
+# Leo Design Path Tools — Preview 5 verified candidate
 
-Preview 5 work addresses object move/scale trails: current transform artwork
+[Windows x64 single installer](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44753392171/artifacts/14641896749).
+Extract the artifact ZIP and run Leo_Design_Path_Tools_Preview_5_Windows_x64_Setup.exe.
+Binary source: e159b31f72bf0d7064c4fc93542ba5076543f8cf.
+Core Bridge and the five existing tool entries are retained; no pie menu.
+
+Preview 5 addresses object move/scale trails: current transform artwork
 and overlays render from the same document revision instead of waiting for an
 older background frame. Light drawings retain full resolution; expensive
 transforms may use a bounded-size temporary image, replaced by a full-resolution
 still frame after release. Pixel Preview, disabled Real-time Drawing, and
 non-transform interactions retain their existing behavior. A late interaction
-frame must not replace a settled full-quality frame of the same revision.
-This work is pending compilation and regression/desktop validation. The linked
-Preview 4 installer below does not contain the rendering change. No claim of
-Illustrator-equivalent frame rates is made.
+frame cannot replace a settled full-quality frame of the same revision.
+This is a targeted rendering fix, not a claim of Illustrator-equivalent performance.
+
+## Preview 5 verification — 2026-11-20
+
+[Run 44753392171](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44753392171)
+passed all configured regression gates, native Windows release compilation,
+installer generation and isolated installation. This is not every repository test.
+Three new render regressions check stalled-worker move/scale pixel positions,
+draft budget, full-resolution restoration and rejection of late drag frames.
+The configured prior canvas, Path Tools and Core Bridge regression gates passed.
+The first build attempt failed to compile three new test texture-ID comparisons;
+those test comparisons were corrected before this successful run.
+
+The downloaded executable and installer were checked against their artifact
+SHA256s and BUILD_COMMIT. An isolated local Preview 5 application on an NVIDIA
+GeForce RTX 5090 Laptop GPU (Dx12) passed 40 consecutive drag positions across
+move/scale of a single rectangle and move/scale with a blurred background.
+Each displayed frame matched the current document revision. Release restored
+full resolution; undo worked. Four screenshots were captured and inspected.
+App-reported CPU render times are not pointer-to-photon latency or an FPS benchmark.
+Complex production documents and other hardware still need user validation.
+
+Local native-tool checks also passed: PathScribe H marquee, L equal length,
+S symmetry and undo/redo; Extend Path Bezier extension, endpoint snap and
+direction lock; brush anchor removal and guarded node sliding with undo;
+Trim and Join X trimming, J/N overrides, C preview color, Escape and undo.
+The earlier Preview 3/4 H/L/S local failures below remain historical evidence;
+their cause was not established. No keyboard-specific source fix is claimed.
+All local checks used synthetic documents and an isolated application profile.
+
+Installer smoke verified the installed EXE hash/version, required files,
+receiver launcher/config and sender placement/hash in a synthetic Chinese
+Illustrator installation directory. It did not exercise a live Illustrator document.
+The installer was not installed into the user's regular application directory.
+
+EXE SHA256: 57eed0f4f6477a6207e038ca1510ae16fa96cc88b3b2507076455396f3ecc390
+Installer SHA256: fb7f6169993fbaba081339d80e8e2eddd1223529669732561c86cfdbef949d6f
+
+The bundled README was captured before these post-build local checks. This
+documentation update does not change the verified binaries. Tool scope and
+limitations below still apply.
 
 ## Preview 4 candidate (historical)
 
@@ -167,4 +210,5 @@ while preserving the native default; its packaging run passed the original
 regression. Preview 1 artifact 14440179511 is withdrawn because the later actual
 EXE check found broken idle H/L/S routing. Preview 2 did not include the new
 four-tool panel. Neither is the four-tool delivery.
+
 
