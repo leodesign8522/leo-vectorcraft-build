@@ -1,12 +1,80 @@
-# Leo Design Path Tools — Preview 3
+# Leo Design Path Tools — Preview 4 candidate
 
-Development after Preview 3: an independent intersection-based Trim and Join
-tool is being added. It is not in the linked Preview 3 installer. Its initial
-scope is expanded open paths with plain appearances, exact cubic subdivision,
-optional joining at unambiguous compatible endpoints, dashed stroke previews,
-Alt rubberband / Shift angle constraint, J/N/C and Escape. Closed-path trimming,
-variable-width/brush profile splitting and cross-style/layer joins are excluded.
-Native compilation and interaction regressions for this addition are pending.
+Preview 4 adds the independent **Trim and Join** tool. It is an initial
+open-path implementation, not complete AG Trim and Join parity. Existing
+Core Bridge and the prior four tool implementations are retained; no pie menu.
+
+[Windows x64 single installer](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44573057281/artifacts/14557134414).
+Extract the artifact ZIP and run Leo_Design_Path_Tools_Preview_4_Windows_x64_Setup.exe.
+Built from 1d6cbcf43508e692a272e00895d29fd2e96e1faa.
+Open Window > Leo Design Path Tools > 5 · Trim and Join.
+Scroll the flyout or dock its tab into the main sidebar if controls are clipped.
+
+## Trim and Join scope
+
+Drag across unwanted portions of expanded editable open paths with plain
+appearances. Structural artwork intersections define the cut boundaries,
+rather than the position where the gesture crosses the artwork. Retained
+Bézier pieces are subdivided directly rather than approximated by refitting.
+A removed middle interval leaves separate subpaths under the original node.
+
+Automatic joining requires compatible appearance/metadata, the same parent,
+and an unambiguous pair of remaining endpoints at a new cut. J forces joining
+for this gesture, N disables it, C cycles the dashed stroke color, and Escape
+cancels. Alt makes a straight rubberband section; Alt+Shift constrains it to
+45-degree directions. Prefer Selected limits trimming to selected path roots
+when eligible paths are selected; other eligible paths can supply boundaries.
+
+Closed paths are not trimmed. Locked/hidden/out-of-isolation art, clipping
+paths, live shapes, brush/variable-width/profile paths and effect paths are
+excluded from editing. Cross-style and cross-parent joins are excluded.
+Limits: 512 eligible artwork segments, 512 gesture points, 8192 structural
+intersection records, 2048 remaining pieces (256 with joining enabled).
+Commands refuse excess complexity before editing. Oversized tool gestures
+cancel as a whole. Collinear overlaps and stroke hits exactly on cut boundaries
+are not resolved as deletions.
+
+## Verification and unresolved items — 2026-11-20
+
+[Run 44573057281](https://github.com/leodesign8522/leo-vectorcraft-build/actions/runs/44573057281)
+passed all configured regression steps, native Windows compilation, installer
+generation and isolated installation. All 7 new trim engine regressions passed:
+X cut/join/undo, no-join/selected preference, exact cubic subdivision/middle
+removal, ambiguous junction/atomic invalid input, closed/locked protection,
+atomic segment limit, and native drag/Escape/N gesture behavior.
+The tool-level rubberband/angle/override/cancel test and the real egui
+registered-tool button tests also passed. The configured prior Core Bridge
+and four-tool regression gates passed; this is not every repository test.
+
+The downloaded EXE was verified against the artifact and executable SHA256s.
+An isolated local app using synthetic art passed actual X trimming at the
+artwork intersection, J/N key routing, C preview color change, Escape,
+single-step undo, and visible five-tool panel screenshot inspection. Native
+Extend Path (Bézier, snap, direction lock), brush removal and node slide with
+undo also passed in the new release EXE.
+
+**Unresolved local H/L/S recheck:** the prior handle keyboard automation did
+not select handles / change the SVG in this local session. The same recheck
+also failed against Preview 3 in the same environment. Its reason is not
+established. CI's H/L/S egui frame regressions passed, but that does not replace
+a successful local keyboard recheck. Do not report this local check as passed,
+or treat Preview 4 as an unqualified all-tools validated release. Earlier
+capture attempts also encountered no-presented-frame replies; usable new-tool
+screenshots were subsequently obtained. No user artwork was used or changed.
+
+Installer smoke verified the installed EXE hash/version, required files,
+receiver launcher/config and sender placement/hash in a synthetic Chinese
+Illustrator installation directory. It did not test a live Illustrator document.
+
+EXE SHA256: e61dd81325d931354a8b41a8f105979988fb47734365f42f5f81ec8fe3e1e942
+Installer SHA256: fdd9ea46607238224ba3d506c20304779d1d769c442532db3fea14652d45d0c0
+
+Earlier attempts failed on a document-cache borrow lifetime and an incorrect
+ViewInfo test reference; both were corrected before the passing run above.
+The README bundled at build time predates these local checks; this branch
+records the post-build verification without rebuilding unchanged binaries.
+
+## Historical Preview 3 verification
 
 Baseline: VectorCraft 0.24.1 / Leo Design Core Bridge 0.20.4.
 Preview 3 is built from 565d9aac7a5b571b161468b5a416226a64c8ce08.
@@ -86,3 +154,4 @@ while preserving the native default; its packaging run passed the original
 regression. Preview 1 artifact 14440179511 is withdrawn because the later actual
 EXE check found broken idle H/L/S routing. Preview 2 did not include the new
 four-tool panel. Neither is the four-tool delivery.
+
