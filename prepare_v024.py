@@ -81,7 +81,7 @@ for before, after in [
     ("    let mut native_pdf_compatible = None;", "    let mut native_pdf_compatible = None;\n    let mut native_preview = None;"),
     ("            native_pdf_compatible = Some(info.pdf_compatible);", "            native_pdf_compatible = Some(info.pdf_compatible);\n            native_preview = Some(vectorcraft_format::preview(bytes).is_some());"),
     ("editing_data, native_pdf_compatible })", "editing_data, native_pdf_compatible, native_preview })"),
-    ("converted, native_pdf_compatible, .. }", "converted, native_pdf_compatible, native_preview, .. }"),
+    ("converted, native_pdf_compatible, editing_data, .. }", "converted, native_pdf_compatible, native_preview, editing_data, .. }"),
     ("    if let Some(pdf) = native_pdf_compatible {", "    if let Some(preview) = native_preview {\n        st.save_options.insert(\"preview\".into(), json!(preview));\n    }\n    if let Some(pdf) = native_pdf_compatible {"),
 ]:
     if s.count(before) != 1:
