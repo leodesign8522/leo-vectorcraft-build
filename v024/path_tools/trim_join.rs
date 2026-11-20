@@ -109,7 +109,13 @@ pub(super) fn run(s:&mut Session,p:&Value)->Result<Value> {
                 && st.effects.is_empty() && st.start_arrow.is_none() && st.end_arrow.is_none(),
             vectorcraft_doc::AppearanceItem::Fill(fill)=>fill.effects.is_empty(),
         });
-        if plain {if let NodeKind::Path{guide:false,live:None,clipping:false,..}=&n.kind {ids.push(n.id);}}
+        if plain {
+            if let NodeKind::Path{guide:false,live,clipping:false,..}=&n.kind {
+                if matches!(live.as_deref(), None | Some(vectorcraft_doc::LiveShape::Line { .. })) {
+                    ids.push(n.id);
+                }
+            }
+        }
     });
     } // Release the artboard-lock cache before taking mutable document access.
     let selected=|id:NodeId|state.selection.objects.iter().any(|root|within(d,Some(*root),id));

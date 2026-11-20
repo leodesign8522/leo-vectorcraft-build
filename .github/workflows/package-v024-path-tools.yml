@@ -1,4 +1,4 @@
-name: Leo Design Path Tools Preview 5 installer
+name: Leo Design Path Tools Preview 6 installer
 on:
   workflow_dispatch:
   push:
@@ -11,9 +11,9 @@ jobs:
     uses: ./.github/workflows/build-v024-edition.yml
     with:
       flavor: core
-      label: Leo Design Core Bridge 0.20.4 + Path Tools Preview 5
-      artifact: Leo_Design_Path_Tools_Preview_5_Windows_x64_Build
-      installer: v024/Leo_Design_Path_Tools_Preview_5.iss
-      output: Leo_Design_Path_Tools_Preview_5_Installer
+      label: Leo Design Core Bridge 0.20.4 + Path Tools Preview 6
+      artifact: Leo_Design_Path_Tools_Preview_6_Windows_x64_Build
+      installer: v024/Leo_Design_Path_Tools_Preview_6.iss
+      output: Leo_Design_Path_Tools_Preview_6_Installer
       path_tools_preview: true
-# Rebuild after texture ID comparison fix in rendering tests.
+# Native Line Segment trim and join regression.

@@ -16,6 +16,29 @@ mod leo_path_tools_trim_join_regressions {
         s.execute("path.leoTrimJoin",&json!({"points":[[50,-120],[50,120]],"join":join,"preferSelected":false})).unwrap()
     }
     #[test]
+    fn selected_native_lines_trim_join_and_undo() {
+        let mut s=session();
+        let mut ids=Vec::new();
+        for (y1,y2) in [(0,200),(200,0)] {
+            let line=s.execute("shape.line",&json!({"x1":0,"y1":y1,"x2":200,"y2":y2})).unwrap();
+            ids.push(line["id"].as_u64().unwrap());
+        }
+        s.execute("select.set",&json!({"ids":ids})).unwrap();
+        let before=s.doc().unwrap().doc.clone();
+        let result=s.execute("path.leoTrimJoin",&json!({"points":[[155,10],[160,100],[150,195]]})).unwrap();
+        assert_eq!(result["trimmed"],2);
+        assert_eq!(result["joined"],1);
+        let doc=&s.doc().unwrap().doc;
+        let remaining:Vec<_>=ids.iter().filter_map(|id|doc.node(NodeId(*id))).collect();
+        assert_eq!(remaining.len(),1);
+        assert!(remaining[0].live_shape().is_none());
+        let points=&remaining[0].path_data().unwrap().subpaths[0].anchors;
+        assert_eq!(points.len(),3);
+        assert!(points[1].p.distance(Point::new(100.,100.))<1e-3);
+        s.execute("edit.undo",&json!({})).unwrap();
+        assert_eq!(s.doc().unwrap().doc,before);
+    }
+    #[test]
     fn x_trims_at_artwork_intersection_joins_and_undoes_once() {
         let mut s=session();let (a,b)=cross(&mut s);let before=s.doc().unwrap().doc.clone();
         let history=s.doc().unwrap().history.undo.len();let r=trim(&mut s,true);
