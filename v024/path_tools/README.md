@@ -1,4 +1,17 @@
-# Leo Design Path Tools — Preview 4 candidate
+# Leo Design Path Tools — Preview 5 development
+
+Preview 5 work addresses object move/scale trails: current transform artwork
+and overlays render from the same document revision instead of waiting for an
+older background frame. Light drawings retain full resolution; expensive
+transforms may use a bounded-size temporary image, replaced by a full-resolution
+still frame after release. Pixel Preview, disabled Real-time Drawing, and
+non-transform interactions retain their existing behavior. A late interaction
+frame must not replace a settled full-quality frame of the same revision.
+This work is pending compilation and regression/desktop validation. The linked
+Preview 4 installer below does not contain the rendering change. No claim of
+Illustrator-equivalent frame rates is made.
+
+## Preview 4 candidate (historical)
 
 Preview 4 adds the independent **Trim and Join** tool. It is an initial
 open-path implementation, not complete AG Trim and Join parity. Existing

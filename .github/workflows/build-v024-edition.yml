@@ -112,6 +112,17 @@ jobs:
         run: |
           cargo fmt --all
           if ($LASTEXITCODE -ne 0) { throw "Rust formatting failed" }
+      - name: Test current transform frames and full-resolution restoration
+        if: inputs.path_tools_preview
+        shell: pwsh
+        working-directory: vectorcraft
+        run: |
+          cargo test --locked -p vectorcraft-ui-egui --lib leo_render_ -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw "Current transform frame or draft restoration regression failed" }
+          foreach ($filter in @("canvas::tests::poll_worker_accepts_frames", "canvas::tests::an_edit_renders_only_its_part", "canvas::tests::pixel_preview_shows_the_document_pixels", "canvas::tests::dragging_an_object_with_raster_effects", "canvas::tests::a_drag_on_the_canvas", "canvas::tests::a_drag_over_a_wide_blur", "canvas::tests::an_interaction")) {
+            cargo test --locked -p vectorcraft-ui-egui --lib $filter -- --nocapture
+            if ($LASTEXITCODE -ne 0) { throw "Existing canvas regression failed: $filter" }
+          }
       - name: Test Path Tools engine and trim gestures before UI compilation
         if: inputs.path_tools_preview
         shell: pwsh
@@ -359,6 +370,8 @@ jobs:
           ${{ inputs.label }} / VectorCraft 0.24.1
 
           This is a development preview with the original four tools and an initial Trim and Join tool.
+          Object move/scale artwork updates with the current selection preview.
+          Large drawings may look softer during a transform; full resolution returns after release.
           The Path Tools panel opens once on upgrade; reopen it from Window > Leo Design Path Tools.
           PathScribe: pick handles or use H then drag a box; Shift toggles picks.
           Use the panel for equal length, symmetry, numeric rotation and scaling.
@@ -448,3 +461,4 @@ jobs:
           path: overlay-output/
           if-no-files-found: error
           retention-days: 30
+
