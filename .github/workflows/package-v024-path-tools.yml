@@ -2,8 +2,8 @@ name: Leo Design Path Tools Preview 6 installer
 on:
   workflow_dispatch:
   push:
-    branches: [leo-v024-path-tools]
-    paths: ['.github/workflows/package-v024-path-tools.yml']
+    branches: [leo-v024-path-tools, fix/preview4-retain-native-thumbnail]
+    paths: ['.github/workflows/package-v024-path-tools.yml', 'prepare_v024.py']
 permissions:
   contents: read
 jobs:
